@@ -8,12 +8,12 @@ export function getIndustryOpener(angleId, industry) {
     // Default generic openers
     const defaultOpeners = {
         '4cp': {
-            hook: 'Question about your summer peak strategy',
-            pain: 'Most facilities get hit with unexpected 4CP tags'
+            hook: 'Question about summer usage spikes',
+            pain: 'Some facilities get hit with charges tied to only a few hot-weather spikes'
         },
         'ratchet': {
-            hook: 'Noticed a pattern in manufacturing demand charges',
-            pain: 'Ghost capacity penalties eating into margins'
+            hook: 'Question about old usage spikes still affecting the bill',
+            pain: 'Old peak charges can keep showing up long after the busy day is over'
         },
         'volatility': {
             hook: 'How are you handling the price swings?',
@@ -34,12 +34,12 @@ export function getRoleCta(angleId, role) {
     // High-friction CTAs that force engagement
     const defaultCtas = {
         '4cp': {
-            cta: 'Are you tracking your 4CP exposure this summer?',
-            why: 'Forces them to admit they either track it (and care) or don\'t (and should)'
+            cta: 'Are you tracking which summer hours create the biggest charges?',
+            why: 'Gets them talking about whether they know what drives the expensive moments'
         },
         'ratchet': {
-            cta: 'Do you know your current ratchet floor?',
-            why: 'Most don\'t track this - creates curiosity gap'
+            cta: 'Do you know if an old usage spike is still affecting the bill?',
+            why: 'Most do not track this and it creates a useful discovery gap'
         },
         'volatility': {
             cta: 'How much volatility protection do you have baked in?',
@@ -58,8 +58,8 @@ export function getRoleCta(angleId, role) {
  */
 export function getIndustryProof(angleId, industry) {
     const proofPoints = {
-        '4cp': `Most ${industry || 'commercial'} facilities we audit find 15-30% of their transmission costs are avoidable`,
-        'ratchet': `${industry || 'Manufacturing'} clients typically recover $8-12k annually by resetting demand ratchets`,
+        '4cp': `Most ${industry || 'commercial'} facilities we review find avoidable charges tied to a few summer usage spikes`,
+        'ratchet': `${industry || 'Manufacturing'} clients often find old peak charges that no longer match how the site runs`,
         'volatility': `We've helped ${industry || 'industrial'} buyers cut exposure to scarcity pricing by 40%+`
     };
 

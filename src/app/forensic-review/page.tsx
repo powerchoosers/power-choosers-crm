@@ -349,9 +349,9 @@ export default function BillReviewLandingPage() {
             Find out what your bill is actually costing you.
           </h2>
             <p className="text-lg text-zinc-600 leading-7 mb-10 max-w-xl mx-auto reveal-on-scroll delay-100">
-            Accounts entering ERCOT&apos;s four coincident peak months without a clear picture of
-            their demand ratchet exposure carry liability they don&apos;t have to. A 15-minute
-            review changes that.
+            Accounts entering Texas&apos;s summer peak months without a clear picture of
+            which usage spikes drive the bill can carry charges they do not need. A
+            15-minute review changes that.
           </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 reveal-on-scroll delay-200">
             <Link
