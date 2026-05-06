@@ -2789,7 +2789,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(footprint change|stranded power costs|unused meters|leftover contracts|meter cleanup|contract cleanup)\b/i.test(lower)
   const repeatedQuestionEcho = /\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b[\s\S]{0,140}\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b/i.test(lower)
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
-  const footprintOpener = /reviewing the operational footprint|operational footprint for/i.test(lower)
+  const footprintOpener = /reviewing the operational footprint|operational footprint for|reviewing the company profile|company profile for/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const healthcareRestaurantJargon = context.industryCluster === 'healthcare' &&
     /\b(coincident kitchen peak|service rushes?|game[-\s]?day|fryers?|grills?|restaurant|restaurant brand|kitchen peak)\b/i.test(lower)
@@ -2910,14 +2910,14 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     // This feels more peer-to-peer than "I saw your website"
     const observationalOpenerOptions = multiSiteInfo.isMultiSite
       ? [
-          `I was looking at ${companyName}'s branch network.`,
-          `I was reviewing ${companyName}'s locations across the portfolio.`,
-          `I was looking into how ${companyName} is managing all those sites.`,
+          `I was curious how ${companyName} is managing all those sites.`,
+          `I was looking at how ${companyName}'s locations line up across the portfolio.`,
+          `I wanted to understand how ${companyName} is handling that multi-site footprint.`,
         ]
       : [
           `I caught the update about ${companyName} online.`,
           `I was looking into the setup at ${companyName}.`,
-          `I was reviewing the company profile for ${companyName}.`,
+          `I was curious about what is driving the bill at ${companyName}.`,
         ]
     const observationalOpener = observationalOpenerOptions[hashString(variantSeed) % observationalOpenerOptions.length]
 
@@ -4121,7 +4121,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates) : rescueCandidates[0] || null
+    const shouldKeepFallbackContext = usedFallback && (
+      !generatedBrief ||
+      generatedBrief.selected_priority === 9 ||
+      generatedBrief.signal_headline === 'Industry Context' ||
+      generatedBrief.source_title === 'Industry Context'
+    )
+    const talkTrackCandidate = shouldKeepFallbackContext
+      ? null
+      : generatedBrief
+        ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates)
+        : rescueCandidates[0] || null
     const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, false)
     const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
     if (validated) {
