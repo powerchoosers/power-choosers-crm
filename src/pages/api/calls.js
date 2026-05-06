@@ -309,6 +309,12 @@ function norm10(v) {
   try { return (v == null ? '' : String(v)).replace(/\D/g, '').slice(-10); } catch (_) { return ''; }
 }
 
+function rowPhoneMatches(row, digits, fields) {
+  const needle = norm10(digits);
+  if (!needle) return false;
+  return fields.some((field) => norm10(row?.[field]) === needle);
+}
+
 function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   const to10 = norm10(to);
   const from10 = norm10(from);
@@ -454,13 +460,17 @@ export async function upsertCallInSupabase(payload) {
     const phoneCandidates = [...new Set(candidates)];
 
     for (const digits of phoneCandidates) {
+      const phoneTail = digits.slice(-4);
       if (!finalContactId) {
-        const { data: contactMatch } = await supabaseAdmin
+        const { data: contactMatches } = await supabaseAdmin
           .from('contacts')
-          .select('id, name, accountId')
-          .or(`mobile.ilike.%${digits},workPhone.ilike.%${digits},phone.ilike.%${digits},otherPhone.ilike.%${digits},companyPhone.ilike.%${digits}`)
-          .limit(1)
-          .maybeSingle();
+          .select('id, name, accountId, mobile, workPhone, phone, otherPhone, companyPhone')
+          .or(`mobile.ilike.%${phoneTail},workPhone.ilike.%${phoneTail},phone.ilike.%${phoneTail},otherPhone.ilike.%${phoneTail},companyPhone.ilike.%${phoneTail}`)
+          .limit(10);
+
+        const contactMatch = (contactMatches || []).find((row) =>
+          rowPhoneMatches(row, digits, ['mobile', 'workPhone', 'phone', 'otherPhone', 'companyPhone'])
+        );
 
         if (contactMatch) {
           finalContactId = contactMatch.id;
@@ -471,12 +481,15 @@ export async function upsertCallInSupabase(payload) {
       }
 
       if (!finalAccountId) {
-        const { data: accountMatch } = await supabaseAdmin
+        const { data: accountMatches } = await supabaseAdmin
           .from('accounts')
-          .select('id, name')
-          .or(`phone.ilike.%${digits}`)
-          .limit(1)
-          .maybeSingle();
+          .select('id, name, phone')
+          .ilike('phone', `%${phoneTail}`)
+          .limit(10);
+
+        const accountMatch = (accountMatches || []).find((row) =>
+          rowPhoneMatches(row, digits, ['phone'])
+        );
 
         if (accountMatch) {
           finalAccountId = accountMatch.id;
