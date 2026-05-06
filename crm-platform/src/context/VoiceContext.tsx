@@ -623,7 +623,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
       })
 
-      newDevice.on('incoming', async (call) => {
+      newDevice.on('incoming', (call) => {
         console.log('[Voice] Incoming call')
 
         // Only show incoming call UI if in platform
@@ -634,12 +634,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // Resolve metadata for incoming call
-        // Ported from legacy phone.js: Check originalCaller parameter first
+        // Render the answer UI immediately. Caller lookup can lag, but answering cannot.
         const from = call.parameters.originalCaller || call.parameters.From || ''
-        const meta = await resolvePhoneMeta(from)
-        setMetadata(meta)
         setPhoneNumber(formatToE164(from) || from)
+        let resolvedMeta: VoiceMetadata | null = null
+        let incomingSettled = false
 
         let nativeNotification: Notification | undefined
 
@@ -654,6 +653,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
 
         const answerIncomingCall = async () => {
+          incomingSettled = true
           clearNativeNotification()
           // Ported from legacy phone.js: Set audio devices before answering
           if (newDevice.audio) {
@@ -677,6 +677,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           call.accept()
           isCallSessionActiveRef.current = true
           setCurrentCall(call)
+          setMetadata(resolvedMeta)
           setActive(true)
           setStatus('connected')
           setCallHealth('good')
@@ -713,6 +714,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
 
         const declineIncomingCall = () => {
+          incomingSettled = true
           clearNativeNotification()
           call.reject()
           if (toastId !== undefined) {
@@ -723,19 +725,19 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         // 1) Show In-App Toast
         const toastId = toast(
           <IncomingCallToast
-            meta={meta}
+            meta={null}
             from={from}
             onAnswer={answerIncomingCall}
             onDecline={declineIncomingCall}
           />,
           {
-            duration: 30000, // Longer duration for incoming call
+            duration: Infinity,
           }
         )
 
         // 2) Show Global / Desktop Notification
-        const nfTitle = `Incoming Call: ${meta?.name || from || 'Unknown'}`
-        const nfBody = meta?.account ? `from ${meta.account}` : 'Click to view in CRM.'
+        const nfTitle = `Incoming Call: ${from || 'Unknown'}`
+        const nfBody = 'Answer in Nodal Point.'
         
         if (isDesktopBridgeAvailable()) {
           void showDesktopNotification({
@@ -758,13 +760,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
 
         call.on('cancel', () => {
+          incomingSettled = true
           clearNativeNotification()
           console.log('[Voice] Call cancelled by caller')
           isCallSessionActiveRef.current = false
-          emitCallFinished(meta, from)
+          emitCallFinished(resolvedMeta, from)
           toast.dismiss(toastId)
           toast.error('Missed Call', {
-            description: `from ${meta?.name || from}`,
+            description: `from ${resolvedMeta?.name || from}`,
             duration: 5000,
           })
           setMetadata(null)
@@ -776,9 +779,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         })
 
         call.on('disconnect', () => {
+          incomingSettled = true
           clearNativeNotification()
           isCallSessionActiveRef.current = false
-          emitCallFinished(meta, from)
+          emitCallFinished(resolvedMeta, from)
           toast.dismiss(toastId)
           setCurrentCall(null)
           setActive(false)
@@ -786,6 +790,26 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           setMetadata(null)
           setPhoneNumber('')
           setCallHealth('good')
+        })
+
+        void resolvePhoneMeta(from).then((meta) => {
+          if (incomingSettled) return
+          resolvedMeta = meta
+          setMetadata(meta)
+          toast(
+            <IncomingCallToast
+              meta={meta}
+              from={from}
+              onAnswer={answerIncomingCall}
+              onDecline={declineIncomingCall}
+            />,
+            {
+              id: toastId,
+              duration: Infinity,
+            }
+          )
+        }).catch((error) => {
+          console.warn('[Voice] Incoming caller lookup failed:', error)
         })
       })
 

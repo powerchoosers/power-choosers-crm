@@ -44,6 +44,7 @@ export function GlobalSearch() {
   const { data: filteredEmails = [], isLoading: isSearchingEmails } = useSearchEmails(debouncedQuery)
 
   const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingProtocols || isSearchingTargets || isSearchingTasks || isSearchingCalls || isSearchingEmails
+  const isPhoneQuery = debouncedQuery.replace(/\D/g, '').length >= 7
 
   useEffect(() => {
     const open = () => {
@@ -206,7 +207,9 @@ export function GlobalSearch() {
                           />
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{contact.name}</div>
-                            <div className="text-xs text-zinc-500 truncate">{contact.company}</div>
+                            <div className="text-xs text-zinc-500 truncate">
+                              {isPhoneQuery ? ((contact as any).phone || (contact as any).companyPhone || contact.company) : contact.company}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -237,7 +240,9 @@ export function GlobalSearch() {
                           />
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{account.name}</div>
-                            <div className="text-xs text-zinc-500 truncate">{account.industry}</div>
+                            <div className="text-xs text-zinc-500 truncate">
+                              {isPhoneQuery ? ((account as any).companyPhone || account.industry) : account.industry}
+                            </div>
                           </div>
                         </button>
                       ))}
@@ -387,7 +392,7 @@ export function GlobalSearch() {
                       No results found for &quot;{query}&quot;
                     </div>
                     <div className="text-zinc-600 text-[10px] mt-1">
-                      Try searching for names, emails, or company domains
+                      Try searching for names, emails, company domains, or phone numbers
                     </div>
                   </div>
                 )}

@@ -282,7 +282,7 @@ const PAGE_SIZE = 50
 const CONTACTS_QUERY_BUSTER = 'v6'
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
-const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
 const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
 const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
@@ -306,6 +306,27 @@ function normalizePrimaryPhoneField(value: unknown): ContactDetail['primaryPhone
 function cleanText(value: unknown): string {
   if (value == null) return ''
   return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function normalizeSearchPhoneDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
+function contactMatchesPhoneDigits(contact: ContactRow, searchDigits: string) {
+  if (searchDigits.length < 7) return false
+  const candidates = [
+    contact.phone,
+    contact.mobile,
+    contact.workPhone,
+    contact.otherPhone,
+    contact.companyPhone,
+  ].map(normalizeSearchPhoneDigits).filter(Boolean)
+
+  return candidates.some((digits) => {
+    const last10 = digits.slice(-10)
+    const queryLast10 = searchDigits.slice(-10)
+    return digits.includes(searchDigits) || searchDigits.includes(digits) || last10 === queryLast10
+  })
 }
 
 function formatCityState(city?: string | null, state?: string | null): string {
@@ -685,6 +706,8 @@ export function useSearchContacts(queryTerm: string) {
       if (loading || !user) return []
 
       try {
+        const searchDigits = normalizeSearchPhoneDigits(queryTerm)
+        const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
         let query = supabase
           .from('contacts')
           .select(CONTACT_SEARCH_SELECT);
@@ -707,7 +730,35 @@ export function useSearchContacts(queryTerm: string) {
           return [];
         }
 
-        return (data as ContactRow[]).map(item => {
+        const byId = new Map<string, ContactRow>()
+        for (const item of (data as ContactRow[]) || []) {
+          byId.set(item.id, item)
+        }
+
+        if (phoneTail) {
+          let phoneQuery = supabase
+            .from('contacts')
+            .select(CONTACT_SEARCH_SELECT)
+
+          if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+            phoneQuery = phoneQuery.in('ownerId', ownerScopeValues);
+          }
+
+          phoneQuery = phoneQuery.or(`phone.ilike.%${phoneTail}%,mobile.ilike.%${phoneTail}%,workPhone.ilike.%${phoneTail}%,otherPhone.ilike.%${phoneTail}%,companyPhone.ilike.%${phoneTail}%`)
+
+          const { data: phoneData, error: phoneError } = await phoneQuery.limit(25)
+          if (!phoneError) {
+            for (const item of (phoneData as ContactRow[]) || []) {
+              if (contactMatchesPhoneDigits(item, searchDigits)) {
+                byId.set(item.id, item)
+              }
+            }
+          } else if (phoneError.message !== 'FetchUserError: Request was aborted') {
+            console.error("Phone search error:", phoneError)
+          }
+        }
+
+        return Array.from(byId.values()).slice(0, 10).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
           const metadata = normalizeMetadata(item.metadata)
 
@@ -731,6 +782,8 @@ export function useSearchContacts(queryTerm: string) {
             company: account?.name || '',
             logoUrl: account?.logo_url || '',
             accountId: item.accountId || undefined,
+            phone: item.phone || item.mobile || item.workPhone || item.otherPhone || item.companyPhone || '',
+            companyPhone: item.companyPhone || '',
           };
         });
       } catch (err) {
