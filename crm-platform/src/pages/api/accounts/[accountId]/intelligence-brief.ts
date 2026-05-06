@@ -761,7 +761,7 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   if (!candidate) {
     return cleanText(account.domain)
-      ? `I was looking at ${companyName}'s website.`
+      ? `I was looking at how ${companyName} runs the business.`
       : `I came across an update about ${companyName}.`
   }
   const signalAnchor = deriveSignalAnchor(account, candidate)
@@ -779,7 +779,7 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
         ? `I saw your announcement about ${signalAnchor}.`
         : `I saw your announcement about ${companyName}.`
     }
-    return `I came across ${companyName}'s website.`
+    return `I was looking at how ${companyName} runs the business.`
   }
 
   // Add variation based on priority to prevent repetition
@@ -1255,6 +1255,8 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /peak demand charges/i,
   /transmission side/i,
   /correlation/i,
+  /came across .*website/i,
+  /headcount or capex/i,
   /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
 
@@ -2745,7 +2747,7 @@ ${behavioralHealthContext}   - For multi-site care organizations, keep the compa
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
-9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
+9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
@@ -3809,7 +3811,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
+- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
 - If the sentence cannot name the event clearly, do not use a report-style opener.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
@@ -4189,12 +4191,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const shouldKeepFallbackContext = usedFallback && (
-      !generatedBrief ||
-      generatedBrief.selected_priority === 9 ||
-      generatedBrief.signal_headline === 'Industry Context' ||
-      generatedBrief.source_title === 'Industry Context'
-    )
+    const shouldKeepFallbackContext = usedFallback
     const talkTrackCandidate = shouldKeepFallbackContext
       ? null
       : generatedBrief
