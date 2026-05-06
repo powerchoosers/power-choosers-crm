@@ -889,17 +889,17 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'education_nonprofit':
       return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
-      return `${prefix}, the critical detail is how the clinical load, HVAC, and equipment timing are affecting the billing floor on that meter.`
+      return `${prefix}, the critical detail is how clinical equipment, HVAC, and daily timing are showing up as peak charges on that meter.`
     case 'restaurant':
       return `${prefix}, the biggest risk is usually kitchen load and HVAC hitting during peak hours and driving up transmission fees.`
     case 'retail':
       return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'logistics':
-      return `${prefix}, the focus is usually on dock activity and automation driving peaks that hit the transmission side of the bill.`
+      return `${prefix}, the focus is usually on whether dock activity, automation, and HVAC are creating expensive usage spikes.`
     case 'office_services':
-      return `${prefix}, the concern is usually occupancy and HVAC creating demand ratchets during the summer shoulder months.`
+      return `${prefix}, the concern is usually whether occupancy and HVAC are creating summer spikes that stay on the bill.`
     case 'food_storage':
-      return `${prefix}, the volatility usually comes from refrigeration and defrost cycles creating spikes that hit the transmission side.`
+      return `${prefix}, the issue is usually refrigeration and defrost cycles creating expensive usage spikes.`
     case 'manufacturing':
     case 'energy_intensive':
       return `${prefix}, the primary driver is usually which processes or equipment start-ups are creating peak transmission exposure.`
@@ -1172,7 +1172,8 @@ function hasLeadershipChangeEvidence(text: string) {
 }
 
 function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null): { isMultiSite: boolean; locationCount: number | null; regions: string[] } {
-  const text = `${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const notes = getAccountNotes(account)
+  const text = `${account.name || ''} ${account.industry || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`
   const lower = text.toLowerCase()
   
   // Extract location count if mentioned
@@ -1247,6 +1248,13 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /\binventory\b/i,
   /cars?,\s*trucks?,\s*&?\s*suvs?/i,
   /dealership/i,
+  /forensic signal/i,
+  /forensic driver/i,
+  /thermal liability/i,
+  /artificial liability/i,
+  /peak demand charges/i,
+  /transmission side/i,
+  /correlation/i,
   /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
 
@@ -1266,7 +1274,7 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   manufacturing: ['process', 'equipment', 'shift', 'peak', 'load', 'production', 'startup'],
   logistics: ['dock', 'automation', 'hvac', 'throughput', 'occupancy', 'warehouse', '24/7'],
   food_storage: ['refrigeration', 'freezer', 'defrost', 'cooler', 'temperature', 'compressor'],
-  healthcare: ['occupancy', 'hvac', 'backup', 'reliability', '24/7', 'clinical', 'lab'],
+  healthcare: ['occupancy', 'hvac', 'backup', 'reliability', '24/7', 'clinical', 'lab', 'blood', 'donor', 'storage'],
   banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
   retail: ['store', 'seasonal', 'traffic', 'lighting', 'hvac', 'refrigeration', 'multi-site'],
   restaurant: ['kitchen', 'hvac', 'refrigeration', 'prep', 'hours', 'multi-unit', 'equipment'],
@@ -1320,15 +1328,38 @@ function hashString(value: string) {
 
 function simplifyTalkTrackLanguage(value: string) {
   return cleanText(value)
+    .replace(/\bforensic signal\b/gi, 'thing to watch')
+    .replace(/\bforensic driver\b/gi, 'thing to watch')
+    .replace(/\bforensic check\b/gi, 'check')
+    .replace(/\bforensic question\b/gi, 'question')
+    .replace(/\bforensic audit\b/gi, 'review')
+    .replace(/\bthermal liability\b/gi, 'cooling and door activity')
+    .replace(/\bstructural inefficiency\b/gi, 'bill issue')
+    .replace(/\bdemand profile\b/gi, 'usage pattern')
+    .replace(/\b4CP exposure\b/gi, 'summer peak-hour exposure')
+    .replace(/\b4CP\b/gi, 'summer peak hours')
+    .replace(/\bcoincident peak\b/gi, 'summer peak')
     .replace(/\bload factor\b/gi, 'usage pattern')
     .replace(/\bbase load\b/gi, 'steady usage')
-    .replace(/\bdemand ratchets?\b/gi, 'peak charges that stick on the bill')
+    .replace(/\bdemand ratchets\b/gi, 'peak charges that stick on the bill')
     .replace(/\bdemand ratchet\b/gi, 'peak charge that sticks on the bill')
+    .replace(/\bbilling floors\b/gi, 'peak charges on the bill')
     .replace(/\bbilling floor\b/gi, 'peak charge on the bill')
-    .replace(/\blocked-in peak charges?\b/gi, 'peak charges that stick on the bill')
+    .replace(/\blocked-in peak charges\b/gi, 'peak charges that stick on the bill')
     .replace(/\blocked-in peak charge\b/gi, 'peak charge that sticks on the bill')
+    .replace(/\bpeak demand charges\b/gi, 'peak charges on the bill')
+    .replace(/\bpeak demand charge\b/gi, 'peak charge on the bill')
     .replace(/\bpeak exposure\b/gi, 'peak-charge exposure')
+    .replace(/\bdemand peak\b/gi, 'usage spike')
+    .replace(/\bartificial liability\b/gi, 'charge that may not match how the site runs now')
+    .replace(/\btransmission side of the bill\b/gi, 'charges tied to when the site uses the most power')
+    .replace(/\btransmission side\b/gi, 'peak-timing side')
+    .replace(/\bcorrelation\b/gi, 'connection')
     .replace(/\bbranch operations\b/gi, 'multi-site operations')
+    .replace(/\bbranch IT loads\b/gi, 'site-level office and equipment usage')
+    .replace(/\ba peak charges\b/gi, 'a peak charge')
+    .replace(/\ba stealth peak charges\b/gi, 'a hidden peak charge')
+    .replace(/\btriggering a peak charges\b/gi, 'triggering a peak charge')
 }
 
 function pickVariant<T>(items: T[], seed: string) {
@@ -1467,6 +1498,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
+  if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   const hotelProperty = looksLikeHotelProperty(text)
@@ -1853,12 +1885,12 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Manufacturing / industrial',
-        angle: 'Forensic machine startup cycles and shift-driven demand peaks setting billing floors.',
-        question: 'Have you mapped your equipment startup sequences yet to see if they are setting a billing floor for the whole year?',
+        angle: 'Machine startup timing and production ramps creating usage spikes that can stay on the bill.',
+        question: 'Have you mapped which equipment starts at the same time and whether that timing is creating peak charges that stay on the bill?',
         openers: [
-          `In a manufacturing setup like yours, the biggest forensic signal is usually the machine startup sequence and how it hits the billing floor.`,
-          `If your production lines ramp up simultaneously, you're likely setting a demand peak that you pay for long after the shift ends.`,
-          `The diagnostic check I'd want to run is whether your equipment timing is creating an artificial liability in the transmission side of the bill.`,
+          `In a manufacturing setup like yours, the thing to watch is whether several machines start at once and create the highest usage moment of the month.`,
+          `If your production lines ramp up simultaneously, that one usage spike can stay on the bill long after the shift ends.`,
+          `The useful check is whether equipment timing is creating a peak charge that may not match normal production.`,
         ],
         focus: ['startup sequences', 'production ramps', 'shift-driven peaks', 'billing floors', 'demand ratchets', 'transmission liability'],
       }
@@ -1889,11 +1921,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           : {
               label: 'Logistics network',
               angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-              question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or are they hiding in the group budget?`,
+              question: `With ${locationDesc}${regionDesc}, are you checking which sites have peak charges that stick on the bill, or is that getting hidden in the group budget?`,
               openers: [
                 `Logistics groups with ${locationDesc} usually have different locked-in peak charges hiding in each specific facility's bill.`,
                 `With that kind of footprint${regionDesc}, one warehouse's summer peak can leave its own peak charge sitting on that meter.`,
-                `The diagnostic check I'd want to run is whether the site-level exposure is being managed across all ${locationDesc} or if a few sites are dragging down the total budget.`,
+                `The useful check is whether a few sites are creating the highest charges while the group total makes everything look normal.`,
               ],
               focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
             }
@@ -1901,12 +1933,12 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Logistics / warehouse / distribution',
-        angle: 'Thermal liability from dock doors and automation setting stealth demand ratchets.',
-        question: 'Have you looked at the correlation between your dock activity and your peak demand charges lately?',
+        angle: 'Dock doors, automation, and HVAC creating expensive usage spikes during busy windows.',
+        question: 'Have you looked at whether dock activity and HVAC are lining up at the same time and creating peak charges on the bill?',
         openers: [
-          `In high-volume logistics, the biggest forensic driver is usually Thermal Liability—where dock doors and HVAC fight each other during peaks.`,
-          `If your automation or dock cycles spike during high-heat hours, you're setting a demand ratchet that follows you into the slow season.`,
-          `A lot of warehouse groups focus on the usage, but the real leak is usually the peak floor set by dock timing and climate control.`,
+          `In high-volume logistics, the thing to watch is whether dock doors, automation, and HVAC all hit the meter at the same time.`,
+          `If automation or dock cycles spike during high-heat hours, that one window can leave a peak charge on the bill for months.`,
+          `A lot of warehouse groups focus on total usage, but the real issue is often the timing of dock work and climate control.`,
         ],
         focus: ['thermal liability', 'dock door timing', 'automation peaks', 'HVAC load', 'demand ratchets', 'billing floors'],
       }
@@ -2061,6 +2093,25 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic|imaging|ortho|pediatric|wellness|doctor)/i.test(text)
       const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
+      const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
+
+      if (isBloodCenter) {
+        const locationDesc = healthcareMultiSite.locationCount
+          ? `${healthcareMultiSite.locationCount}+ blood-service sites`
+          : 'a regional blood-service network'
+
+        return {
+          label: 'Blood center / clinical laboratory network',
+          angle: `Donor collection, lab processing, refrigerated storage, and hospital delivery support across ${locationDesc}.`,
+          question: `Are you comparing the donor centers, lab space, refrigerated storage, and mobile-drive support separately to see which meters are creating the highest peak charges?`,
+          openers: [
+            `Blood centers are different from logistics businesses because the power profile is tied to donor collection, lab testing, refrigerated storage, and hospital supply reliability.`,
+            `With ${locationDesc}, the useful question is which parts of the clinical operation are creating the biggest spikes on their own meters.`,
+            `The part I would want to separate is donor collection, lab processing, and cold storage because each one can create a different power pattern.`,
+          ],
+          focus: ['donor collection', 'lab processing', 'refrigerated storage', 'mobile blood drives', 'hospital supply reliability', 'peak charges'],
+        }
+      }
       
       if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 3) {
         const locationDesc = healthcareMultiSite.locationCount >= 10 
@@ -2574,6 +2625,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
   const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
   const industryGuidance = buildIndustryGuidance(industryCluster, account, candidate)
   const marketGuidance = buildMarketGuidance(industryCluster)
+  const simplifyList = (items: string[]) => items.map(simplifyTalkTrackLanguage).filter(Boolean)
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Observation-led opening that names the event first.',
@@ -2585,22 +2637,22 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
   return {
     signalFamily,
     signalLabel: signalGuidance.label,
-    signalAngle: signalGuidance.angle,
-    signalOpeners: signalGuidance.openers,
+    signalAngle: simplifyTalkTrackLanguage(signalGuidance.angle),
+    signalOpeners: simplifyList(signalGuidance.openers),
     industryCluster,
     industryLabel: industryGuidance.label,
-    industryAngle: industryGuidance.angle,
-    industryOpeners: industryGuidance.openers,
+    industryAngle: simplifyTalkTrackLanguage(industryGuidance.angle),
+    industryOpeners: simplifyList(industryGuidance.openers),
     marketSeason: marketGuidance.marketSeason,
     marketLabel: marketGuidance.marketLabel,
-    marketAngle: marketGuidance.marketAngle,
-    marketQuestion: marketGuidance.marketQuestion,
-    marketOpeners: marketGuidance.marketOpeners,
-    marketFocus: marketGuidance.marketFocus,
+    marketAngle: simplifyTalkTrackLanguage(marketGuidance.marketAngle),
+    marketQuestion: simplifyTalkTrackLanguage(marketGuidance.marketQuestion),
+    marketOpeners: simplifyList(marketGuidance.marketOpeners),
+    marketFocus: simplifyList(marketGuidance.marketFocus),
     openingPattern,
     openingStyle: openingStyleMap[openingPattern],
-    question: signalGuidance.question || industryGuidance.question,
-    ercotFocus: Array.from(new Set([...signalGuidance.focus, ...industryGuidance.focus])),
+    question: simplifyTalkTrackLanguage(signalGuidance.question || industryGuidance.question),
+    ercotFocus: Array.from(new Set(simplifyList([...signalGuidance.focus, ...industryGuidance.focus]))),
     avoidPhrases: [
       'autopilot',
       'site by site',
@@ -2654,7 +2706,7 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
     : ''
 
-  const prompt = `You are a forensic energy analyst and strategist. You are crafting a talk track opener for a peer-to-peer conversation with a C-level executive or operations lead.
+  const prompt = `You are a plainspoken energy analyst and strategist. You are crafting a talk track opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
 VOICE:
 - Conversational, peer-to-peer, and undeniably expert. 
@@ -2679,7 +2731,7 @@ MARKET CONTEXT:
 REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
-3. FORENSIC PAIN POINT: Connect the technical detail directly to a liability:
+3. BUSINESS PAIN POINT: Connect the technical detail directly to a bill issue:
    - Electrification shift: The risk of adding electric equipment and changing usage faster than the bill structure catches up.
    - One-time peak charges that stick: A single spike can leave a higher peak charge on the bill for months.
    - Transmission exposure: Hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
@@ -2694,11 +2746,11 @@ ${behavioralHealthContext}   - For multi-site care organizations, keep the compa
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
-10. FORENSIC AUTHORITY: Never sound like you are selling a service. Sound like you are reporting a diagnostic finding. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor."
-11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the forensic insight immediately.
+10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
+11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
 
-Generate a forensic, peer-to-peer opener for ${companyName}:`
+Generate a plain-English, peer-to-peer opener for ${companyName}:`
 
   try {
     const openrouterKey = process.env.OPENROUTER_API_KEY
@@ -2816,7 +2868,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(coincident kitchen peak|service rushes?|fryers?|grills?|restaurant)\b/i.test(lower)
   const hotelEventSpaceJargon = context.industryCluster === 'hotel_owner' &&
     /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
-  const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets)\b/i.test(lower)
+  const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -2885,8 +2937,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `Fresh capital can turn into new space, new equipment, or both.`,
     ],
     technical_load: [
-      `Deploying new technical load like this usually changes the load factor faster than the billing structure can keep up with.`,
-      `Moving processes over to the electric side is a good move, but it usually creates a hidden liability on the billing floor.`,
+      `Adding equipment like this can change the usage pattern faster than the bill setup catches up.`,
+      `Moving processes over to the electric side can create peak charges that stay on the bill if the timing is not checked.`,
     ],
     industry_context: [
       fallbackIndustryLine,
@@ -4191,6 +4243,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...validated,
           talk_track: rewrittenTalkTrack,
         }
+      }
+
+      validated = {
+        ...validated,
+        talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
       }
 
       // Add to cache after successful generation

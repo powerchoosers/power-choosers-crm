@@ -83,8 +83,8 @@ const PROOF_CARDS: ProofCard[] = [
     title: 'Manufacturing facility',
     bill: '$18,442.17',
     usage: '112,600 kWh',
-    issue: 'A demand ratchet was billing 85 kW above actual usage.',
-    action: '4CP curtailment protocol and load shifting review.',
+    issue: 'A past usage spike was still adding 85 kW worth of charges.',
+    action: 'Summer peak-hour review and equipment timing check.',
     region: 'CenterPoint / Texas',
   },
   {

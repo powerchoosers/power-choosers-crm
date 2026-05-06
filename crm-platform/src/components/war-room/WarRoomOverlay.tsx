@@ -300,7 +300,7 @@ export function WarRoomOverlay() {
                                             </div>
                                             <div className="min-h-[3rem]">
                                                 <p className="text-xs font-mono text-zinc-100 leading-relaxed">
-                                                    {liveTranscript || <span className="text-zinc-700 italic">Listening for forensic signals...</span>}
+                                                    {liveTranscript || <span className="text-zinc-700 italic">Listening for live cues...</span>}
                                                 </p>
                                             </div>
                                         </motion.div>

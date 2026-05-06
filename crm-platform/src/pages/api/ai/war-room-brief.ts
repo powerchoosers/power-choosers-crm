@@ -134,8 +134,8 @@ INSTRUCTIONS:
 2. For each bullet (STRICT 60 WORD MAXIMUM PER BULLET):
    - Identify the SPECIFIC ACCOUNT and the PRIMARY STAKEHOLDER.
    - Reference a SPECIFIC DETAIL from their transcript/email (e.g., "they mentioned X locked contract").
-   - Define the TACTICAL OPENING using the NEPQ framework: DO NOT "pitch savings." Diagnose a structural inefficiency. If they previously had an objection (e.g., "locked in", "broker"), script exactly how to diffuse it with a curiosity-driven consequence question (e.g. "When you renew, will you have a benchmark?"). Use a calm, unhurried tone with verbal pauses ("...").
-3. Vocabulary: demand ratchet liability, 4CP peak exposure, scarcity adder, transmission liability, structural audit.
+   - Define the TACTICAL OPENING using the NEPQ framework: DO NOT "pitch savings." Name the plain-English bill issue. If they previously had an objection (e.g., "locked in", "broker"), script exactly how to diffuse it with a curiosity-driven consequence question (e.g., "When you renew, will you have a benchmark?"). Use a calm, unhurried tone with verbal pauses ("...").
+3. Vocabulary: plain English only. Use phrases like old usage spike, peak charge still on the bill, summer peak-hour charges, supplier pass-through, and bill review. Avoid demand ratchet, 4CP, load factor, base load, and structural inefficiency.
 4. EXTREMELY CRITICAL: DO NOT get cut off. Keep it short. 3 bullets total.
 
 Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets. No fluff.`
