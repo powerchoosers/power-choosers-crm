@@ -1506,6 +1506,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
+  if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   const hotelProperty = looksLikeHotelProperty(text)
@@ -1793,7 +1794,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
       }
     case 'manufacturing':
-      if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
+      if (/(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
         const foodMultiSite = detectMultiSiteScale(account, candidate)
 
         if (foodMultiSite.isMultiSite && foodMultiSite.locationCount && foodMultiSite.locationCount >= 3) {
@@ -1806,27 +1807,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
           return {
             label: 'Food production network',
-            angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-            question: `With ${locationDesc}${regionDesc}, are you tracking which plant is setting the peaks, or is it all getting rolled into one bill?`,
+            angle: `Production-site comparison across ${locationDesc}${regionDesc}, with refrigeration, cooking, packaging, and sanitation each creating different power patterns.`,
+            question: `With ${locationDesc}${regionDesc}, are you comparing the production sites separately to see which plants create the biggest usage spikes, or is that getting blended into the group total?`,
             openers: [
-              `Food production groups with ${locationDesc} usually have a hidden blind spot in how refrigeration and bake-line start-ups are hitting the total budget.`,
-              `With that kind of footprint${regionDesc}, one plant's cooling load can set a billing floor that sticks for the rest of the year.`,
-              `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from refrigeration or oven start-up.`,
+              `Food production groups with ${locationDesc} usually need to separate refrigeration, cooking, packaging, and sanitation because each plant can hit the meter differently.`,
+              `With that kind of footprint${regionDesc}, one USDA production site can create a much bigger usage spike than the others.`,
+              `The useful check is whether the protein, soup, sauce, or packaging lines are creating the highest usage moments at any one plant.`,
             ],
-            focus: ['refrigeration', 'bake-line start-up', 'production cycles', 'demand ratchets', 'billing floors', 'portfolio management'],
+            focus: ['refrigeration', 'cooking lines', 'packaging', 'sanitation', 'production cycles', 'portfolio management'],
           }
         }
 
         return {
-          label: 'Food production / bakery',
-          angle: 'Refrigeration, ovens, bake-line start-ups, and production timing driving the billing floor.',
-          question: 'Have you mapped which equipment or production cycles are creating the peaks, or is that still buried in the bill?',
+          label: 'Food production',
+          angle: 'Refrigeration, cooking, packaging, sanitation, and production timing creating the highest usage moments.',
+          question: 'Have you mapped which refrigeration, cooking, packaging, or sanitation cycles are creating the biggest usage spikes on the bill?',
           openers: [
-            `Food production is different because refrigeration, ovens, and bake-line start-ups can move the bill long before anyone notices it in operations.`,
-            `The part I would watch is whether the cooling load or start-up sequence is setting a billing floor that sticks around all year.`,
-            `For a dessert or bakery plant, the power side usually comes down to which lines are creating the peaks, not the average usage.`,
+            `Food production is different because refrigeration, cooking, packaging, and sanitation can all hit the meter during the same production windows.`,
+            `The part I would watch is whether cooling, cooking, or packaging cycles are creating the highest usage moments on the meter.`,
+            `For a food plant, the power side usually comes down to which production lines create the spikes, not the average usage.`,
           ],
-          focus: ['refrigeration', 'oven start-up', 'bake lines', 'production timing', 'demand ratchets', 'billing floors'],
+          focus: ['refrigeration', 'cooking', 'packaging', 'sanitation', 'production timing', 'peak charges'],
         }
       }
 
@@ -2884,6 +2885,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsAutomotive = /\b(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|showrooms?|used vehicles?|new vehicles?|nissan|hyundai|chevrolet|cadillac|volkswagen|mitsubishi|kia|genesis|chrysler|jeep|dodge|ram)\b/i.test(accountText)
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
+  const accountIsFoodProduction = /\b(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice)\b/i.test(accountText)
+  const accountFoodLogisticsJargon = accountIsFoodProduction &&
+    /\b(warehouse groups?|dock activity|dock work|dock doors?|high-volume logistics|logistics groups?|automation and hvac|warehouse's summer peak)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -2893,7 +2897,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountAutomotiveHotelJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountAutomotiveHotelJargon || accountFoodLogisticsJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
