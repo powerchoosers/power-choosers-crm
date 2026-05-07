@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
+import { buildAudienceLead, buildAudienceProfile, buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
 
 // Simple LRU Cache for talk track deduplication
 class TalkTrackCache {
@@ -106,6 +107,7 @@ type AccountRow = {
   domain: string | null
   website?: string | null
   linkedin_url: string | null
+  primaryContactId: string | null
   city: string | null
   state: string | null
   ownerId: string | null
@@ -273,11 +275,12 @@ type TalkTrackContext = {
   ercotFocus: string[]
   avoidPhrases: string[]
   seed: string
+  audienceProfile?: AudienceProfile | null
 }
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, "primaryContactId", city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
   'acquired',
@@ -3382,7 +3385,12 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
   }
 }
 
-function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | null, isFallbackMode: boolean): TalkTrackContext {
+function buildTalkTrackContext(
+  account: AccountRow,
+  candidate: ResearchHit | null,
+  isFallbackMode: boolean,
+  audienceProfile: AudienceProfile | null = null,
+): TalkTrackContext {
   const seed = [account.id, candidate?.url || candidate?.title || '', isFallbackMode ? 'fallback' : 'signal'].join('|')
   const signalFamily = inferSignalFamily(candidate, isFallbackMode)
   const industryCluster = inferIndustryCluster(account, candidate)
@@ -3446,6 +3454,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'dealership',
     ],
     seed,
+    audienceProfile,
   }
 }
 
@@ -3477,6 +3486,11 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
         `- Guardrails: ${identityProfile.talkTrackGuardrails.join('; ') || 'n/a'}`,
       ].join('\n')
     : ''
+  const audienceProfileBlock = buildAudienceProfileBlock(context.audienceProfile)
+  const audienceRule = context.audienceProfile
+    ? `- AUDIENCE PROFILE: ${context.audienceProfile.contactName || context.audienceProfile.contactFirstName || 'the contact'} is the person you are writing to. Use their first name once if it helps the opener and use their title to frame what they care about. If the audience profile came from a sequence contact, that person wins over a decision-maker card.\n`
+    : ''
+  const sequencePriorityRule = '- If the account has both a sequence contact and a decision-maker card, the sequence contact wins. Do not blend two different people into one talk track.'
   
   const behavioralHealthContext = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
@@ -3506,6 +3520,8 @@ MARKET CONTEXT:
 
 ${identityContext}
 
+${audienceProfileBlock ? `AUDIENCE PROFILE:\n${audienceProfileBlock}\n` : ''}
+
 REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
@@ -3517,6 +3533,7 @@ REQUIREMENTS:
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
 5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule created a peak charge that is still sitting on the bill?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
+${audienceRule}${sequencePriorityRule}
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
    - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
    - For hospital operators and neighborhood-hospital networks, use hospital language like emergency departments, inpatient rooms, imaging, lab work, and health-system partnerships. Never use hotel, guest-room, laundry, lodging, banquet, or hospitality language for hospitals.
@@ -3675,6 +3692,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const sourceLead = buildSourceLead(account, candidate)
+  const audienceLead = buildAudienceLead(context.audienceProfile)
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
@@ -3696,7 +3714,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
   }
 
-  const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
+  const opener = audienceLead || pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const signalLineBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       `After an acquisition, somebody usually has to sort out what got inherited on the power side.`,
@@ -4463,6 +4481,7 @@ async function runOpenRouterResearch(
   isFallbackMode = false,
   hierarchyContext: HierarchyResearchContext | null = null,
   hierarchyWebsiteHits: ResearchHit[] = [],
+  audienceProfile: AudienceProfile | null = null,
 ) {
   const openRouterKey = process.env.OPEN_ROUTER_API_KEY
   if (!openRouterKey) {
@@ -4471,7 +4490,7 @@ async function runOpenRouterResearch(
 
   const selectedCandidates = candidates.slice(0, 16)
   const primaryCandidate = selectedCandidates[0] || null
-  const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode)
+  const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode, audienceProfile)
   const talkTrackContextJson = JSON.stringify(talkTrackContext, null, 2)
   const identityProfile = getAccountIdentityProfile(account)
   const researchPayload = {
@@ -4488,6 +4507,24 @@ async function runOpenRouterResearch(
       description: account.description || '',
       annual_usage: account.annual_usage || '',
     },
+    audience_profile: audienceProfile ? {
+      source: audienceProfile.source,
+      source_label: audienceProfile.sourceLabel,
+      name: audienceProfile.contactName,
+      first_name: audienceProfile.contactFirstName,
+      title: audienceProfile.contactTitle,
+      company_name: audienceProfile.companyName,
+      industry: audienceProfile.industry,
+      role_family: audienceProfile.roleFamily,
+      role_summary: audienceProfile.roleSummary,
+      care_abouts: audienceProfile.careAbouts,
+      opener_hint: audienceProfile.openerHint,
+      question_hint: audienceProfile.questionHint,
+      background_signals: audienceProfile.backgroundSignals,
+      evidence: audienceProfile.evidence,
+      guardrails: audienceProfile.guardrails,
+      linked_in_url: audienceProfile.linkedInUrl,
+    } : null,
     identity_profile: identityProfile ? {
       industry_cluster: identityProfile.industryCluster,
       company_type: identityProfile.companyType,
@@ -4549,6 +4586,7 @@ async function runOpenRouterResearch(
       source: item.source,
     })),
   }
+  const audienceProfileBlock = buildAudienceProfileBlock(audienceProfile)
 
   const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
@@ -4561,6 +4599,7 @@ Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
 - If the payload includes an identity_profile block, use it as the operating identity guardrail for the account unless the research clearly proves it wrong.
+- If an audience_profile block is present, use it as the human lens for the talk track. Use the person's first name once if it improves the opener, and use the title to decide what they actually care about. Treat LinkedIn/about/work-history clues as internal only.
 - If the payload includes a hierarchy_context block, use it to understand the parent/subsidiary structure and related websites, but keep the operating company as the center of the brief unless the account itself is the parent.
 - Related parent/subsidiary websites are context, not automatic signals. Do not turn a parent-only article into the operating company's headline unless the operating company is clearly named or the account itself is the parent entity.
 - If related_entity_research is present, use it to validate what the company actually is and how the linked businesses describe themselves. It is support context, not a free pass to invent a parent-level event.
@@ -4601,12 +4640,14 @@ Decision rules:
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
+- If an audience profile is present, do not blend a decision-maker card and a sequence contact into one voice. The sequence contact wins when there is a mismatch.
 - Respect the hierarchy context. If the account is a subsidiary, write the brief around the subsidiary's actual business and use the parent only to orient the reader. If the account is a parent company, it is fine to mention the portfolio or network, but keep the talk track meter-specific and location-aware.
 - If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 - If market context is secondary, keep it to one short clause or leave it out.
+- If an audience profile is present, make the talk track feel aimed at that person, not just the company. Mention the first name once if it sounds natural and helps the opening.
 
 Talk Track angle selection (choose ONE based on the actual signal):
 
@@ -4699,6 +4740,7 @@ Decision rules:
 - Signal Date should be today's date in YYYY-MM-DD format.
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
+- If an audience_profile block is present, use it as the human lens. Keep the first name or title tied to the business question instead of generic company language.
 - Start with a direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
@@ -4771,6 +4813,8 @@ Return JSON only with this shape:
 
 TALK_TRACK_CONTEXT:
 ${talkTrackContextJson}
+
+${audienceProfileBlock ? `AUDIENCE_PROFILE:\n${audienceProfileBlock}\n` : ''}
 
 RESEARCH PAYLOAD:
 ${JSON.stringify(researchPayload, null, 2)}`
@@ -4890,6 +4934,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ ok: false, message: 'Account not found' })
     }
 
+    const { data: primaryContact } = account.primaryContactId
+      ? await supabaseAdmin
+        .from('contacts')
+        .select('id, firstName, lastName, name, title, email, linkedinUrl, notes, metadata, accountId')
+        .eq('id', account.primaryContactId)
+        .maybeSingle()
+      : { data: null }
+    const audienceProfile = buildAudienceProfile(
+      primaryContact ? {
+        id: primaryContact.id,
+        contactId: primaryContact.id,
+        name: primaryContact.name || [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' '),
+        firstName: primaryContact.firstName,
+        lastName: primaryContact.lastName,
+        title: primaryContact.title,
+        email: primaryContact.email,
+        linkedinUrl: primaryContact.linkedinUrl,
+        notes: primaryContact.notes,
+        metadata: primaryContact.metadata,
+        accountId: primaryContact.accountId,
+      } : null,
+      {
+        name: account.name,
+        industry: account.industry,
+        description: account.description,
+      },
+      'account_primary',
+    )
+
     const privileged = auth.isAdmin || auth.role === 'dev'
     const ownerScopeValues = buildOwnerScopeValues(auth.user)
     const accountOwner = cleanText(account.ownerId).toLowerCase()
@@ -4954,7 +5027,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (candidateResults.length > 0) {
       try {
-        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false, hierarchyContext, hierarchyWebsiteHits)
+        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false, hierarchyContext, hierarchyWebsiteHits, audienceProfile)
         if (generatedBrief) {
           outcomeStatus = 'ready'
           validated = generatedBrief
@@ -5000,7 +5073,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           rescueCandidates = dedupeAndSort([...candidateResults, ...fallbackCandidates], account)
           
-          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true, hierarchyContext, hierarchyWebsiteHits)
+          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true, hierarchyContext, hierarchyWebsiteHits, audienceProfile)
           if (generatedBrief) {
             outcomeStatus = 'ready'
             validated = generatedBrief
@@ -5015,7 +5088,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!validated && rescueCandidates.length > 0) {
       const rescueCandidate = rescueCandidates[0]
-      const rescueContext = buildTalkTrackContext(briefingAccount, rescueCandidate, false)
+      const rescueContext = buildTalkTrackContext(briefingAccount, rescueCandidate, false, audienceProfile)
       const rescueBrief = buildRescueBrief(briefingAccount, rescueCandidate, rescueContext)
       if (rescueBrief) {
         validated = rescueBrief
@@ -5040,7 +5113,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         industry: briefingAccount.industry,
       })
       
-      const fallbackContext = buildTalkTrackContext(briefingAccount, null, true)
+      const fallbackContext = buildTalkTrackContext(briefingAccount, null, true, audienceProfile)
       const aiTalkTrack = await generateAITalkTrack(briefingAccount, null, fallbackContext)
       
       if (aiTalkTrack) {
@@ -5098,7 +5171,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : generatedBrief
         ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates)
         : rescueCandidates[0] || null
-    const talkTrackRewriteContext = buildTalkTrackContext(briefingAccount, talkTrackCandidate, false)
+    const talkTrackRewriteContext = buildTalkTrackContext(briefingAccount, talkTrackCandidate, false, audienceProfile)
     const previousTalkTrack = cleanText(briefingAccount.intelligence_brief_talk_track || '')
     if (validated) {
       const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, briefingAccount) ||
