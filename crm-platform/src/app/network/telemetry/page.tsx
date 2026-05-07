@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useEffect, useMemo } from 'react'
 import {
   ResponsiveContainer,
@@ -273,9 +274,7 @@ export default function TelemetryPage() {
                 Capacity Gauge
               </span>
               <span className="text-[10px] font-mono text-zinc-400 tabular-nums">
-                Load {Math.round(grid.actual_load ?? 0).toLocaleString()} / Capacity{' '}
-                {Math.round(grid.total_capacity ?? 0).toLocaleString()} MW · Reserve{' '}
-                {Math.round(grid.reserves ?? 0).toLocaleString()} MW
+                Load <AnimatedCount value={Math.round(grid.actual_load ?? 0)} /> / Capacity <AnimatedCount value={Math.round(grid.total_capacity ?? 0)} /> MW · Reserve <AnimatedCount value={Math.round(grid.reserves ?? 0)} /> MW
               </span>
             </div>
             <div className="relative h-10 w-full rounded-xl bg-black/40 overflow-hidden">
@@ -308,8 +307,8 @@ export default function TelemetryPage() {
               <span>Capacity</span>
             </div>
             <div className="mt-3 flex gap-6 text-sm font-mono tabular-nums text-zinc-400">
-              <span>Wind: {Math.round(grid.wind_gen ?? 0).toLocaleString()} MW</span>
-              <span>PV: {Math.round(grid.pv_gen ?? 0).toLocaleString()} MW</span>
+              <span>Wind: <AnimatedCount value={Math.round(grid.wind_gen ?? 0)} /> MW</span>
+              <span>PV: <AnimatedCount value={Math.round(grid.pv_gen ?? 0)} /> MW</span>
             </div>
           </div>
         )}

@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRightLeft, ChevronLeft, ChevronRight, Mic, Sparkles, History } from 'lucide-react'
@@ -73,7 +74,7 @@ export function EngagementLog({
                 <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     {!isSkinny && <History className="w-3.5 h-3.5" />} Transmission Log
                 </h3>
-                <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{recentCalls?.length ?? 0} RECORDS</span>
+                <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums"><AnimatedCount value={recentCalls?.length ?? 0} /> RECORDS</span>
             </div>
 
             <div className="space-y-3">
@@ -153,7 +154,7 @@ export function EngagementLog({
                             {String(pageStart).padStart(2, '0')}–{String(pageEnd).padStart(2, '0')}
                         </span>
                         <span className="opacity-40">|</span>
-                        <span>{recentCalls.length} total</span>
+                        <span><AnimatedCount value={recentCalls.length} /> total</span>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                         <Button
