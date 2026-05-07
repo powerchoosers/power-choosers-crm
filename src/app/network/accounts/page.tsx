@@ -7,13 +7,11 @@ import {
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
-  getSortedRowModel,
   ColumnDef,
   SortingState,
-  PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, GripVertical } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, Check } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -76,6 +74,57 @@ import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/
 
 const PAGE_SIZE = 50
 
+function getSortableDateValue(value: unknown) {
+  if (!value) return null
+  const parsed = new Date(String(value))
+  const time = parsed.getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+function compareDatesAscending(left: unknown, right: unknown) {
+  const leftTime = getSortableDateValue(left)
+  const rightTime = getSortableDateValue(right)
+
+  if (leftTime == null && rightTime == null) return 0
+  if (leftTime == null) return 1
+  if (rightTime == null) return -1
+  return leftTime - rightTime
+}
+
+function SortableHeaderButton({
+  label,
+  column,
+  className,
+  title,
+}: {
+  label: string
+  column: any
+  className?: string
+  title?: string
+  }) {
+  const sortState = column.getIsSorted()
+  return (
+    <button
+      type="button"
+      onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      className={cn(
+        "icon-button-forensic flex items-center gap-2 text-sm font-medium -ml-1",
+        className
+      )}
+      title={title || `Sort by ${label.toLowerCase()}`}
+    >
+      <span>{label}</span>
+      <ArrowUpDown
+        className={cn(
+          "h-4 w-4 transition-transform",
+          sortState === 'desc' && "rotate-180",
+          sortState ? "text-[#002FA7]" : "text-zinc-500"
+        )}
+      />
+    </button>
+  )
+}
+
 export default function AccountsPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -106,11 +155,11 @@ export default function AccountsPage() {
     };
   }, [columnFilters]);
 
-  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(debouncedFilter, accountFilters)
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'contractEnd', desc: false }])
+  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(debouncedFilter, accountFilters, undefined, true, sorting)
   const { data: totalAccounts } = useAccountsCount(debouncedFilter, accountFilters)
   const { mutateAsync: deleteAccounts } = useDeleteAccounts()
   const createAccount = useCreateAccount()
-  const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -177,6 +226,9 @@ export default function AccountsPage() {
     'location',
     'owner',
     'companyPhone',
+    'employees',
+    'contractEnd',
+    'updated',
     'status',
     'targetLists',
     'actions'
@@ -484,12 +536,25 @@ export default function AccountsPage() {
       },
       {
         accessorKey: 'employees',
-        header: 'Headcount',
+        header: ({ column }) => (
+          <SortableHeaderButton
+            label="Headcount"
+            column={column}
+            title="Sort by headcount"
+          />
+        ),
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('employees')}</div>,
       },
       {
         accessorKey: 'contractEnd',
-        header: 'Contract End',
+        header: ({ column }) => (
+          <SortableHeaderButton
+            label="Contract End"
+            column={column}
+            title="Sort by contract end date"
+          />
+        ),
+        sortingFn: (rowA, rowB, columnId) => compareDatesAscending(rowA.getValue(columnId), rowB.getValue(columnId)),
         cell: ({ row }) => {
           const dateStr = row.getValue('contractEnd') as string
           if (!dateStr) return <span className="text-zinc-600 font-mono text-xs">--</span>
@@ -515,7 +580,14 @@ export default function AccountsPage() {
       },
       {
         accessorKey: 'updated',
-        header: 'Last Update',
+        header: ({ column }) => (
+          <SortableHeaderButton
+            label="Last Update"
+            column={column}
+            title="Sort by last update"
+          />
+        ),
+        sortingFn: (rowA, rowB, columnId) => compareDatesAscending(rowA.getValue(columnId), rowB.getValue(columnId)),
         cell: ({ row }) => {
           const val = row.original.updated
           if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
@@ -618,7 +690,8 @@ export default function AccountsPage() {
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onSortingChange: setSorting,
-    getSortedRowModel: getSortedRowModel(),
+    manualSorting: true,
+    enableSortingRemoval: true,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
     manualFiltering: true,
