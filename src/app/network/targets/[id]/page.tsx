@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import {
@@ -1076,7 +1077,7 @@ export default function TargetDetailPage() {
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
               <div className="h-1 w-1 rounded-full bg-black/40" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords || data.length}</span></span>
+              <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={totalRecords || data.length} className="text-zinc-400 tabular-nums" /></span>
             </div>
           </div>
           <ForensicPagination

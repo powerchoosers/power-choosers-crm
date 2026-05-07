@@ -38,15 +38,15 @@ export function buildIntelligenceBriefContext(account: IntelligenceBriefLike | n
   const confidence = cleanText(account?.intelligenceBriefConfidenceLevel)
 
   const lines = [
-    'INTELLIGENCE BRIEF (supporting context only, use one fact at most):',
+    'INTELLIGENCE BRIEF (primary research anchor when confidence is Medium or High):',
     headline ? `- Signal Headline: ${headline}` : null,
     detail ? `- Signal Detail: ${detail}` : null,
     talkTrack ? `- Talk Track: ${talkTrack}` : null,
     signalDate ? `- Signal Date: ${signalDate}` : null,
     reportedAt ? `- Reported At: ${reportedAt}` : null,
     confidence ? `- Confidence: ${confidence}` : null,
+    '- Use the signal or talk-track angle as the main reason for the note when it is specific and credible. Do not copy it word-for-word.',
   ].filter(Boolean)
 
   return lines.join('\n')
 }
-

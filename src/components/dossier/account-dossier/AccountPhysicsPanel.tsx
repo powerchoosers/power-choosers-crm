@@ -87,7 +87,8 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                 <AccountUplinkCard
                     account={{
                         ...account,
-                        companyPhone: editCompanyPhone || account.companyPhone,
+                        // Keep empty strings while editing so backspace can clear the field.
+                        companyPhone: isEditing ? editCompanyPhone : (editCompanyPhone || account.companyPhone),
                         domain: editDomain || account.domain,
                         address: editAddress || account.address,
                         logoUrl: editLogoUrl || account.logoUrl

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   Users,
@@ -359,7 +360,7 @@ export default function TargetOverviewPage() {
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block 01–{filteredTargets.length.toString().padStart(2, '0')}</span>
               <div className="h-1 w-1 rounded-full bg-black/40" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredTargets.length}</span></span>
+              <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={filteredTargets.length} className="text-zinc-400 tabular-nums" /></span>
             </div>
           </div>
 
