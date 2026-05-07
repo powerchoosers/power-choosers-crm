@@ -121,10 +121,11 @@ export function VelocityTrackerV3() {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;
-
   const currentCalls = Math.min(metrics?.totalCalls || 0, 100);
   const animatedCalls = useAnimatedCount(currentCalls);
+
+  if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;
+
   const isCold = currentCalls <= 33;
   const isTracing = currentCalls > 33 && currentCalls <= 66;
   const isLocked = currentCalls > 66;
