@@ -13,10 +13,98 @@ function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 }
 
+function cleanText(value) {
+  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
+}
+
 function buildSourceTruthLine(linkedInUrl, website) {
+  if (website) return 'SOURCE_TRUTH: Company website/public company info is available. You may reference the website or public company facts once. LinkedIn is research-only and must never be mentioned.';
   if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn is available as a research signal only. Do NOT mention LinkedIn, profiles, or how you found them in the email copy.';
-  if (website) return 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.';
   return 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+}
+
+function getMetadataNoteText(metadata) {
+  const safeMeta = asObject(metadata);
+  return [
+    safeMeta.notes,
+    safeMeta.note,
+    safeMeta.accountNotes,
+    safeMeta.summary,
+  ]
+    .map(cleanText)
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function normalizeWebsiteUrl(value) {
+  const raw = cleanText(value);
+  if (!raw) return '';
+  const normalized = raw.startsWith('http') ? raw : `https://${raw.replace(/^www\./i, '')}`;
+  try {
+    return new URL(normalized).toString();
+  } catch (_) {
+    return '';
+  }
+}
+
+function buildHierarchyResearchSummary(organizationRole, hierarchySummary, relatedAccounts) {
+  const lines = [];
+  if (hierarchySummary) {
+    lines.push(`Hierarchy: ${hierarchySummary}`);
+  }
+
+  const relatedLines = (relatedAccounts || [])
+    .slice(0, 6)
+    .map((row) => {
+      const name = cleanText(row?.name);
+      if (!name) return '';
+      const url = normalizeWebsiteUrl(row?.website || row?.domain);
+      const description = cleanText(row?.description);
+      const location = [cleanText(row?.city), cleanText(row?.state)].filter(Boolean).join(', ');
+      const role = row?.role === 'parent' ? 'Parent' : 'Subsidiary';
+      return [
+        `${role}: ${name}`,
+        location ? `Location ${location}` : null,
+        description ? `What they do: ${description}` : null,
+        url ? `Website ${url}` : null,
+      ].filter(Boolean).join(' | ');
+    })
+    .filter(Boolean);
+
+  if (organizationRole && organizationRole !== 'standalone') {
+    lines.push(`Organization role: ${organizationRole}`);
+  }
+
+  if (relatedLines.length) {
+    lines.push(`Related entities:\n${relatedLines.join('\n')}`);
+  }
+
+  return lines.join('\n');
+}
+
+function buildExecutionPromptOverlay({ replyStage, hasBrief, hasAccountNotes, organizationRole }) {
+  const lines = [
+    'EXECUTION OVERLAY:',
+    hasBrief
+      ? '1. If a usable intelligence brief exists, that brief is the main reason for the note. Start from the event, operating fact, or business question in the brief before generic industry language.'
+      : '1. If no usable intelligence brief exists, use one concrete operating fact from the company description, notes, location, or related-company context.',
+    '2. The first sentence should prove you know what the company actually does.',
+    '3. Do not default to stock wording like "short read", "budget drift", "rate vs delivery", or "one-page snapshot" unless the line still sounds natural and specific to this account.',
+    organizationRole === 'subsidiary'
+      ? '4. This account is a subsidiary or operating brand. Write to the operating company first and mention the parent once at most if it helps orientation.'
+      : organizationRole === 'parent'
+        ? '4. This account is a parent or portfolio account. It is fine to compare locations, but never imply one meter or one site changes every other site.'
+        : '4. Keep the note anchored to the operating company and actual site, not a generic corporate abstraction.',
+    hasAccountNotes
+      ? '5. If account notes are present, you may use one note if it sharpens the email. Do not dump internal note text into the body.'
+      : '5. Use the fewest facts needed to make the note feel researched and manual.',
+  ];
+
+  if (replyStage === 'first_touch') {
+    lines.push('6. First touch should earn a reply with a clear business question, not just an offer.');
+  }
+
+  return lines.join('\n');
 }
 
 function normalizeDomain(value) {
@@ -252,32 +340,32 @@ function buildReplyFirstDirective(stage) {
       'Lane selection by role: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/real estate/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement = renewal timing, vendor fit, or contract cleanup; owner/GM = leverage, timing, or simple cost check; school/church/nonprofit/healthcare = stewardship, comfort, reliability, or predictability.',
       'Do not choose delivery charges or demand charges unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       'Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
-      'Use one concrete company, event, role, city, or location fact and make the payoff explicit without asking for a bill: a one-page snapshot, short read, simple yes/no reply, or routing reply.',
-      'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Want me to send the one-page snapshot?", "Reply yes and I\'ll send the short read.", "Does this sit with you or someone else?", or "Am I barking up the right tree on this?" Never ask for a bill in first touch.',
+      'Use one concrete company, event, role, city, or location fact and make the payoff explicit without asking for a bill: a quick breakdown, short note on what you would check first, simple yes/no reply, routing reply, or plain comparison.',
+      'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Want me to send what I\'d check first?", "Reply yes and I\'ll send the quick breakdown.", "Does this sit with you or someone else?", or "Am I off base?" Never ask for a bill in first touch.',
       'If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
-      'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost check. Ops examples: load timing, delivery gap. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
+      'Subject line: 1-4 words, plain, specific, and value-led. Do not keep reusing stock labels like budget drift, fixed cost check, or load timing when the company, city, issue, or timing would sound more natural.',
       'Never mention LinkedIn, profiles, or how you found them.'
     ].join('\n'),
     follow_up: [
       'REPLY-FIRST NOTE: Keep the body at 45-75 words.',
       'Add one new fact or angle. Reference prior contact by topic only, never opens or clicks. Do not repeat the same lane from the prior note if the prompt gives a new signal.',
-      'Reinforce one concrete output that does not require document sharing yet: a one-page snapshot, a short read, a short call, or a routing reply.',
+      'Reinforce one concrete output that does not require document sharing yet: a quick breakdown, a short note, a short call, or a routing reply.',
       'Follow-up tone should be more diagnostic and a little more direct than first touch. Prefer one direct CTA only, and do not ask for a bill unless this is clearly a later, high-intent step.',
       'If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally. Keep it as a location cue, not jargon.',
-      'Subject line: 1-4 words, specific and plain. Slightly more diagnostic than Day 1. Examples: rate vs delivery, demand adds cost, timing check.'
+      'Subject line: 1-4 words, specific and plain. Slightly more diagnostic than Day 1, but do not keep defaulting to the same 2-3 subject formulas.'
     ].join('\n'),
     no_reply: [
       'REPLY-FIRST NOTE: Keep the body at 30-50 words and max 2 sentences.',
       'Assume you already reached the right person. Do not ask who owns electricity review.',
       'Sentence 1 should state the value in plain English and name one likely leak area.',
-      'Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short read.',
+      'Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a quick note.',
       'No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       'Never ask for a bill, statement, or invoice in this branch.',
       'If the account is outside Texas, keep the market framing broad enough for a deregulated market and do not imply Texas-only coverage.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally, but keep the message short.',
-      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence. Examples: short read, quick yes/no, close the loop.'
+      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence, but do not keep defaulting to short read or quick yes/no.'
     ].join('\n'),
     general: [
       'REPLY-FIRST NOTE: Use the shortest draft that still gives one real observation and a concrete reason to reply.',
@@ -444,14 +532,15 @@ export default async function handler(req, res) {
     const { data: relatedAccounts } = relatedIds.length
       ? await supabase
         .from('accounts')
-        .select('id, name')
+        .select('id, name, domain, website, description, city, state, metadata')
         .in('id', relatedIds)
       : { data: [] };
-    const relatedAccountMap = new Map((relatedAccounts || []).map((row) => [row.id, row.name]));
-    const parentCompanyName = hierarchyIds.parentAccountId ? relatedAccountMap.get(hierarchyIds.parentAccountId) || null : null;
+    const relatedAccountMap = new Map((relatedAccounts || []).map((row) => [row.id, row]));
+    const parentCompany = hierarchyIds.parentAccountId ? relatedAccountMap.get(hierarchyIds.parentAccountId) || null : null;
     const subsidiaryCompanyNames = (hierarchyIds.subsidiaryAccountIds || [])
       .map((id) => relatedAccountMap.get(id))
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((row) => row.name);
     const organizationRole = hierarchyIds.parentAccountId
       ? 'subsidiary'
       : hierarchyIds.subsidiaryAccountIds.length > 0
@@ -478,10 +567,26 @@ export default async function handler(req, res) {
       : texasEnergy.marketContext;
     const hierarchySummary = [
       `Operating company: ${account?.name || 'Unknown'}`,
-      `Parent company: ${parentCompanyName || hierarchyIds.parentAccountId || 'none'}`,
+      `Parent company: ${parentCompany?.name || hierarchyIds.parentAccountId || 'none'}`,
       `Subsidiaries: ${subsidiaryCompanyNames.length ? subsidiaryCompanyNames.join('; ') : hierarchyIds.subsidiaryAccountIds.length ? `${hierarchyIds.subsidiaryAccountIds.length} linked account(s)` : 'none'}`,
       `Role: ${organizationRole}`
     ].join(' | ');
+    const hierarchyResearchContext = buildHierarchyResearchSummary(
+      organizationRole,
+      hierarchySummary,
+      [
+        ...(parentCompany ? [{ ...parentCompany, role: 'parent' }] : []),
+        ...((relatedAccounts || [])
+          .filter((row) => hierarchyIds.subsidiaryAccountIds.includes(row.id))
+          .map((row) => ({ ...row, role: 'subsidiary' }))),
+      ],
+    );
+    const relatedResearchLinks = normalizeStringList([
+      parentCompany ? normalizeWebsiteUrl(parentCompany.website || parentCompany.domain) : '',
+      ...((relatedAccounts || [])
+        .filter((row) => hierarchyIds.subsidiaryAccountIds.includes(row.id))
+        .map((row) => normalizeWebsiteUrl(row.website || row.domain))),
+    ]);
 
     const { data: rawCalls } = await supabase
       .from('calls')
@@ -494,6 +599,10 @@ export default async function handler(req, res) {
     const usableCalls = buildUsableCallContextEntries(rawCalls || [], 4);
     const usableCallContext = buildUsableCallContextBlock(rawCalls || [], 4);
 
+    const accountNoteText = [
+      account?.description || null,
+      getMetadataNoteText(account?.metadata),
+    ].filter(Boolean).join('\n\n');
     const noteEntries = buildForensicNoteEntries([
       {
         label: `CONTACT NOTE • ${[contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'UNKNOWN CONTACT'}`,
@@ -501,7 +610,7 @@ export default async function handler(req, res) {
       },
       {
         label: `ACCOUNT NOTE • ${account?.name || 'UNKNOWN ACCOUNT'}`,
-        notes: account?.description || null,
+        notes: accountNoteText || null,
       },
     ]);
     const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
@@ -568,10 +677,12 @@ export default async function handler(req, res) {
       contact.title ? `Contact title: ${contact.title}` : null,
       contact.city || contact.state ? `Contact location: ${[contact.city, contact.state].filter(Boolean).join(', ')}` : null,
       marketContext ? `Market context: ${marketContext}` : null,
-      parentCompanyName ? `Parent company: ${parentCompanyName}` : null,
+      parentCompany?.name ? `Parent company: ${parentCompany.name}` : null,
       subsidiaryCompanyNames.length ? `Subsidiaries: ${subsidiaryCompanyNames.join('; ')}` : null,
       `Organization role: ${organizationRole}`,
       `Hierarchy summary: ${hierarchySummary}`,
+      hierarchyResearchContext ? `Related company context:\n${hierarchyResearchContext}` : null,
+      relatedResearchLinks.length ? `Related websites: ${relatedResearchLinks.join('; ')}` : null,
       noteContext ? `Dossier notes:\n${noteContext}` : null,
       briefContext ? `Intelligence brief:\n${briefContext}` : null,
       usableCallContext ? `Transmission log:\n${usableCallContext}` : null,
@@ -596,12 +707,18 @@ export default async function handler(req, res) {
     const protocol = req.headers['x-forwarded-proto'] || (req.headers.host?.includes('localhost') ? 'http' : 'https');
     const host = req.headers.host;
     const optimizeUrl = `${protocol}://${host}/api/ai/optimize`;
+    const promptOverlay = buildExecutionPromptOverlay({
+      replyStage,
+      hasBrief: Boolean(briefContext),
+      hasAccountNotes: Boolean(accountNoteText),
+      organizationRole,
+    });
 
     const optimizeRes = await fetch(optimizeUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: `${executionMeta?.prompt || 'Draft a personalized follow-up'}\n\n${buildReplyFirstDirective(replyStage)}\n\n${sourceTruthLine}`,
+        prompt: `${promptOverlay}\n\nORIGINAL STEP PROMPT:\n${executionMeta?.prompt || 'Draft a personalized follow-up'}\n\n${buildReplyFirstDirective(replyStage)}\n\n${sourceTruthLine}`,
         provider: 'openrouter',
         type: 'email',
         vectors: Array.isArray(executionMeta?.vectors) ? executionMeta.vectors : [],
@@ -637,18 +754,21 @@ export default async function handler(req, res) {
           tdu_candidates: texasEnergy.tduCandidates || [],
           market_context: marketContext,
           utility_territory: utilityTerritory || null,
-          parent_company: parentCompanyName,
+          parent_company: parentCompany?.name || null,
           parent_company_id: hierarchyIds.parentAccountId,
           subsidiary_companies: subsidiaryCompanyNames,
           subsidiary_count: subsidiaryCompanyNames.length,
           organization_role: organizationRole,
           hierarchy_summary: hierarchySummary,
+          account_notes: accountNoteText || null,
+          related_accounts: hierarchyResearchContext || null,
+          research_links: relatedResearchLinks,
           linkedin_url: linkedInUrl,
           domain: accountDomain,
           website,
           has_linkedin: !!linkedInUrl,
           has_website: !!website,
-          source_label: linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info'),
+          source_label: website ? 'website' : (linkedInUrl ? 'linkedin' : 'public_company_info'),
           sender_email: fromEmail,
           sender_domain: senderDomain,
           sender_first_name: senderFirstName,

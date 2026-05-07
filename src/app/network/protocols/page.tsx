@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useEffect, useMemo, useState } from 'react'
 import { useProtocols, useProtocolsCount, Protocol } from '@/hooks/useProtocols'
 import { Button } from '@/components/ui/button'
@@ -422,7 +423,7 @@ export default function ProtocolsPage() {
                 <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
                   <span>Sync_Block {showingStart}–{showingEnd}</span>
                   <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+                  <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={effectiveTotalRecords} className="text-zinc-400 tabular-nums" /></span>
                 </div>
             </div>
           <ForensicPagination
