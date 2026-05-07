@@ -108,7 +108,7 @@ function SortableHeaderButton({
       type="button"
       onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
       className={cn(
-        "flex items-center gap-1.5 -ml-1 text-sm font-medium normal-case tracking-normal leading-none text-zinc-500 transition-colors hover:text-zinc-200",
+        "flex items-center gap-1 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 transition-colors hover:text-zinc-300",
         className
       )}
       title={title || `Sort by ${label.toLowerCase()}`}
@@ -116,7 +116,7 @@ function SortableHeaderButton({
       <span>{label}</span>
       <ArrowUpDown
         className={cn(
-          "h-3.5 w-3.5 transition-transform",
+          "h-2.5 w-2.5 transition-transform",
           sortState === 'desc' && "rotate-180",
           sortState ? "text-[#002FA7]" : "text-zinc-500"
         )}
@@ -398,18 +398,18 @@ export default function AccountsPage() {
           return (
             <button
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium gap-2"
+              className="flex items-center gap-1.5 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 transition-colors hover:text-zinc-300"
             >
-              Account Name
-              <ArrowUpDown className="ml-1 h-4 w-4" />
+              <span>Account Name</span>
+              <ArrowUpDown className="h-2.5 w-2.5" />
               {/* Health legend */}
               <span
-                className="flex items-center gap-0.5 ml-1"
+                className="flex items-center gap-0.5 ml-1 shrink-0"
                 title="Relationship health: green <30d · amber 30–90d · rose >90d since last call or email"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+                <span className="w-1 h-1 rounded-full bg-emerald-500 opacity-60" />
+                <span className="w-1 h-1 rounded-full bg-amber-500 opacity-60" />
+                <span className="w-1 h-1 rounded-full bg-rose-500 opacity-60" />
               </span>
             </button>
           )
@@ -538,7 +538,7 @@ export default function AccountsPage() {
         accessorKey: 'employees',
         header: ({ column }) => (
           <SortableHeaderButton
-            label="Headcount"
+            label="HEADCOUNT"
             column={column}
             title="Sort by headcount"
           />
@@ -549,7 +549,7 @@ export default function AccountsPage() {
         accessorKey: 'contractEnd',
         header: ({ column }) => (
           <SortableHeaderButton
-            label="Contract End"
+            label="CONTRACT END"
             column={column}
             title="Sort by contract end date"
           />
@@ -582,7 +582,7 @@ export default function AccountsPage() {
         accessorKey: 'updated',
         header: ({ column }) => (
           <SortableHeaderButton
-            label="Last Update"
+            label="LAST UPDATE"
             column={column}
             title="Sort by last update"
           />
