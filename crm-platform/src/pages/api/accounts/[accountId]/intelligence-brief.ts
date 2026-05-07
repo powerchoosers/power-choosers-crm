@@ -214,6 +214,23 @@ type MarketGuidance = {
   marketFocus: string[]
 }
 
+type IdentityConfidence = 'high' | 'medium' | 'low'
+
+type IntelligenceProfile = {
+  version: 1
+  industryCluster: IndustryCluster
+  companyType: string
+  operatingModel: string
+  facilityType: string
+  identityKeywords: string[]
+  powerKeywords: string[]
+  talkTrackGuardrails: string[]
+  evidence: string[]
+  confidence: IdentityConfidence
+  generatedAt: string
+  sourceKinds: ResearchSourceKind[]
+}
+
 type TalkTrackContext = {
   signalFamily: SignalFamily
   signalLabel: string
@@ -292,9 +309,140 @@ const SEC_FILING_FORMS = new Set([
   'DEF 14A',
   'PRE 14A',
 ])
+const IDENTITY_PROFILE_VERSION = 1 as const
+const INDUSTRY_CLUSTER_VALUES: IndustryCluster[] = [
+  'manufacturing',
+  'logistics',
+  'food_storage',
+  'healthcare',
+  'banking',
+  'retail',
+  'restaurant',
+  'hotel_owner',
+  'hospitality_group',
+  'school_district',
+  'higher_education',
+  'residential_care',
+  'education_nonprofit',
+  'religious',
+  'technology',
+  'energy_intensive',
+  'office_services',
+  'multi_site',
+  'public_sector',
+  'unknown',
+]
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
+}
+
+function uniqueStrings(values: unknown[], limit = 12) {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const value of values) {
+    const cleaned = cleanText(value)
+    const key = cleaned.toLowerCase()
+    if (!cleaned || seen.has(key)) continue
+    seen.add(key)
+    result.push(cleaned)
+    if (result.length >= limit) break
+  }
+
+  return result
+}
+
+function getAccountMetadata(account: AccountRow) {
+  return account.metadata && typeof account.metadata === 'object' && !Array.isArray(account.metadata)
+    ? account.metadata as Record<string, unknown>
+    : {}
+}
+
+function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | null {
+  const raw = getAccountMetadata(account).intelligenceProfile
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const record = raw as Record<string, unknown>
+  const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
+  if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
+
+  const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
+  const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
+    ? confidence
+    : 'low'
+
+  return {
+    version: IDENTITY_PROFILE_VERSION,
+    industryCluster: cluster,
+    companyType: cleanText(record.companyType),
+    operatingModel: cleanText(record.operatingModel),
+    facilityType: cleanText(record.facilityType),
+    identityKeywords: uniqueStrings(Array.isArray(record.identityKeywords) ? record.identityKeywords : [], 8),
+    powerKeywords: uniqueStrings(Array.isArray(record.powerKeywords) ? record.powerKeywords : [], 8),
+    talkTrackGuardrails: uniqueStrings(Array.isArray(record.talkTrackGuardrails) ? record.talkTrackGuardrails : [], 8),
+    evidence: uniqueStrings(Array.isArray(record.evidence) ? record.evidence : [], 4),
+    confidence: safeConfidence,
+    generatedAt: cleanText(record.generatedAt),
+    sourceKinds: uniqueStrings(Array.isArray(record.sourceKinds) ? record.sourceKinds : [], 4)
+      .filter((value): value is ResearchSourceKind => ['news', 'web', 'sec', 'linkedin'].includes(value))
+      .slice(0, 4),
+  }
+}
+
+function buildIdentityProfileText(account: AccountRow) {
+  const profile = getAccountIdentityProfile(account)
+  if (!profile) return ''
+
+  return cleanText([
+    profile.companyType,
+    profile.operatingModel,
+    profile.facilityType,
+    profile.identityKeywords.join(' '),
+    profile.powerKeywords.join(' '),
+    profile.talkTrackGuardrails.join(' '),
+  ].join(' ')).toLowerCase()
+}
+
+function selectIdentityKeywords(text: string, preferred: string[], fallback: string[], limit = 6) {
+  const lower = text.toLowerCase()
+  const matched = preferred.filter((keyword) => lower.includes(keyword.toLowerCase()))
+  return uniqueStrings([...matched, ...fallback], limit)
+}
+
+function buildIdentityEvidence(account: AccountRow, candidates: ResearchHit[], emphasisKeywords: string[]) {
+  const evidence: string[] = []
+  const description = cleanText(account.description)
+  const lowerKeywords = emphasisKeywords.map((keyword) => keyword.toLowerCase())
+
+  if (description) {
+    evidence.push(shortenText(description, 220))
+  }
+
+  for (const candidate of candidates.slice(0, 8)) {
+    const line = cleanText(`${candidate.title}${candidate.snippet ? `. ${candidate.snippet}` : ''}`)
+    if (!line) continue
+
+    const lower = line.toLowerCase()
+    if (evidence.length < 2 || lowerKeywords.some((keyword) => lower.includes(keyword))) {
+      evidence.push(shortenText(line, 220))
+    }
+
+    if (evidence.length >= 4) break
+  }
+
+  return uniqueStrings(evidence, 4)
+}
+
+function getIdentitySearchHints(account: AccountRow) {
+  const profile = getAccountIdentityProfile(account)
+  if (!profile) return []
+
+  return uniqueStrings([
+    profile.companyType,
+    profile.facilityType,
+    ...profile.identityKeywords,
+  ], 4).filter((value) => value.length >= 4).slice(0, 2)
 }
 
 function getAccountNotes(account: AccountRow) {
@@ -637,10 +785,14 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
   const state = cleanText(account.state)
   const location = [city, state].filter(Boolean).join(', ')
   const industry = cleanText(account.industry)
+  const identityHints = getIdentitySearchHints(account)
   const domainClause = includeDomainClause && domain ? ` site:${domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : ''
 
   const locationClause = location ? ` ${location}` : ''
   const texasClause = ' Texas'
+  const identityClause = identityHints.length > 0
+    ? ` ${identityHints.map((hint) => `"${hint}"`).join(' ')}`
+    : ''
 
   return [
     {
@@ -651,7 +803,7 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
     {
       priority: 2,
       label: 'Texas Openings / Construction',
-      query: `"${name}" (opened OR opening OR opens OR launch OR launches OR groundbreaking OR "lease signed" OR construction OR relocation OR relocating OR "new facility" OR "new site" OR "new office" OR "new branch")${domainClause}${texasClause}${locationClause}`,
+      query: `"${name}" (opened OR opening OR opens OR launch OR launches OR groundbreaking OR "lease signed" OR construction OR relocation OR relocating OR "new facility" OR "new site" OR "new office" OR "new branch")${identityClause}${domainClause}${texasClause}${locationClause}`,
     },
     {
       priority: 3,
@@ -661,7 +813,7 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
     {
       priority: 4,
       label: 'Expansion / Capex / Headcount',
-      query: `"${name}" expansion planned expansion capital expenditure capex hiring headcount growth future site${industry ? ` ${industry}` : ''}${domainClause}${locationClause}`,
+      query: `"${name}" expansion planned expansion capital expenditure capex hiring headcount growth future site${industry ? ` ${industry}` : ''}${identityClause}${domainClause}${locationClause}`,
     },
     {
       priority: 5,
@@ -1207,6 +1359,303 @@ function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null
   }
 }
 
+function buildStructuredIdentityProfile(account: AccountRow, candidates: ResearchHit[]): IntelligenceProfile | null {
+  const savedProfile = getAccountIdentityProfile(account)
+  const researchText = candidates
+    .slice(0, 8)
+    .map((candidate) => `${candidate.title} ${candidate.snippet}`)
+    .join(' ')
+  const synthesizedAccount: AccountRow = {
+    ...account,
+    description: cleanText(`${account.description || ''} ${researchText}`),
+  }
+  const primaryCandidate = candidates[0] || null
+  const cluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
+  const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${buildIdentityProfileText(account)}`).toLowerCase()
+
+  if (!text && !savedProfile) return null
+  if (!text && savedProfile) return savedProfile
+
+  const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
+  const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
+  const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
+  const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
+  const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|foodservice|production facilities)/i.test(text)
+  const isAutoGroup = /\b(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|showrooms?|used vehicles?|new vehicles?|nissan|hyundai|chevrolet|cadillac|volkswagen|mitsubishi|kia|genesis|chrysler|jeep|dodge|ram)\b/i.test(text)
+  const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
+  const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
+  const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
+  const isPublicSector = /\b(city of|county|municipal|public facilities|utility infrastructure|public safety|government entity)\b/i.test(text)
+
+  let companyType = cleanText(account.industry) || 'commercial account'
+  let operatingModel = multiSiteInfo.isMultiSite ? 'multi-site portfolio' : 'single-site operator'
+  let facilityType = 'commercial facility'
+  let identityKeywords: string[] = []
+  let powerKeywords: string[] = []
+  let talkTrackGuardrails: string[] = []
+
+  switch (cluster) {
+    case 'healthcare':
+      if (isBloodCenter) {
+        companyType = multiSiteInfo.isMultiSite ? 'blood center and clinical lab network' : 'blood center'
+        operatingModel = multiSiteInfo.isMultiSite ? 'regional donor collection and lab network' : 'clinical blood-service facility'
+        facilityType = 'donor center / laboratory'
+        identityKeywords = selectIdentityKeywords(text, ['blood center', 'bloodcare', 'donor center', 'blood products', 'lab processing', 'refrigerated storage', 'hospital supply'], ['blood center', 'donor collection', 'lab processing'])
+        powerKeywords = selectIdentityKeywords(text, ['refrigerated storage', 'lab processing', 'blood processing', 'cold storage', 'mobile blood drives', 'hvac'], ['refrigerated storage', 'lab processing', 'HVAC'])
+        talkTrackGuardrails = ['No logistics language', 'No warehouse-only language', 'No dock-door language']
+        break
+      }
+
+      if (isBehavioralHealth) {
+        companyType = multiSiteInfo.isMultiSite ? 'behavioral health network' : 'behavioral health provider'
+        operatingModel = multiSiteInfo.isMultiSite ? 'distributed community-care network' : 'community-care facility'
+        facilityType = 'clinic / crisis center / support building'
+        identityKeywords = selectIdentityKeywords(text, ['behavioral health', 'mental health', 'crisis services', 'counseling', 'care coordination', 'community programs'], ['behavioral health', 'community care', 'crisis services'])
+        powerKeywords = selectIdentityKeywords(text, ['hvac', 'clinical space', 'support buildings', 'crisis center', 'counseling center'], ['HVAC', 'clinical space', 'support buildings'])
+        talkTrackGuardrails = ['No senior-living language', 'No hotel language', 'No restaurant language']
+        break
+      }
+
+      if (isSeniorLiving) {
+        companyType = multiSiteInfo.isMultiSite ? 'senior care campus network' : 'senior living community'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site senior-care portfolio' : '24-hour residential care community'
+        facilityType = 'senior living / nursing facility'
+        identityKeywords = selectIdentityKeywords(text, ['senior living', 'assisted living', 'memory care', 'skilled nursing', 'retirement living', 'continuum of care'], ['senior living', 'memory care', 'skilled nursing'])
+        powerKeywords = selectIdentityKeywords(text, ['laundry', 'dining', 'hvac', 'patient rooms', 'common areas'], ['HVAC', 'common areas', 'dining'])
+        talkTrackGuardrails = ['No hotel language', 'No school language']
+        break
+      }
+
+      if (hasHospitalSignals) {
+        companyType = multiSiteInfo.isMultiSite ? 'neighborhood hospital operator' : 'hospital operator'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site hospital network with health-system partnerships' : 'licensed hospital site'
+        facilityType = 'hospital'
+        identityKeywords = selectIdentityKeywords(text, ['neighborhood hospital', 'small-format hospital', 'emergency care', 'inpatient services', 'diagnostic care', 'health system partnerships', 'micro-hospital'], ['neighborhood hospital', 'emergency care', 'inpatient services'])
+        powerKeywords = selectIdentityKeywords(text, ['emergency department', 'imaging', 'short-stay rooms', 'inpatient rooms', 'lab work', 'hvac'], ['emergency department', 'imaging', 'lab work', 'HVAC'])
+        talkTrackGuardrails = ['No hotel language', 'No guest-room language', 'No laundry language', 'No banquet or event-venue language']
+        break
+      }
+
+      companyType = multiSiteInfo.isMultiSite ? 'clinical care network' : 'medical practice'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site clinical network' : 'daytime clinical facility'
+      facilityType = 'clinic / medical office'
+      identityKeywords = selectIdentityKeywords(text, ['medical practice', 'clinic', 'patient care', 'diagnostic imaging', 'specialists', 'treatment rooms'], ['medical practice', 'clinic', 'patient care'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'treatment rooms', 'imaging', 'lighting', 'patient hours'], ['HVAC', 'patient hours', 'treatment rooms'])
+      talkTrackGuardrails = ['No hotel language', 'No hospital-inpatient language unless source confirms it']
+      break
+
+    case 'manufacturing':
+      if (isFoodProduction) {
+        companyType = multiSiteInfo.isMultiSite ? 'food production network' : 'food manufacturer'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site production network' : 'production facility'
+        facilityType = 'production plant'
+        identityKeywords = selectIdentityKeywords(text, ['food production', 'food manufacturing', 'food processing', 'usda-approved', 'custom proteins', 'soups', 'sauces', 'foodservice'], ['food production', 'food processing', 'USDA production'])
+        powerKeywords = selectIdentityKeywords(text, ['refrigeration', 'cooking', 'packaging', 'sanitation', 'freezer', 'cold chain'], ['refrigeration', 'packaging', 'sanitation'])
+        talkTrackGuardrails = ['No warehouse-group language', 'No dock-only language']
+        break
+      }
+
+      companyType = multiSiteInfo.isMultiSite ? 'industrial manufacturing network' : 'industrial manufacturer'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site production footprint' : 'production facility'
+      facilityType = 'plant / production facility'
+      identityKeywords = selectIdentityKeywords(text, ['manufacturing', 'industrial', 'production', 'fabrication', 'chemical', 'packaging'], ['manufacturing', 'production', 'industrial'])
+      powerKeywords = selectIdentityKeywords(text, ['production lines', 'process equipment', 'hvac', 'compressed air', 'start-up sequence'], ['production lines', 'process equipment', 'HVAC'])
+      talkTrackGuardrails = ['No retail language', 'No office-only language']
+      break
+
+    case 'logistics':
+      companyType = isFreightForwarder ? 'freight forwarder and logistics operator' : (multiSiteInfo.isMultiSite ? 'distribution network' : 'distribution and logistics operator')
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site logistics network' : 'distribution support site'
+      facilityType = isFreightForwarder ? 'logistics office / yard' : 'warehouse / distribution facility'
+      identityKeywords = selectIdentityKeywords(text, ['distribution', 'logistics', 'warehouse', 'freight forwarder', 'shipping', 'cargo', 'supply chain', 'nvocc'], ['distribution', 'logistics', isFreightForwarder ? 'freight forwarding' : 'warehouse'])
+      powerKeywords = selectIdentityKeywords(text, ['dock activity', 'material handling', 'hvac', 'yard lighting', 'cold storage'], ['dock activity', 'material handling', 'HVAC'])
+      talkTrackGuardrails = isFreightForwarder ? ['No manufacturing language', 'No plant language'] : ['No manufacturing language']
+      break
+
+    case 'food_storage':
+      companyType = multiSiteInfo.isMultiSite ? 'cold-storage network' : 'cold-storage operator'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site cold-storage footprint' : 'refrigerated storage facility'
+      facilityType = 'cold storage / warehouse'
+      identityKeywords = selectIdentityKeywords(text, ['cold storage', 'refrigerated storage', 'freezer', 'dairy', 'produce', 'meat', 'grocery'], ['cold storage', 'refrigerated storage', 'freezer'])
+      powerKeywords = selectIdentityKeywords(text, ['refrigeration', 'freezer', 'dock activity', 'hvac'], ['refrigeration', 'freezer', 'HVAC'])
+      talkTrackGuardrails = ['No manufacturing language unless source confirms production']
+      break
+
+    case 'retail':
+      if (isAutoGroup) {
+        companyType = multiSiteInfo.isMultiSite ? 'auto dealership group' : 'auto dealership'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site dealership portfolio' : 'dealership property'
+        facilityType = 'showroom / service bay / lot'
+        identityKeywords = selectIdentityKeywords(text, ['dealership', 'auto group', 'showroom', 'service bays', 'vehicle inventory'], ['auto dealership', 'showroom', 'service bays'])
+        powerKeywords = selectIdentityKeywords(text, ['lot lighting', 'showroom', 'service bays', 'hvac'], ['lot lighting', 'showroom HVAC', 'service bays'])
+        talkTrackGuardrails = ['No hotel language', 'No hospitality language']
+        break
+      }
+
+      companyType = multiSiteInfo.isMultiSite ? 'retail store network' : 'retail business'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-store footprint' : 'customer-facing retail site'
+      facilityType = 'store / showroom'
+      identityKeywords = selectIdentityKeywords(text, ['retail', 'store', 'shopping', 'showroom', 'franchise'], ['retail', 'store', 'showroom'])
+      powerKeywords = selectIdentityKeywords(text, ['lighting', 'hvac', 'refrigeration', 'comfort'], ['lighting', 'HVAC', 'comfort'])
+      talkTrackGuardrails = ['No industrial language']
+      break
+
+    case 'restaurant':
+      companyType = multiSiteInfo.isMultiSite ? 'restaurant group' : 'restaurant'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-location dining footprint' : 'single restaurant site'
+      facilityType = 'restaurant / dining facility'
+      identityKeywords = selectIdentityKeywords(text, ['restaurant', 'dining', 'grill', 'cafe', 'bar', 'eatery'], ['restaurant', 'dining', 'kitchen'])
+      powerKeywords = selectIdentityKeywords(text, ['kitchen', 'refrigeration', 'hvac', 'service rushes'], ['kitchen', 'refrigeration', 'HVAC'])
+      talkTrackGuardrails = ['No hotel language unless lodging is core to the business']
+      break
+
+    case 'hotel_owner':
+      companyType = 'hotel owner'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-property hotel ownership' : 'single hotel property'
+      facilityType = 'hotel'
+      identityKeywords = selectIdentityKeywords(text, ['hotel', 'guest rooms', 'lodging', 'brand flag', 'laundry'], ['hotel', 'guest rooms', 'lodging'])
+      powerKeywords = selectIdentityKeywords(text, ['guest rooms', 'laundry', 'kitchen', 'hvac'], ['guest rooms', 'laundry', 'HVAC'])
+      talkTrackGuardrails = ['No event-venue language unless the source explicitly says banquet or convention space']
+      break
+
+    case 'hospitality_group':
+      companyType = isHotelGroup ? 'hospitality group' : 'hotel portfolio operator'
+      operatingModel = 'multi-property hospitality portfolio'
+      facilityType = 'hotels / resorts'
+      identityKeywords = selectIdentityKeywords(text, ['hospitality group', 'hotel portfolio', 'multiple properties', 'resorts', 'hotels'], ['hospitality group', 'hotel portfolio', 'multiple properties'])
+      powerKeywords = selectIdentityKeywords(text, ['guest rooms', 'laundry', 'kitchen', 'hvac'], ['guest rooms', 'laundry', 'HVAC'])
+      talkTrackGuardrails = ['No event-venue language unless source confirms it']
+      break
+
+    case 'school_district':
+      companyType = 'school district'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-campus public-school system' : 'public-school campus'
+      facilityType = 'school campus'
+      identityKeywords = selectIdentityKeywords(text, ['school district', 'campus', 'students', 'classrooms', 'chromebooks', 'athletics', 'cafeterias'], ['school district', 'campuses', 'classroom technology'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'classroom technology', 'cafeterias', 'athletics', 'lighting'], ['HVAC', 'classroom technology', 'cafeterias'])
+      talkTrackGuardrails = ['No factory language', 'No shift or production language']
+      break
+
+    case 'higher_education':
+      companyType = 'college or university'
+      operatingModel = multiSiteInfo.isMultiSite ? 'campus network' : 'single campus'
+      facilityType = 'campus / academic buildings'
+      identityKeywords = selectIdentityKeywords(text, ['college', 'university', 'campus', 'student housing', 'dorm', 'labs'], ['college', 'campus', 'academic buildings'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'labs', 'student housing', 'classrooms'], ['HVAC', 'labs', 'student housing'])
+      talkTrackGuardrails = ['No school-district language']
+      break
+
+    case 'residential_care':
+      companyType = /(children'?s home|foster care|youth services)/i.test(text) ? 'children and family residential-care campus' : 'residential-care organization'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-program care campus' : 'residential-care campus'
+      facilityType = 'residential-care facility'
+      identityKeywords = selectIdentityKeywords(text, ['children\'s home', 'residential services', 'counseling center', 'independent living', 'group home', 'youth services'], ['residential care', 'counseling', 'support services'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'residential wings', 'common areas', 'counseling space', 'kitchen'], ['HVAC', 'common areas', 'counseling space'])
+      talkTrackGuardrails = ['No school-district language', 'No hotel language']
+      break
+
+    case 'public_sector':
+      companyType = isPublicSector ? 'municipal facility portfolio' : 'public-sector organization'
+      operatingModel = multiSiteInfo.isMultiSite ? 'public-facility portfolio' : 'public facility'
+      facilityType = 'municipal / administrative facility'
+      identityKeywords = selectIdentityKeywords(text, ['city of', 'county', 'municipal', 'public safety', 'utility infrastructure', 'public facilities'], ['municipal facilities', 'public safety', 'utility infrastructure'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'water infrastructure', 'public safety', 'administrative buildings'], ['HVAC', 'public safety', 'administrative buildings'])
+      talkTrackGuardrails = ['No non-profit language']
+      break
+
+    case 'banking':
+      companyType = multiSiteInfo.isMultiSite ? 'branch banking network' : 'financial-services office'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-branch financial footprint' : 'office-based financial services'
+      facilityType = multiSiteInfo.isMultiSite ? 'branches / offices' : 'office'
+      identityKeywords = selectIdentityKeywords(text, ['bank', 'credit union', 'financial services', 'branches', 'wealth management'], ['financial services', 'branches', 'banking'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'branch operations', 'it equipment'], ['HVAC', 'lighting', 'IT equipment'])
+      talkTrackGuardrails = ['No healthcare language']
+      break
+
+    case 'religious':
+      companyType = 'religious organization'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-building worship campus' : 'worship facility'
+      facilityType = 'church / worship campus'
+      identityKeywords = selectIdentityKeywords(text, ['church', 'ministry', 'parish', 'worship', 'congregation', 'sanctuary'], ['worship campus', 'sanctuary', 'ministry'])
+      powerKeywords = selectIdentityKeywords(text, ['sanctuary', 'classrooms', 'hvac', 'fellowship hall'], ['HVAC', 'sanctuary', 'classrooms'])
+      talkTrackGuardrails = ['No school-district language', 'No factory language']
+      break
+
+    case 'technology':
+      companyType = /(data center)/i.test(text) ? 'data-center or digital infrastructure operator' : 'technology business'
+      operatingModel = multiSiteInfo.isMultiSite ? 'distributed technology footprint' : 'technology facility'
+      facilityType = /(data center)/i.test(text) ? 'data center' : 'office / technical facility'
+      identityKeywords = selectIdentityKeywords(text, ['technology', 'software', 'saas', 'data center', 'cloud', 'digital infrastructure'], ['technology', /(data center)/i.test(text) ? 'data center' : 'software'])
+      powerKeywords = selectIdentityKeywords(text, ['servers', 'cooling', 'ups', 'technical load', 'hvac'], ['technical load', 'cooling', 'HVAC'])
+      talkTrackGuardrails = ['No hospitality language']
+      break
+
+    case 'energy_intensive':
+      companyType = 'energy-intensive industrial operator'
+      operatingModel = multiSiteInfo.isMultiSite ? 'industrial site portfolio' : 'industrial facility'
+      facilityType = 'plant / heavy industrial site'
+      identityKeywords = selectIdentityKeywords(text, ['oil', 'gas', 'refinery', 'cement', 'mining', 'industrial gas'], ['industrial operations', 'heavy process', 'plant'])
+      powerKeywords = selectIdentityKeywords(text, ['process equipment', 'motors', 'hvac', 'compressors'], ['process equipment', 'motors', 'compressors'])
+      talkTrackGuardrails = ['No office-only language']
+      break
+
+    case 'office_services':
+      companyType = 'professional services business'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-office footprint' : 'office-based business'
+      facilityType = 'office'
+      identityKeywords = selectIdentityKeywords(text, ['services', 'professional services', 'administration', 'headquarters', 'office'], ['office', 'professional services', 'administration'])
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'it equipment'], ['HVAC', 'lighting', 'IT equipment'])
+      talkTrackGuardrails = ['No heavy-industrial language']
+      break
+
+    case 'multi_site':
+      companyType = 'multi-site operating portfolio'
+      operatingModel = 'distributed portfolio'
+      facilityType = 'multi-site portfolio'
+      identityKeywords = selectIdentityKeywords(text, ['portfolio', 'network', 'multiple locations', 'multi-site', 'nationwide'], ['multi-site', 'portfolio', 'network'])
+      powerKeywords = selectIdentityKeywords(text, ['portfolio comparison', 'meter history', 'hvac'], ['portfolio comparison', 'meter history', 'HVAC'])
+      talkTrackGuardrails = ['Keep liabilities meter-specific']
+      break
+
+    default:
+      companyType = cleanText(account.industry) || 'commercial account'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site portfolio' : 'commercial facility'
+      facilityType = multiSiteInfo.isMultiSite ? 'portfolio of sites' : 'commercial facility'
+      identityKeywords = selectIdentityKeywords(text, [cleanText(account.industry), cleanText(account.name)], [cleanText(account.industry) || 'commercial account'], 4)
+      powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'operations'], ['HVAC', 'operations'], 4)
+      talkTrackGuardrails = ['Use plain language', 'Avoid unrelated industry labels']
+      break
+  }
+
+  const confidenceSignals = identityKeywords.filter((keyword) => text.includes(keyword.toLowerCase())).length +
+    powerKeywords.filter((keyword) => text.includes(keyword.toLowerCase())).length
+  const confidence: IdentityConfidence = cluster === 'unknown'
+    ? 'low'
+    : confidenceSignals >= 5
+      ? 'high'
+      : (candidates.length > 0 || cleanText(account.description))
+        ? 'medium'
+        : 'low'
+
+  return {
+    version: IDENTITY_PROFILE_VERSION,
+    industryCluster: cluster,
+    companyType,
+    operatingModel,
+    facilityType,
+    identityKeywords,
+    powerKeywords,
+    talkTrackGuardrails,
+    evidence: buildIdentityEvidence(account, candidates, [...identityKeywords, ...powerKeywords]),
+    confidence,
+    generatedAt: new Date().toISOString(),
+    sourceKinds: uniqueStrings(candidates.map((candidate) => candidate.sourceKind), 4)
+      .filter((value): value is ResearchSourceKind => ['news', 'web', 'sec', 'linkedin'].includes(value))
+      .slice(0, 4),
+  }
+}
+
 function inferSignalPriority(text: string, fallbackPriority: number) {
   const lower = cleanText(text).toLowerCase()
   
@@ -1503,7 +1952,7 @@ function isUsefulSignalAnchor(value: string) {
   return true
 }
 
-function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
+function inferIndustryClusterFromSignals(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const notes = getAccountNotes(account)
   const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
@@ -1535,6 +1984,15 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
   if (/\b(multi[-\s]?site|portfolio|branch(?:es)?|(?<!supply\s)chain|holdings)\b/i.test(text)) return 'multi_site'
   return 'unknown'
+}
+
+function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
+  const savedProfile = getAccountIdentityProfile(account)
+  if (savedProfile?.industryCluster) {
+    return savedProfile.industryCluster
+  }
+
+  return inferIndustryClusterFromSignals(account, candidate)
 }
 
 function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false): SignalFamily {
@@ -1750,7 +2208,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
 function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
 
   switch (industryCluster) {
@@ -1888,13 +2346,13 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Manufacturing network',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you managing the portfolio as a group, or is each site carrying its own hidden transmission liability?`,
+          question: `With ${locationDesc}${regionDesc}, are you reviewing each site on its own meter, or is the roll-up view making it hard to see where the biggest charges are coming from?`,
           openers: [
-            `Manufacturing groups with ${locationDesc} usually have a significant blind spot in how local transmission fees at a single site are hitting the group budget.`,
+            `Manufacturing groups with ${locationDesc} usually have a visibility problem, where one site's bill looks very different from the rest even though the portfolio summary looks fine.`,
             `With that kind of footprint${regionDesc}, a spike at one plant can set a local billing floor that stays on the books for a year.`,
-            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet that is dragging down the total budget.`,
+            `The useful check is whether any of those ${locationDesc} are carrying a peak charge that sticks on that site's bill longer than the operation justifies.`,
           ],
-          focus: ['portfolio transmission', 'consolidated demand ratchets', 'multi-site coordination', 'billing floors', 'load factor'],
+          focus: ['portfolio visibility', 'meter-specific peak charges', 'multi-site coordination', 'billing floors', 'site-level review'],
         }
       }
       
@@ -1936,13 +2394,13 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           : {
               label: 'Logistics network',
               angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-              question: `With ${locationDesc}${regionDesc}, are you checking which sites have peak charges that stick on the bill, or is that getting hidden in the group budget?`,
+              question: `With ${locationDesc}${regionDesc}, are you checking which sites have peak charges that stick on their own bills, or is that getting lost in the roll-up view?`,
               openers: [
                 `Logistics groups with ${locationDesc} usually have different locked-in peak charges hiding in each specific facility's bill.`,
                 `With that kind of footprint${regionDesc}, one warehouse's summer peak can leave its own peak charge sitting on that meter.`,
                 `The useful check is whether a few sites are creating the highest charges while the group total makes everything look normal.`,
               ],
-              focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
+              focus: ['portfolio visibility', 'meter-specific peak charges', 'warehouse coordination', 'billing floors', '24/7 load'],
             }
       }
       
@@ -2304,10 +2762,10 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Retail chain',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you seeing demand ratchets at specific locations, or is the portfolio masking them?`,
+          question: `With ${locationDesc}${regionDesc}, are you seeing peak charges that stick on specific store meters, or is the roll-up view making them hard to spot?`,
           openers: [
             `Retail chains with ${locationDesc} usually benefit from a portfolio view rather than managing each store separately.`,
-            `With that kind of footprint${regionDesc}, one location can easily carry a demand ratchet that hides in the group total.`,
+            `With that kind of footprint${regionDesc}, a few locations can carry very different meter histories even when the group total looks stable.`,
             `The question I'd want answered is whether your ${locationDesc} are being managed centrally or location-by-location.`,
           ],
           focus: ['portfolio management', 'multi-store coordination', 'seasonal swings', 'demand ratchets', 'centralized procurement'],
@@ -2316,14 +2774,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Retail',
-        angle: 'Portfolio masking where individual site peaks drag down the total group budget.',
-        question: 'Are you seeing demand ratchets at specific stores, or is the group budget masking those local peaks?',
+        angle: 'A few store meters carrying higher peak charges while the roll-up view makes the issue easy to miss.',
+        question: 'Are you seeing peak charges that stick on specific stores, or is the roll-up view hiding which meters are causing them?',
         openers: [
-          `Retail operations are sensitive because the summer cooling load at one site can set a billing floor that the whole group carries.`,
-          `The biggest liability in a retail footprint is Portfolio Masking, where a few 'dirty' sites are setting the floor for the entire budget.`,
-          `With retail footprints, the lighting and HVAC load usually masks a lot of hidden transmission exposure at the meter level.`,
+          `Retail operations are sensitive because one store can carry a much higher peak charge on its own meter than the rest of the group.`,
+          `The issue in a retail footprint is usually not the whole portfolio bill. It is that a few stores may be carrying charges that get missed in the roll-up view.`,
+          `With retail footprints, the lighting and HVAC load can make it hard to tell which meters are actually creating the biggest charges.`,
         ],
-        focus: ['portfolio masking', 'meter-level ratchets', 'group budget liability', 'billing floors', 'occupancy swings'],
+        focus: ['portfolio visibility', 'meter-level ratchets', 'site-level comparison', 'billing floors', 'occupancy swings'],
       }
     case 'restaurant':
       const restaurantMultiSite = detectMultiSiteScale(account, candidate)
@@ -2338,14 +2796,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         
         return {
           label: 'Restaurant chain',
-          angle: 'Coincident kitchen peaks and portfolio masking dragging down the total group budget.',
+          angle: 'Coincident kitchen peaks showing up on specific site meters while the roll-up view makes the problem harder to isolate.',
           question: `With ${locationDesc}${regionDesc}, are you tracking the coincident peaks site-by-site, or is it one big bucket?`,
           openers: [
             `Restaurant groups with ${locationDesc} usually have a significant blind spot in how kitchen service rushes are setting local demand ratchets.`,
-            `With that kind of footprint${regionDesc}, one unit's kitchen spike can trigger a billing floor that the whole group has to carry.`,
+            `With that kind of footprint${regionDesc}, one unit's kitchen spike can leave a higher charge on that meter even if the rest of the group looks normal.`,
             `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet from service peaks.`,
           ],
-          focus: ['coincident peaks', 'service rushes', 'kitchen load', 'demand ratchets', 'portfolio masking', 'billing floors'],
+          focus: ['coincident peaks', 'service rushes', 'kitchen load', 'demand ratchets', 'portfolio visibility', 'billing floors'],
         }
       }
       
@@ -2543,14 +3001,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'multi_site':
       return {
         label: 'Multi-site / portfolio',
-        angle: 'Forensic audit of consolidated billing floors and hidden demand ratchets across a portfolio.',
-        question: 'Has anyone mapped the portfolio to see if one site is carrying a stealth demand ratchet that is dragging down the group budget?',
+        angle: 'Portfolio-wide review of meter-specific peak charges that can get lost in a roll-up view.',
+        question: 'Has anyone mapped the portfolio meter by meter to see which sites are carrying peak charges that stick on their own bills?',
         openers: [
-          `Multi-site footprints usually have a blind spot where one location quietly sets a local peak demand floor that penalizes the total portfolio budget.`,
-          `The part I care about is whether any of the sites in your group are carrying a stealth demand ratchet that is dragging down the total budget.`,
+          `Multi-site footprints usually have a blind spot where a few site bills look very different from the portfolio summary.`,
+          `The part I care about is whether any of the sites in your group are carrying peak charges that stick on those local meters.`,
           `With multiple locations, the forensic check is whether a few specific meters are setting a billing floor that you're stuck with for the rest of the year.`,
         ],
-        focus: ['stealth billing floors', 'portfolio liability', 'consolidated demand ratchets', 'transmission exposure'],
+        focus: ['stealth billing floors', 'portfolio visibility', 'meter-specific peak charges', 'transmission exposure'],
       }
     case 'unknown':
     default:
@@ -2745,6 +3203,7 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const city = cleanText(account.city) || ''
   const state = cleanText(account.state) || ''
   const location = [city, state].filter(Boolean).join(', ') || 'Texas'
+  const identityProfile = getAccountIdentityProfile(account)
   
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const multiSiteContext = multiSiteInfo.isMultiSite && multiSiteInfo.locationCount
@@ -2755,6 +3214,17 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const revenueContext = account.revenue ? `- Revenue: ${account.revenue}` : ''
   const descriptionContext = account.description ? `- Description: ${account.description}` : ''
   const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage} kWh` : ''
+  const identityContext = identityProfile
+    ? [
+        'IDENTITY PROFILE:',
+        `- Company Type: ${identityProfile.companyType}`,
+        `- Operating Model: ${identityProfile.operatingModel}`,
+        `- Facility Type: ${identityProfile.facilityType}`,
+        `- Identity Keywords: ${identityProfile.identityKeywords.join(', ') || 'n/a'}`,
+        `- Power Keywords: ${identityProfile.powerKeywords.join(', ') || 'n/a'}`,
+        `- Guardrails: ${identityProfile.talkTrackGuardrails.join('; ') || 'n/a'}`,
+      ].join('\n')
+    : ''
   
   const behavioralHealthContext = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
@@ -2782,6 +3252,8 @@ MARKET CONTEXT:
 - Market angle: ${context.marketAngle}
 - Season: ${context.marketLabel}
 
+${identityContext}
+
 REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
@@ -2804,6 +3276,7 @@ ${behavioralHealthContext}   - For multi-site care organizations, keep the compa
 10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
+13. IDENTITY PROFILE: If an identity profile is provided, treat it as the source of truth for what kind of company this is unless the signal text directly contradicts it. Do not use language blocked by the guardrails.
 
 Generate a plain-English, peer-to-peer opener for ${companyName}:`
 
@@ -2893,7 +3366,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
 
   const lower = text.toLowerCase()
   const accountText = account
-    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)}`).toLowerCase()
+    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)}`).toLowerCase()
     : ''
   const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
@@ -3706,6 +4179,7 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
   const primaryCandidate = selectedCandidates[0] || null
   const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode)
   const talkTrackContextJson = JSON.stringify(talkTrackContext, null, 2)
+  const identityProfile = getAccountIdentityProfile(account)
   const researchPayload = {
     current_date: new Date().toISOString().slice(0, 10),
     account: {
@@ -3720,6 +4194,17 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       description: account.description || '',
       annual_usage: account.annual_usage || '',
     },
+    identity_profile: identityProfile ? {
+      industry_cluster: identityProfile.industryCluster,
+      company_type: identityProfile.companyType,
+      operating_model: identityProfile.operatingModel,
+      facility_type: identityProfile.facilityType,
+      identity_keywords: identityProfile.identityKeywords,
+      power_keywords: identityProfile.powerKeywords,
+      talk_track_guardrails: identityProfile.talkTrackGuardrails,
+      confidence: identityProfile.confidence,
+      evidence: identityProfile.evidence,
+    } : null,
     priorities: [
       '1. Recent acquisitions or being acquired (last 24 months)',
       '2. New facility openings, lease signings, or construction announcements in Texas',
@@ -3754,6 +4239,7 @@ If a research result has "official_source": true, treat it as the source of reco
 Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
+- If the payload includes an identity_profile block, use it as the operating identity guardrail for the account unless the research clearly proves it wrong.
 - If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
 - If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
 - Only use an acquisition/ownership signal when the source explicitly says the business was acquired, sold, merged, or taken over. Company history pages and family-origin stories are not acquisition signals.
@@ -3790,6 +4276,7 @@ Decision rules:
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
+- Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
 - If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
@@ -4102,10 +4589,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const candidateResults = await collectResearchCandidates(account)
+    const identityProfile = buildStructuredIdentityProfile(account as AccountRow, candidateResults)
+    const briefingAccount: AccountRow = identityProfile
+      ? {
+          ...(account as AccountRow),
+          metadata: {
+            ...getAccountMetadata(account as AccountRow),
+            intelligenceProfile: identityProfile,
+          },
+        }
+      : account as AccountRow
     const diagnostics = buildResearchDiagnostics(candidateResults)
     console.info('[Intelligence Brief] Research candidates collected:', {
       accountId,
-      accountName: account.name,
+      accountName: briefingAccount.name,
       total: diagnostics.total,
       bySourceKind: diagnostics.bySourceKind,
     })
@@ -4118,7 +4615,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (candidateResults.length > 0) {
       try {
-        generatedBrief = await runOpenRouterResearch(account, candidateResults, false)
+        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false)
         if (generatedBrief) {
           outcomeStatus = 'ready'
           validated = generatedBrief
@@ -4139,20 +4636,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const fallbackCandidates: ResearchHit[] = []
         
         // Fetch company website
-        const websiteInfo = await fetchCompanyWebsiteInfo(account)
+        const websiteInfo = await fetchCompanyWebsiteInfo(briefingAccount)
         if (websiteInfo) {
           fallbackCandidates.push(websiteInfo)
         }
         
         if (fallbackCandidates.length === 0) {
-          const profileFallback = buildCompanyProfileFallbackHit(account)
+          const profileFallback = buildCompanyProfileFallbackHit(briefingAccount)
           if (profileFallback) {
             fallbackCandidates.push(profileFallback)
           }
         }
         
         // Fetch industry trends
-        const industryTrends = await fetchIndustryTrends(account)
+        const industryTrends = await fetchIndustryTrends(briefingAccount)
         fallbackCandidates.push(...industryTrends)
         
         if (fallbackCandidates.length > 0) {
@@ -4164,7 +4661,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           rescueCandidates = dedupeAndSort([...candidateResults, ...fallbackCandidates], account)
           
-          generatedBrief = await runOpenRouterResearch(account, fallbackCandidates, true)
+          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true)
           if (generatedBrief) {
             outcomeStatus = 'ready'
             validated = generatedBrief
@@ -4179,15 +4676,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!validated && rescueCandidates.length > 0) {
       const rescueCandidate = rescueCandidates[0]
-      const rescueContext = buildTalkTrackContext(account, rescueCandidate, false)
-      const rescueBrief = buildRescueBrief(account, rescueCandidate, rescueContext)
+      const rescueContext = buildTalkTrackContext(briefingAccount, rescueCandidate, false)
+      const rescueBrief = buildRescueBrief(briefingAccount, rescueCandidate, rescueContext)
       if (rescueBrief) {
         validated = rescueBrief
         generatedBrief = rescueBrief
         outcomeStatus = 'ready'
         console.info('[Intelligence Brief] Using deterministic rescue brief:', {
           accountId,
-          accountName: account.name,
+          accountName: briefingAccount.name,
           candidateTitle: rescueCandidate.title,
           sourceKind: rescueCandidate.sourceKind,
         })
@@ -4200,27 +4697,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Even with no signals, generate an AI talk track based on company context
       console.info('[Intelligence Brief] No signals found, generating AI talk track from company context:', {
         accountId,
-        accountName: account.name,
-        industry: account.industry,
+        accountName: briefingAccount.name,
+        industry: briefingAccount.industry,
       })
       
-      const fallbackContext = buildTalkTrackContext(account, null, true)
-      const aiTalkTrack = await generateAITalkTrack(account, null, fallbackContext)
+      const fallbackContext = buildTalkTrackContext(briefingAccount, null, true)
+      const aiTalkTrack = await generateAITalkTrack(briefingAccount, null, fallbackContext)
       
       if (aiTalkTrack) {
         // Create a minimal brief with just the AI talk track
-        const industryLabel = cleanText(account.industry) || 'this business'
+        const industryLabel = cleanText(briefingAccount.industry) || 'this business'
         validated = {
           signal_headline: 'Industry Context',
           signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
           talk_track: aiTalkTrack,
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
-          source_url: account.domain ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
+          source_url: briefingAccount.domain ? `https://${cleanText(briefingAccount.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
           confidence_level: 'Low',
           selected_priority: 9,
           source_title: 'Industry Context',
-          source_domain: account.domain || '',
+          source_domain: briefingAccount.domain || '',
         }
         outcomeStatus = 'ready'
         usedFallback = true
@@ -4232,11 +4729,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // AI generation failed, use manual template as last resort
         console.warn('[Intelligence Brief] AI talk track generation failed, using manual template fallback:', {
           accountId,
-          accountName: account.name,
+          accountName: briefingAccount.name,
         })
         
-        const manualTalkTrack = buildManualTalkTrack(account, null, fallbackContext, 0)
-        const industryLabel = cleanText(account.industry) || 'this business'
+        const manualTalkTrack = buildManualTalkTrack(briefingAccount, null, fallbackContext, 0)
+        const industryLabel = cleanText(briefingAccount.industry) || 'this business'
         
         validated = {
           signal_headline: 'Industry Context',
@@ -4244,11 +4741,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           talk_track: manualTalkTrack,
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
-          source_url: account.domain ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
+          source_url: briefingAccount.domain ? `https://${cleanText(briefingAccount.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
           confidence_level: 'Low',
           selected_priority: 9,
           source_title: 'Industry Context',
-          source_domain: account.domain || '',
+          source_domain: briefingAccount.domain || '',
         }
         outcomeStatus = 'ready'
         usedFallback = true
@@ -4262,10 +4759,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       : generatedBrief
         ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates)
         : rescueCandidates[0] || null
-    const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, false)
-    const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
+    const talkTrackRewriteContext = buildTalkTrackContext(briefingAccount, talkTrackCandidate, false)
+    const previousTalkTrack = cleanText(briefingAccount.intelligence_brief_talk_track || '')
     if (validated) {
-      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, account) ||
+      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, briefingAccount) ||
         (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack)) ||
         talkTrackCache.isTooSimilar(validated.talk_track || '')
 
@@ -4273,11 +4770,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         let rewrittenTalkTrack: string | null = null
         
         // Always try AI generation first for rewrites
-        rewrittenTalkTrack = await generateAITalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
+        rewrittenTalkTrack = await generateAITalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext)
         
         // Validate AI-generated talk track
         if (rewrittenTalkTrack) {
-          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, account) ||
+          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, briefingAccount) ||
               (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
             console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
@@ -4287,17 +4784,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Fall back to manual generation if AI failed or not applicable
         if (!rewrittenTalkTrack) {
-          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 0)
+          rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 0)
 
           // Check against cache and previous talk track
           if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
-            rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 1)
+            rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 1)
           }
 
           if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
-            rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 2)
+            rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 2)
           }
         }
 
@@ -4321,6 +4818,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const updatePayload: Record<string, unknown> = {
       intelligence_brief_status: outcomeStatus,
       intelligence_brief_last_refreshed_at: new Date().toISOString(),
+    }
+
+    if (identityProfile) {
+      updatePayload.metadata = briefingAccount.metadata
     }
 
     if (validated) {
