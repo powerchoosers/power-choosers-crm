@@ -82,6 +82,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [isReady, setIsReady] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [metadata, setMetadata] = useState<VoiceMetadata | null>(null)
+  const [incomingPrompt, setIncomingPrompt] = useState<{
+    from: string
+    meta: VoiceMetadata | null
+    onAnswer: () => void
+    onDecline: () => void
+  } | null>(null)
 
   const { user } = useAuth()
   const { setStatus, setActive, setCallHealth, setPhoneNumber, phoneNumber } = useCallStore()
@@ -678,6 +684,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           isCallSessionActiveRef.current = true
           setCurrentCall(call)
           setMetadata(resolvedMeta)
+          setIncomingPrompt(null)
           setActive(true)
           setStatus('connected')
           setCallHealth('good')
@@ -717,10 +724,18 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           incomingSettled = true
           clearNativeNotification()
           call.reject()
+          setIncomingPrompt(null)
           if (toastId !== undefined) {
             toast.dismiss(toastId)
           }
         }
+
+        setIncomingPrompt({
+          from,
+          meta: null,
+          onAnswer: answerIncomingCall,
+          onDecline: declineIncomingCall,
+        })
 
         // 1) Show In-App Toast
         const toastId = toast(
@@ -764,6 +779,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           clearNativeNotification()
           console.log('[Voice] Call cancelled by caller')
           isCallSessionActiveRef.current = false
+          setIncomingPrompt(null)
           emitCallFinished(resolvedMeta, from)
           toast.dismiss(toastId)
           toast.error('Missed Call', {
@@ -782,6 +798,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           incomingSettled = true
           clearNativeNotification()
           isCallSessionActiveRef.current = false
+          setIncomingPrompt(null)
           emitCallFinished(resolvedMeta, from)
           toast.dismiss(toastId)
           setCurrentCall(null)
@@ -796,6 +813,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           if (incomingSettled) return
           resolvedMeta = meta
           setMetadata(meta)
+          setIncomingPrompt((current) => current ? { ...current, meta } : current)
           toast(
             <IncomingCallToast
               meta={meta}
@@ -1349,6 +1367,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       metadata
     }}>
       {children}
+      {incomingPrompt && (
+        <div className="fixed top-4 right-4 z-[2147483647] w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-zinc-950/95 p-4 shadow-[0_24px_80px_rgba(0,0,0,0.75)] backdrop-blur-xl">
+          <IncomingCallToast
+            meta={incomingPrompt.meta}
+            from={incomingPrompt.from}
+            onAnswer={incomingPrompt.onAnswer}
+            onDecline={incomingPrompt.onDecline}
+          />
+        </div>
+      )}
     </VoiceContext.Provider>
   )
 }
