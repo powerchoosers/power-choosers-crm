@@ -1,3 +1,4 @@
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import type { RefObject } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
@@ -523,7 +524,7 @@ export function EmailList({
           </div>
         </div>
         <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-[0.2em]">
-          Total_Entropy: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span>
+          Total_Entropy: <AnimatedCount value={totalForActiveFilter} className="text-zinc-400 tabular-nums" />
           {filter === 'scheduled' && displayedEmails.some((email) => String(email.status || '').toLowerCase() === 'failed') && (
             <>
               <span className="mx-2 text-zinc-700">|</span>
@@ -978,7 +979,7 @@ export function EmailList({
           <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
             <span>Sync_Block {showingStart}–{showingEnd}</span>
             <div className="h-1 w-1 rounded-full bg-zinc-800" />
-            <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span></span>
+            <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={totalForActiveFilter} className="text-zinc-400 tabular-nums" /></span>
           </div>
         </div>
         <ForensicPagination

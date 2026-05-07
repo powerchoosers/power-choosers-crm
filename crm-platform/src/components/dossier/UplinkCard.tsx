@@ -379,6 +379,8 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
+                    inputMode="tel"
+                    autoComplete="tel"
                     value={phone.value}
                     onChange={(e) => handlePhoneChange(phone.id, e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
@@ -459,6 +461,8 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
+                          inputMode="tel"
+                          autoComplete="tel"
                           value={phone.value}
                           onChange={(e) => handleAdditionalPhoneChange(phone.id, e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}

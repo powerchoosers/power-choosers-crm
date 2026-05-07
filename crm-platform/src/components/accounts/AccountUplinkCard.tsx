@@ -176,6 +176,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
               </div>
               <input
                 type="text"
+                inputMode="tel"
+                autoComplete="tel"
                 value={account.companyPhone || ''}
                 onChange={(e) => onUpdate?.({ companyPhone: formatPhoneNumber(e.target.value) })}
                 onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}

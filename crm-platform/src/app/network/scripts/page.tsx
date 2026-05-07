@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import { useState, useEffect } from 'react'
 import { Search, Plus, FileText, ChevronRight, Filter, ChevronLeft, Loader2 } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
@@ -57,7 +58,7 @@ export default function ScriptsPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-zinc-600">Total_Nodes:</span>
-            <span className="text-zinc-400 tabular-nums">{totalRecords}</span>
+            <AnimatedCount value={totalRecords} className="text-zinc-400 tabular-nums" />
           </div>
         </div>
 
@@ -125,7 +126,7 @@ export default function ScriptsPage() {
                 <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
                   <span>Sync_Block 01–{showingCount.toString().padStart(2, '0')}</span>
                   <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords}</span></span>
+                  <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={totalRecords} className="text-zinc-400 tabular-nums" /></span>
                 </div>
             </div>
             <div className="flex items-center gap-2">

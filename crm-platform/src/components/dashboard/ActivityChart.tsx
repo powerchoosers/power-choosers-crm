@@ -3,12 +3,44 @@
 import { useCallStore } from '@/store/callStore';
 import { supabase } from '@/lib/supabase';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { isHumanConnectCall } from '@/lib/voice-outcomes';
+
+// ─── Animated integer hook ────────────────────────────────────────────────────
+function useAnimatedCount(target: number, duration = 800): number {
+  const [displayed, setDisplayed] = useState(0);
+  const prevRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = target;
+    if (from === to) return;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    startRef.current = null;
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 4);
+    const tick = (ts: number) => {
+      if (startRef.current === null) startRef.current = ts;
+      const progress = Math.min((ts - startRef.current) / duration, 1);
+      setDisplayed(Math.round(from + (to - from) * easeOut(progress)));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        prevRef.current = to;
+        rafRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+
+  return displayed;
+}
 
 type VelocityCallRow = {
   id: string
@@ -92,6 +124,7 @@ export function VelocityTrackerV3() {
   if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;
 
   const currentCalls = Math.min(metrics?.totalCalls || 0, 100);
+  const animatedCalls = useAnimatedCount(currentCalls);
   const isCold = currentCalls <= 33;
   const isTracing = currentCalls > 33 && currentCalls <= 66;
   const isLocked = currentCalls > 66;
@@ -131,7 +164,7 @@ export function VelocityTrackerV3() {
             isLocked ? "text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" :
               isTracing ? "text-[#002FA7] drop-shadow-[0_0_15px_rgba(0,47,167,0.5)]" : "text-white"
           )}>
-            {currentCalls.toString().padStart(2, '0')}
+          {animatedCalls.toString().padStart(2, '0')}
           </span>
           <span className="text-[32px] xl:text-[40px] text-zinc-700 tracking-widest transition-colors group-hover/velocity:text-zinc-600">/100</span>
         </motion.div>

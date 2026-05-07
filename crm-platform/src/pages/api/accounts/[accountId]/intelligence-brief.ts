@@ -104,6 +104,7 @@ type AccountRow = {
   name: string | null
   industry: string | null
   domain: string | null
+  website?: string | null
   linkedin_url: string | null
   city: string | null
   state: string | null
@@ -229,6 +230,26 @@ type IntelligenceProfile = {
   confidence: IdentityConfidence
   generatedAt: string
   sourceKinds: ResearchSourceKind[]
+}
+
+type HierarchyResearchAccount = {
+  id: string
+  name: string
+  website: string | null
+  domain: string | null
+  description: string | null
+  city: string | null
+  state: string | null
+  role: 'parent' | 'subsidiary'
+}
+
+type HierarchyResearchContext = {
+  organizationRole: 'standalone' | 'parent' | 'subsidiary'
+  hierarchySummary: string
+  parent: HierarchyResearchAccount | null
+  subsidiaries: HierarchyResearchAccount[]
+  relatedLinks: string[]
+  relatedFacts: string[]
 }
 
 type TalkTrackContext = {
@@ -474,6 +495,113 @@ function getAccountNotes(account: AccountRow) {
   ]
 
   return candidates.map(cleanText).filter(Boolean).join(' ').toLowerCase()
+}
+
+function isLikelyUuid(value: unknown) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim())
+}
+
+function extractHierarchyIds(metadata: unknown) {
+  const safeMeta = metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+    ? metadata as Record<string, unknown>
+    : {}
+  const relationships = safeMeta.relationships && typeof safeMeta.relationships === 'object' && !Array.isArray(safeMeta.relationships)
+    ? safeMeta.relationships as Record<string, unknown>
+    : {}
+  const parentAccountId = cleanText(relationships.parentAccountId)
+    || cleanText(safeMeta.parentAccountId)
+    || cleanText(safeMeta.parent_company_id)
+    || null
+  const subsidiaryAccountIds = Array.isArray(relationships.subsidiaryAccountIds)
+    ? relationships.subsidiaryAccountIds.filter(isLikelyUuid)
+    : Array.isArray(safeMeta.subsidiaryAccountIds)
+      ? safeMeta.subsidiaryAccountIds.filter(isLikelyUuid)
+      : []
+
+  return {
+    parentAccountId,
+    subsidiaryAccountIds: subsidiaryAccountIds.map((value) => String(value).trim()),
+  }
+}
+
+function normalizeWebsiteCandidate(value: unknown) {
+  const raw = cleanText(value)
+  if (!raw) return null
+  const normalized = raw.startsWith('http') ? raw : `https://${raw.replace(/^www\./i, '')}`
+  try {
+    const parsed = new URL(normalized)
+    return parsed.toString()
+  } catch (_) {
+    return null
+  }
+}
+
+function buildHierarchyResearchContext(
+  account: AccountRow,
+  relatedAccounts: Array<Partial<AccountRow> & { id: string }> = [],
+): HierarchyResearchContext | null {
+  const hierarchyIds = extractHierarchyIds(account.metadata)
+  if (!hierarchyIds.parentAccountId && hierarchyIds.subsidiaryAccountIds.length === 0) return null
+
+  const relatedMap = new Map(relatedAccounts.map((row) => [row.id, row]))
+  const parentRow = hierarchyIds.parentAccountId ? relatedMap.get(hierarchyIds.parentAccountId) || null : null
+  const subsidiaries = hierarchyIds.subsidiaryAccountIds
+    .map((id) => relatedMap.get(id))
+    .filter(Boolean)
+    .map((row) => ({
+      id: String(row?.id || ''),
+      name: cleanText(row?.name) || 'Unknown subsidiary',
+      website: normalizeWebsiteCandidate((row as AccountRow)?.website || (row as AccountRow)?.domain),
+      domain: cleanText((row as AccountRow)?.domain) || null,
+      description: cleanText((row as AccountRow)?.description) || null,
+      city: cleanText((row as AccountRow)?.city) || null,
+      state: cleanText((row as AccountRow)?.state) || null,
+      role: 'subsidiary' as const,
+    }))
+
+  const parent = parentRow
+    ? {
+        id: String(parentRow.id || ''),
+        name: cleanText(parentRow.name) || 'Unknown parent',
+        website: normalizeWebsiteCandidate((parentRow as AccountRow).website || (parentRow as AccountRow).domain),
+        domain: cleanText((parentRow as AccountRow).domain) || null,
+        description: cleanText((parentRow as AccountRow).description) || null,
+        city: cleanText((parentRow as AccountRow).city) || null,
+        state: cleanText((parentRow as AccountRow).state) || null,
+        role: 'parent' as const,
+      }
+    : null
+
+  const organizationRole: HierarchyResearchContext['organizationRole'] = parent
+    ? 'subsidiary'
+    : subsidiaries.length > 0
+      ? 'parent'
+      : 'standalone'
+
+  const relatedLinks = uniqueStrings([
+    parent?.website,
+    ...subsidiaries.map((item) => item.website),
+  ], 6)
+
+  const relatedFacts = uniqueStrings([
+    parent ? `Parent company: ${parent.name}${parent.description ? ` - ${shortenText(parent.description, 140)}` : ''}` : null,
+    ...subsidiaries.slice(0, 4).map((item) => `Subsidiary: ${item.name}${item.description ? ` - ${shortenText(item.description, 140)}` : ''}`),
+  ], 6)
+
+  return {
+    organizationRole,
+    hierarchySummary: [
+      `Operating company: ${cleanText(account.name) || 'Unknown'}`,
+      `Role: ${organizationRole}`,
+      `Parent company: ${parent?.name || 'none'}`,
+      `Subsidiaries: ${subsidiaries.length ? subsidiaries.map((item) => item.name).join('; ') : 'none'}`,
+    ].join(' | '),
+    parent,
+    subsidiaries,
+    relatedLinks,
+    relatedFacts,
+  }
 }
 
 function getVerifiedLocationCount(account: AccountRow) {
@@ -797,7 +925,7 @@ async function fetchTextWithTimeout(url: string, init: RequestInit, timeoutMs = 
   }
 }
 
-function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
+function buildSearchBuckets(account: AccountRow, includeDomainClause = false, hierarchyContext: HierarchyResearchContext | null = null) {
   const name = cleanText(account.name) || 'Unknown Company'
   const domain = cleanText(account.domain)
   const city = cleanText(account.city)
@@ -812,8 +940,7 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
   const identityClause = identityHints.length > 0
     ? ` ${identityHints.map((hint) => `"${hint}"`).join(' ')}`
     : ''
-
-  return [
+  const buckets = [
     {
       priority: 1,
       label: 'Acquisitions / M&A',
@@ -850,6 +977,27 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
       query: `"${name}" funding round IPO Series A Series B going public${domainClause}${locationClause}`,
     },
   ]
+
+  const parentName = cleanText(hierarchyContext?.parent?.name)
+  if (parentName) {
+    buckets.push({
+      priority: 4,
+      label: 'Operating company within parent network',
+      query: `"${name}" "${parentName}" expansion facilities locations operations${identityClause}${locationClause}`,
+    })
+  }
+
+  for (const subsidiary of (hierarchyContext?.subsidiaries || []).slice(0, 2)) {
+    const subsidiaryName = cleanText(subsidiary.name)
+    if (!subsidiaryName) continue
+    buckets.push({
+      priority: 4,
+      label: 'Parent / subsidiary operating context',
+      query: `"${name}" "${subsidiaryName}" facilities locations operations${identityClause}${locationClause}`,
+    })
+  }
+
+  return buckets
 }
 
 function buildLinkedInBuckets(account: AccountRow) {
@@ -1378,22 +1526,32 @@ function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null
   }
 }
 
-function buildStructuredIdentityProfile(account: AccountRow, candidates: ResearchHit[]): IntelligenceProfile | null {
+function buildStructuredIdentityProfile(
+  account: AccountRow,
+  candidates: ResearchHit[],
+  hierarchyContext: HierarchyResearchContext | null = null,
+  hierarchyWebsiteHits: ResearchHit[] = [],
+): IntelligenceProfile | null {
   const savedProfile = getAccountIdentityProfile(account)
   const researchText = candidates
     .slice(0, 8)
     .map((candidate) => `${candidate.title} ${candidate.snippet}`)
     .join(' ')
+  const hierarchyText = cleanText([
+    hierarchyContext?.hierarchySummary || '',
+    ...(hierarchyContext?.relatedFacts || []),
+    ...hierarchyWebsiteHits.slice(0, 4).map((candidate) => `${candidate.title} ${candidate.snippet}`),
+  ].join(' '))
   const synthesizedAccount: AccountRow = {
     ...account,
-    description: cleanText(`${account.description || ''} ${researchText}`),
+    description: cleanText(`${account.description || ''} ${researchText} ${hierarchyText}`),
   }
   const primaryCandidate = candidates[0] || null
   const baseCluster = inferIndustryClusterFromSignals(account, null)
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
   const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${buildIdentityProfileText(account)}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account)}`).toLowerCase()
 
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
@@ -3539,13 +3697,13 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     // This feels more peer-to-peer than "I saw your website"
     const observationalOpenerOptions = multiSiteInfo.isMultiSite
       ? [
-          `I was curious how ${companyName} is managing all those sites.`,
-          `I was looking at how ${companyName}'s locations line up across the portfolio.`,
-          `I wanted to understand how ${companyName} is handling that multi-site footprint.`,
+          `I was curious how ${companyName} is comparing electricity across those locations.`,
+          `I wanted to understand whether a few ${companyName} locations are carrying more of the bill than the rest.`,
+          `I was curious how ${companyName} is keeping track of the higher-cost locations.`,
         ]
       : [
           `I caught the update about ${companyName} online.`,
-          `I was looking into the setup at ${companyName}.`,
+          `I was curious what is driving the bill at ${companyName}.`,
           `I was curious about what is driving the bill at ${companyName}.`,
         ]
     const observationalOpener = observationalOpenerOptions[hashString(variantSeed) % observationalOpenerOptions.length]
@@ -3975,12 +4133,48 @@ async function fetchLinkedInHits(account: AccountRow) {
   return dedupeAndSort(hits, account)
 }
 
-async function fetchGeneralWebHits(account: AccountRow) {
-  return fetchBingRssHits(buildSearchBuckets(account, true), 'web', 4, account)
+async function fetchGeneralWebHits(account: AccountRow, hierarchyContext: HierarchyResearchContext | null = null) {
+  return fetchBingRssHits(buildSearchBuckets(account, true, hierarchyContext), 'web', 4, account)
 }
 
-async function collectResearchCandidates(account: AccountRow) {
-  const buckets = buildSearchBuckets(account)
+async function fetchHierarchyWebsiteHits(hierarchyContext: HierarchyResearchContext | null) {
+  if (!hierarchyContext) return [] as ResearchHit[]
+
+  const targets = [
+    hierarchyContext.parent ? {
+      url: hierarchyContext.parent.website,
+      label: 'Parent company website',
+      title: `${hierarchyContext.parent.name} website`,
+      query: `${hierarchyContext.parent.name} parent company`,
+    } : null,
+    ...hierarchyContext.subsidiaries.slice(0, 3).map((item) => ({
+      url: item.website,
+      label: 'Subsidiary website',
+      title: `${item.name} website`,
+      query: `${item.name} subsidiary company`,
+    })),
+  ]
+    .filter((item): item is { url: string | null; label: string; title: string; query: string } => Boolean(item?.url))
+
+  const hits = await Promise.all(targets.map(async (target) => {
+    try {
+      return await fetchPageHit(
+        target.url || '',
+        { priority: 8, label: target.label, query: target.query },
+        'web',
+        target.title,
+      )
+    } catch (error) {
+      console.warn('[Intelligence Brief] Related website fetch failed:', target.url, error)
+      return null
+    }
+  }))
+
+  return hits.filter(Boolean) as ResearchHit[]
+}
+
+async function collectResearchCandidates(account: AccountRow, hierarchyContext: HierarchyResearchContext | null = null) {
+  const buckets = buildSearchBuckets(account, false, hierarchyContext)
   const settled = (await Promise.allSettled([
     (async () => {
       const rssResults = await Promise.all(buckets.map(async (bucket) => {
@@ -3997,7 +4191,7 @@ async function collectResearchCandidates(account: AccountRow) {
       return dedupeAndSort(rssResults.flat(), account)
     })(),
     fetchBingNewsHits(buckets, 'news', 4, account),
-    fetchGeneralWebHits(account),
+    fetchGeneralWebHits(account, hierarchyContext),
     fetchLinkedInHits(account),
     fetchSecSearchHits(account),
     fetchSecFilingHits(account),
@@ -4190,7 +4384,13 @@ async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> 
   }
 }
 
-async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHit[], isFallbackMode = false) {
+async function runOpenRouterResearch(
+  account: AccountRow,
+  candidates: ResearchHit[],
+  isFallbackMode = false,
+  hierarchyContext: HierarchyResearchContext | null = null,
+  hierarchyWebsiteHits: ResearchHit[] = [],
+) {
   const openRouterKey = process.env.OPEN_ROUTER_API_KEY
   if (!openRouterKey) {
     throw new Error('OPEN_ROUTER_API_KEY is not configured')
@@ -4226,6 +4426,26 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       confidence: identityProfile.confidence,
       evidence: identityProfile.evidence,
     } : null,
+    hierarchy_context: hierarchyContext ? {
+      organization_role: hierarchyContext.organizationRole,
+      hierarchy_summary: hierarchyContext.hierarchySummary,
+      parent: hierarchyContext.parent ? {
+        name: hierarchyContext.parent.name,
+        website: hierarchyContext.parent.website,
+        description: hierarchyContext.parent.description,
+        city: hierarchyContext.parent.city,
+        state: hierarchyContext.parent.state,
+      } : null,
+      subsidiaries: hierarchyContext.subsidiaries.slice(0, 6).map((item) => ({
+        name: item.name,
+        website: item.website,
+        description: item.description,
+        city: item.city,
+        state: item.state,
+      })),
+      related_links: hierarchyContext.relatedLinks,
+      related_facts: hierarchyContext.relatedFacts,
+    } : null,
     priorities: [
       '1. Recent acquisitions or being acquired (last 24 months)',
       '2. New facility openings, lease signings, or construction announcements in Texas',
@@ -4248,6 +4468,13 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       source_trust: getSourceTrustRank(account, item),
       official_source: isOfficialCompanyAnnouncement(account, item),
     })),
+    related_entity_research: hierarchyWebsiteHits.slice(0, 6).map((item) => ({
+      label: item.label,
+      title: item.title,
+      url: item.url,
+      snippet: item.snippet,
+      source: item.source,
+    })),
   }
 
   const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
@@ -4261,6 +4488,9 @@ Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
 - If the payload includes an identity_profile block, use it as the operating identity guardrail for the account unless the research clearly proves it wrong.
+- If the payload includes a hierarchy_context block, use it to understand the parent/subsidiary structure and related websites, but keep the operating company as the center of the brief unless the account itself is the parent.
+- Related parent/subsidiary websites are context, not automatic signals. Do not turn a parent-only article into the operating company's headline unless the operating company is clearly named or the account itself is the parent entity.
+- If related_entity_research is present, use it to validate what the company actually is and how the linked businesses describe themselves. It is support context, not a free pass to invent a parent-level event.
 - If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
 - If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
 - Only use an acquisition/ownership signal when the source explicitly says the business was acquired, sold, merged, or taken over. Company history pages and family-origin stories are not acquisition signals.
@@ -4298,6 +4528,7 @@ Decision rules:
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
+- Respect the hierarchy context. If the account is a subsidiary, write the brief around the subsidiary's actual business and use the parent only to orient the reader. If the account is a parent company, it is fine to mention the portfolio or network, but keep the talk track meter-specific and location-aware.
 - If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
@@ -4609,8 +4840,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    const candidateResults = await collectResearchCandidates(account)
-    const identityProfile = buildStructuredIdentityProfile(account as AccountRow, candidateResults)
+    const hierarchyIds = extractHierarchyIds(account.metadata)
+    const relatedIds = [
+      hierarchyIds.parentAccountId,
+      ...hierarchyIds.subsidiaryAccountIds,
+    ].filter(isLikelyUuid)
+    const { data: relatedAccounts } = relatedIds.length > 0
+      ? await supabaseAdmin
+        .from('accounts')
+        .select('id, name, domain, website, description, city, state')
+        .in('id', relatedIds)
+      : { data: [] }
+    const hierarchyContext = buildHierarchyResearchContext(account as AccountRow, (relatedAccounts || []) as Array<Partial<AccountRow> & { id: string }>)
+    const hierarchyWebsiteHits = await fetchHierarchyWebsiteHits(hierarchyContext)
+
+    const candidateResults = await collectResearchCandidates(account as AccountRow, hierarchyContext)
+    const identityProfile = buildStructuredIdentityProfile(account as AccountRow, candidateResults, hierarchyContext, hierarchyWebsiteHits)
     const briefingAccount: AccountRow = identityProfile
       ? {
           ...(account as AccountRow),
@@ -4636,7 +4881,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (candidateResults.length > 0) {
       try {
-        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false)
+        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false, hierarchyContext, hierarchyWebsiteHits)
         if (generatedBrief) {
           outcomeStatus = 'ready'
           validated = generatedBrief
@@ -4682,7 +4927,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           rescueCandidates = dedupeAndSort([...candidateResults, ...fallbackCandidates], account)
           
-          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true)
+          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true, hierarchyContext, hierarchyWebsiteHits)
           if (generatedBrief) {
             outcomeStatus = 'ready'
             validated = generatedBrief
