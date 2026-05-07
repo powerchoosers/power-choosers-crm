@@ -326,10 +326,17 @@ function looksLikeHospitalityGroup(text: string, verifiedLocationCount: number |
     return false
   }
 
+  const combined = `${text} ${notes}`
+  const hospitalityTerms = /\b(hospitality|hotel|hotels|resort|resorts|motel|lodging|inn|guest rooms?|brand flag|boutique property|boutique hotel|boutique resort|hilton|marriott|hyatt|best western|holiday inn|hampton inn|courtyard|residence inn|doubletree|embassy suites|fairfield inn|aloft|homewood suites|springhill suites|wyndham|sonesta|westin|radisson|omni|renaissance|four seasons|intercontinental|candlewood|drury inn|la quinta|quality inn|comfort inn|quality suites)\b/i
+  const explicitHospitalityGroupSignals = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|resort portfolio|full-service hospitality|branded hotel owner|hotel ownership group|hotel operator|hotel development and management|resort management company)\b/i
+  const portfolioSignals = /\b(owns and operates|multiple properties|properties across|hotels across|resorts across|management company|brand portfolio|portfolio|collection|develops? and manages?|operates over \d+|manages \d+)\b/i.test(combined)
+
   return Boolean(
-    verifiedLocationCount && verifiedLocationCount > 1 ||
-    /\b(hotel management|hospitality group|owns and operates|operates over|manages \d+|portfolio of hotels|multiple properties|properties across|hotels across|resorts across|collection|brand portfolio|lifestyle company|full-service hospitality|development and management|management company)\b/i.test(text) ||
-    /\b(hotel management|hospitality group|owns and operates|multiple properties|portfolio|collection|management company|develops? and manages?|operates over \d+)/i.test(notes)
+    explicitHospitalityGroupSignals.test(combined) ||
+    (hospitalityTerms.test(combined) && (
+      Boolean(verifiedLocationCount && verifiedLocationCount > 1) ||
+      portfolioSignals
+    ))
   )
 }
 
@@ -2098,10 +2105,12 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
-      const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic|imaging|ortho|pediatric|wellness|doctor)/i.test(text)
+      const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
+      const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic imaging|imaging center|ortho|orthopedic|pediatric|wellness|doctor)/i.test(text) && !hasHospitalSignals
       const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
       const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
+      const isHospitalOperator = hasHospitalSignals && !isBehavioralHealth && !isSeniorLiving && !isBloodCenter
 
       if (isBloodCenter) {
         const locationDesc = healthcareMultiSite.locationCount
@@ -2122,12 +2131,35 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
       
       if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 3) {
+        const siteLabel = isHospitalOperator
+          ? 'hospitals'
+          : isBehavioralHealth
+            ? 'care sites'
+            : isClinic
+              ? 'clinics'
+              : isSeniorLiving
+                ? 'care communities'
+                : 'care sites'
         const locationDesc = healthcareMultiSite.locationCount >= 10 
-          ? `${healthcareMultiSite.locationCount}+ ${isBehavioralHealth ? 'care sites' : isClinic ? 'clinics' : isSeniorLiving ? 'care communities' : 'care sites'}`
-          : `${healthcareMultiSite.locationCount} ${isBehavioralHealth ? 'care sites' : isClinic ? 'clinics' : isSeniorLiving ? 'care communities' : 'care sites'}`
+          ? `${healthcareMultiSite.locationCount}+ ${siteLabel}`
+          : `${healthcareMultiSite.locationCount} ${siteLabel}`
         const regionDesc = healthcareMultiSite.regions.length > 1 
           ? ` across ${healthcareMultiSite.regions.length} states`
           : ''
+
+        if (isHospitalOperator) {
+          return {
+            label: 'Neighborhood hospital network',
+            angle: `Hospital-by-hospital comparison of emergency care, imaging, inpatient rooms, lab work, and HVAC across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you comparing the hospitals one by one to see which sites are hitting the bill hardest, or is that still buried in the portfolio view?`,
+            openers: [
+              `A neighborhood-hospital network like this can look steady in the group total while one hospital is carrying a much heavier bill pattern than the rest.`,
+              `When each site combines emergency care, imaging, short-stay rooms, lab work, and HVAC, the power pattern can vary a lot from one hospital to the next.`,
+              `The useful check is whether the busier hospitals are the ones creating the biggest spikes on their own bills.`,
+            ],
+            focus: ['emergency care', 'imaging', 'inpatient rooms', 'lab work', 'hospital comparison', 'site-specific bill spikes'],
+          }
+        }
 
         if (isBehavioralHealth) {
           return {
@@ -2170,6 +2202,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
       
+      if (isHospitalOperator) {
+        return {
+          label: 'Hospital / neighborhood hospital',
+          angle: 'Emergency care, imaging, short-stay rooms, lab work, and round-the-clock HVAC shaping the bill at a licensed hospital site.',
+          question: 'Have you looked at whether emergency care, imaging, or short-stay rooms are what create the biggest spikes on that bill?',
+          openers: [
+            `A small-format hospital is different from a clinic because emergency care, imaging, inpatient rooms, and HVAC can all hit the bill at the same time.`,
+            `The part I would want to separate is whether the emergency department, imaging, or short-stay rooms are pushing the bill hardest.`,
+            `For a neighborhood hospital, the useful question is which clinical areas are driving the bigger bill days, not just what the monthly total looks like.`,
+          ],
+          focus: ['emergency care', 'imaging', 'inpatient rooms', 'lab work', 'HVAC', 'bill spikes'],
+        }
+      }
+
       if (isClinic) {
         return {
           label: 'Medical Practice / Clinic',
@@ -2749,6 +2795,7 @@ REQUIREMENTS:
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
    - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
+   - For hospital operators and neighborhood-hospital networks, use hospital language like emergency departments, inpatient rooms, imaging, lab work, and health-system partnerships. Never use hotel, guest-room, laundry, lodging, banquet, or hospitality language for hospitals.
 ${behavioralHealthContext}   - For multi-site care organizations, keep the comparison portfolio-wide but the liability meter-specific. Say each site can carry its own locked-in peak charge rather than implying one site changes every other site.
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
@@ -2881,7 +2928,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
   const accountIsHealthcare = /\b(healthcare|hospital|clinic|medical|medical practice|acupunctur|functional wellness|doctor|dental|ophthalmology|retina|therapy|patient|wellness care)\b/i.test(accountText)
   const accountHealthcareHotelJargon = accountIsHealthcare &&
-    /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property)\b/i.test(lower)
+    /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property|property-by-property)\b/i.test(lower)
   const accountIsAutomotive = /\b(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|showrooms?|used vehicles?|new vehicles?|nissan|hyundai|chevrolet|cadillac|volkswagen|mitsubishi|kia|genesis|chrysler|jeep|dodge|ram)\b/i.test(accountText)
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
