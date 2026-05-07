@@ -91,6 +91,7 @@ export function CallListItem({
   const pendingSeekRef = useRef<number | null>(null)
   const recordingSrcRef = useRef<string | null>(null)
   const seekGuardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isSeekingRef = useRef(false)
   const { user, profile } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
@@ -182,13 +183,21 @@ export function CallListItem({
       }
     }
     const onTimeUpdate = () => {
-      if (isSeeking) return
+      if (isSeekingRef.current) return
       setCurrentTime(el.currentTime)
     }
     const onLoadedMetadata = () => syncDuration()
     const onDurationChange = () => syncDuration()
     const onEnded = () => {
+      clearSeekGuard()
+      pendingSeekRef.current = null
+      isSeekingRef.current = false
       setIsPlaying(false)
+      try {
+        el.currentTime = 0
+      } catch {
+        // Some browsers are picky right at the end of playback; the UI state still resets.
+      }
       setCurrentTime(0)
     }
     const onPlay = () => setIsPlaying(true)
@@ -216,7 +225,7 @@ export function CallListItem({
       el.removeEventListener('pause', onPause)
       el.removeEventListener('seeked', onSeeked)
     }
-  }, [call.recordingUrl, call.recordingSid, isPlayerOpen, fallbackDuration, isSeeking])
+  }, [call.recordingUrl, call.recordingSid, isPlayerOpen, fallbackDuration])
 
   // Preload logged-in user's avatar for agent icon (host Google photo to avoid CORS)
   useEffect(() => {
@@ -273,9 +282,11 @@ export function CallListItem({
     const seekMax = getSeekableMax(el)
     if (seekMax > 0) {
       const target = Math.max(0, Math.min(t, seekMax))
+      isSeekingRef.current = true
       setIsSeeking(true)
       clearSeekGuard()
       seekGuardTimeoutRef.current = setTimeout(() => {
+        isSeekingRef.current = false
         setIsSeeking(false)
         seekGuardTimeoutRef.current = null
       }, 700)
@@ -288,6 +299,7 @@ export function CallListItem({
         pendingSeekRef.current = target
       }
     }
+    isSeekingRef.current = false
     setIsSeeking(false)
     pendingSeekRef.current = t
   }
@@ -297,12 +309,18 @@ export function CallListItem({
     if (el) {
       el.pause()
       el.removeAttribute('src')
+      try {
+        el.load()
+      } catch {
+        // Ignore browsers that reject load() after src removal.
+      }
     }
     setIsPlayerOpen(false)
     setIsPlaying(false)
     setCurrentTime(0)
     setDuration(0)
     setIsSeeking(false)
+    isSeekingRef.current = false
     clearSeekGuard()
     pendingSeekRef.current = null
   }
