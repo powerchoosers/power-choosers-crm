@@ -386,6 +386,60 @@ function getAccountMetadata(account: AccountRow) {
     : {}
 }
 
+function getIdentityProfileSeedText(account: AccountRow) {
+  return cleanText([
+    account.name,
+    account.industry,
+    account.description,
+    getAccountNotes(account),
+    account.website,
+    account.domain,
+  ].filter(Boolean).join(' ')).toLowerCase()
+}
+
+function hasStrongHealthcareSignals(text: string) {
+  return /(healthcare|hospital|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|specialist|wellness|doctor)/i.test(text)
+}
+
+function hasStrongRestaurantSignals(text: string) {
+  return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging)/i.test(text)
+}
+
+function hasStrongManufacturingSignals(text: string) {
+  return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
+}
+
+function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountText: string) {
+  const profileText = cleanText([
+    profile.companyType,
+    profile.operatingModel,
+    profile.facilityType,
+    ...(profile.identityKeywords || []),
+    ...(profile.powerKeywords || []),
+    ...(profile.talkTrackGuardrails || []),
+  ].join(' ')).toLowerCase()
+
+  if (!profileText) return false
+
+  const healthcareSignals = hasStrongHealthcareSignals(accountText)
+  const restaurantSignals = hasStrongRestaurantSignals(accountText)
+  const manufacturingSignals = hasStrongManufacturingSignals(accountText)
+
+  if (healthcareSignals && /(restaurant|dining|kitchen|hotel|hospitality|plant|industrial|warehouse|logistics|distribution)/i.test(profileText)) {
+    return true
+  }
+
+  if (restaurantSignals && /(healthcare|hospital|clinic|medical|behavioral health|mental health|surgery|surgical)/i.test(profileText)) {
+    return true
+  }
+
+  if (manufacturingSignals && /(healthcare|hospital|clinic|medical|restaurant|hotel|hospitality|behavioral health|mental health)/i.test(profileText)) {
+    return true
+  }
+
+  return false
+}
+
 function isBroadIdentityCluster(cluster: IndustryCluster) {
   return BROAD_IDENTITY_CLUSTERS.has(cluster)
 }
@@ -404,7 +458,26 @@ function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | n
   const record = raw as Record<string, unknown>
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
+  const accountText = getIdentityProfileSeedText(account)
   const stableCluster = inferIndustryClusterFromSignals(account, null)
+  const savedProfile = {
+    version: IDENTITY_PROFILE_VERSION,
+    industryCluster: cluster,
+    companyType: cleanText(record.companyType),
+    operatingModel: cleanText(record.operatingModel),
+    facilityType: cleanText(record.facilityType),
+    identityKeywords: uniqueStrings(Array.isArray(record.identityKeywords) ? record.identityKeywords : [], 8),
+    powerKeywords: uniqueStrings(Array.isArray(record.powerKeywords) ? record.powerKeywords : [], 8),
+    talkTrackGuardrails: uniqueStrings(Array.isArray(record.talkTrackGuardrails) ? record.talkTrackGuardrails : [], 8),
+    evidence: uniqueStrings(Array.isArray(record.evidence) ? record.evidence : [], 4),
+    confidence: 'low' as IdentityConfidence,
+    generatedAt: cleanText(record.generatedAt),
+    sourceKinds: uniqueStrings(Array.isArray(record.sourceKinds) ? record.sourceKinds : [], 4)
+      .filter((value): value is ResearchSourceKind => ['news', 'web', 'sec', 'linkedin'].includes(value))
+      .slice(0, 4),
+  }
+
+  if (profileConflictsWithCoreSignals(savedProfile, accountText)) return null
   if (cluster !== stableCluster && !isBroadIdentityCluster(stableCluster)) return null
 
   const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
@@ -1592,7 +1665,7 @@ function buildStructuredIdentityProfile(
         facilityType = 'clinic / crisis center / support building'
         identityKeywords = selectIdentityKeywords(text, ['behavioral health', 'mental health', 'crisis services', 'counseling', 'care coordination', 'community programs'], ['behavioral health', 'community care', 'crisis services'])
         powerKeywords = selectIdentityKeywords(text, ['hvac', 'clinical space', 'support buildings', 'crisis center', 'counseling center'], ['HVAC', 'clinical space', 'support buildings'])
-        talkTrackGuardrails = ['No senior-living language', 'No hotel language', 'No restaurant language']
+        talkTrackGuardrails = ['No senior-living language', 'No hotel language', 'No restaurant language', 'No manufacturing language']
         break
       }
 
@@ -1612,7 +1685,7 @@ function buildStructuredIdentityProfile(
         facilityType = 'hospital'
         identityKeywords = selectIdentityKeywords(text, ['neighborhood hospital', 'small-format hospital', 'emergency care', 'inpatient services', 'diagnostic care', 'health system partnerships', 'micro-hospital'], ['neighborhood hospital', 'emergency care', 'inpatient services'])
         powerKeywords = selectIdentityKeywords(text, ['emergency department', 'imaging', 'short-stay rooms', 'inpatient rooms', 'lab work', 'hvac'], ['emergency department', 'imaging', 'lab work', 'HVAC'])
-        talkTrackGuardrails = ['No hotel language', 'No guest-room language', 'No laundry language', 'No banquet or event-venue language']
+        talkTrackGuardrails = ['No hotel language', 'No guest-room language', 'No laundry language', 'No banquet or event-venue language', 'No restaurant language']
         break
       }
 
@@ -1621,7 +1694,7 @@ function buildStructuredIdentityProfile(
       facilityType = 'clinic / medical office'
       identityKeywords = selectIdentityKeywords(text, ['medical practice', 'clinic', 'patient care', 'diagnostic imaging', 'specialists', 'treatment rooms'], ['medical practice', 'clinic', 'patient care'])
       powerKeywords = selectIdentityKeywords(text, ['hvac', 'treatment rooms', 'imaging', 'lighting', 'patient hours'], ['HVAC', 'patient hours', 'treatment rooms'])
-      talkTrackGuardrails = ['No hotel language', 'No hospital-inpatient language unless source confirms it']
+      talkTrackGuardrails = ['No hotel language', 'No hospital-inpatient language unless source confirms it', 'No restaurant language', 'No manufacturing language']
       break
 
     case 'manufacturing':
