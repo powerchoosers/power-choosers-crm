@@ -3,7 +3,6 @@ import logger from '../_logger.js';
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context';
 import { buildAudienceProfile, buildAudienceProfileBlock } from '@/lib/contact-persona';
-import { buildAudienceProfile, buildAudienceProfileBlock } from '@/lib/contact-persona';
 
 function extractJsonObject(raw) {
   if (!raw || typeof raw !== 'string') return null;
