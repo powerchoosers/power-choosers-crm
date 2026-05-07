@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { SortingState } from '@tanstack/react-table'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { millDecimal } from '@/lib/mills'
@@ -175,6 +176,39 @@ function normalizeStatusTerms(values?: string[]) {
   return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
 }
 
+function normalizeAccountSort(sorting?: SortingState, defaultColumn = 'name') {
+  const sort = sorting?.[0]
+
+  if (!sort?.id) {
+    return { column: defaultColumn, ascending: true, secondary: null as string | null }
+  }
+
+  switch (sort.id) {
+    case 'contractEnd':
+      return { column: 'contract_end_date', ascending: !sort.desc, secondary: null as string | null }
+    case 'updated':
+      return { column: 'updatedAt', ascending: !sort.desc, secondary: null as string | null }
+    case 'employees':
+      return { column: 'employees', ascending: !sort.desc, secondary: null as string | null }
+    case 'name':
+      return { column: 'name', ascending: !sort.desc, secondary: null as string | null }
+    case 'industry':
+      return { column: 'industry', ascending: !sort.desc, secondary: null as string | null }
+    case 'location':
+      return {
+        column: 'city',
+        ascending: !sort.desc,
+        secondary: 'state',
+      }
+    case 'owner':
+      return { column: 'ownerId', ascending: !sort.desc, secondary: null as string | null }
+    case 'companyPhone':
+      return { column: 'phone', ascending: !sort.desc, secondary: null as string | null }
+    default:
+      return { column: defaultColumn, ascending: true, secondary: null as string | null }
+  }
+}
+
 function normalizeSearchPhoneDigits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '')
 }
@@ -349,15 +383,16 @@ export function useSearchAccounts(queryTerm: string) {
   });
 }
 
-export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
+export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true, sorting?: SortingState) {
   const { user, role, loading } = useAuth()
   const ownerScopeValues = buildOwnerScopeValues(user)
   const locationTerms = normalizeLocationTerms(filters?.location)
   const statusTerms = normalizeStatusTerms(filters?.status)
   const industryTerms = (filters?.industry ?? []).map((value) => String(value).trim()).filter(Boolean)
+  const activeSort = normalizeAccountSort(sorting, listId ? 'name' : 'contract_end_date')
 
   return useInfiniteQuery({
-    queryKey: ['accounts', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryKey: ['accounts', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId, activeSort.column, activeSort.ascending],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -421,9 +456,13 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
 
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error } = await query
+        const orderedQuery = query
           .range(from, to)
-          .order('name', { ascending: true });
+          .order(activeSort.column, { ascending: activeSort.ascending, nullsFirst: false })
+
+        const { data, error } = activeSort.secondary
+          ? await orderedQuery.order(activeSort.secondary, { ascending: activeSort.ascending, nullsFirst: false })
+          : await orderedQuery;
 
         if (error) {
           // Suppress logging for aborted requests

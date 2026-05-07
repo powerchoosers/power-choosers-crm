@@ -61,9 +61,11 @@ export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
     return (
         <TableHead
             ref={setNodeRef}
+            {...attributes}
+            {...listeners}
             style={style}
             className={cn(
-                "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 relative select-none overflow-hidden",
+                "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 relative select-none overflow-hidden cursor-grab active:cursor-grabbing",
                 isDragging && "bg-zinc-900 border-x border-[#002FA7]/30"
             )}
         >
@@ -76,20 +78,18 @@ export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
                 {/* Animated Drag Handle Wrapper */}
                 <motion.div
                     variants={handleVariants}
-                    className="flex items-center"
+                    className="flex items-center pointer-events-none"
                     transition={{
                         duration: 0.25,
                         ease: [0.23, 1, 0.32, 1]
                     }}
                 >
-                    <button
-                        {...attributes}
-                        {...listeners}
-                        className="cursor-grab active:cursor-grabbing p-1 -ml-1 text-zinc-600 hover:text-[#002FA7] transition-colors"
+                    <div
+                        className="p-1 -ml-1 text-zinc-600 hover:text-[#002FA7] transition-colors"
                         title="Reorder Column"
                     >
                         <GripVertical className="w-3.5 h-3.5" />
-                    </button>
+                    </div>
                 </motion.div>
 
                 {/* Animated Text Content */}
