@@ -108,7 +108,7 @@ function SortableHeaderButton({
       type="button"
       onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
       className={cn(
-        "icon-button-forensic flex items-center gap-2 text-sm font-medium -ml-1",
+        "flex items-center gap-1.5 -ml-1 text-sm font-medium normal-case tracking-normal leading-none text-zinc-500 transition-colors hover:text-zinc-200",
         className
       )}
       title={title || `Sort by ${label.toLowerCase()}`}
@@ -116,7 +116,7 @@ function SortableHeaderButton({
       <span>{label}</span>
       <ArrowUpDown
         className={cn(
-          "h-4 w-4 transition-transform",
+          "h-3.5 w-3.5 transition-transform",
           sortState === 'desc' && "rotate-180",
           sortState ? "text-[#002FA7]" : "text-zinc-500"
         )}
