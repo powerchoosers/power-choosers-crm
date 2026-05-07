@@ -2,6 +2,8 @@ import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context';
+import { buildAudienceProfile, buildAudienceProfileBlock } from '@/lib/contact-persona';
+import { buildAudienceProfile, buildAudienceProfileBlock } from '@/lib/contact-persona';
 
 function extractJsonObject(raw) {
   if (!raw || typeof raw !== 'string') return null;
@@ -40,6 +42,45 @@ function normalizeSubject(input) {
   const value = String(input || '').trim();
   if (!value) return 'Message from Nodal Point';
   return value.replace(/\s+/g, ' ').slice(0, 140);
+}
+
+function normalizeAudienceProfilePayload(value, fallbackSource = 'fallback', fallbackSourceLabel = 'Fallback contact') {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+
+  const source = value.source || fallbackSource;
+  const sourceLabel = value.source_label || value.sourceLabel || fallbackSourceLabel;
+  const careAbouts = Array.isArray(value.care_abouts)
+    ? value.care_abouts
+    : Array.isArray(value.careAbouts)
+      ? value.careAbouts
+      : [];
+  const backgroundSignals = Array.isArray(value.background_signals)
+    ? value.background_signals
+    : Array.isArray(value.backgroundSignals)
+      ? value.backgroundSignals
+      : [];
+  const evidence = Array.isArray(value.evidence) ? value.evidence : [];
+  const guardrails = Array.isArray(value.guardrails) ? value.guardrails : [];
+
+  return {
+    source,
+    sourceLabel,
+    contactId: value.contact_id || value.contactId || null,
+    contactName: value.name || value.contactName || '',
+    contactFirstName: value.first_name || value.firstName || '',
+    contactTitle: value.title || value.contactTitle || '',
+    companyName: value.company_name || value.companyName || '',
+    industry: value.industry || '',
+    roleFamily: value.role_family || value.roleFamily || 'other',
+    roleSummary: value.role_summary || value.roleSummary || '',
+    careAbouts,
+    openerHint: value.opener_hint || value.openerHint || '',
+    questionHint: value.question_hint || value.questionHint || '',
+    backgroundSignals,
+    evidence,
+    guardrails,
+    linkedInUrl: value.linked_in_url || value.linkedInUrl || null,
+  };
 }
 
 function normalizeLiveSignalText(input) {
@@ -573,9 +614,14 @@ export default async function handler(req, res) {
         intelligenceBriefConfidenceLevel: contact?.intelligence_brief_confidence_level || contact?.intelligenceBriefConfidenceLevel || null,
         intelligenceBriefStatus: contact?.intelligence_brief_status || contact?.intelligenceBriefStatus || null,
       });
+      const audienceProfile = normalizeAudienceProfilePayload(contact?.audience_profile, 'sequence', 'Sequence contact')
+        || buildAudienceProfile(contact, { name: companyName, industry: contactIndustry, description: companyDescription }, 'fallback', sourceLabel);
+      const decisionMakerProfile = normalizeAudienceProfilePayload(contact?.decision_maker_profile, 'decision_maker_card', 'Decision-maker card');
+      const audienceProfileBlock = buildAudienceProfileBlock(audienceProfile);
+      const decisionMakerProfileBlock = buildAudienceProfileBlock(decisionMakerProfile);
 
       const dataVectors = [
-        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
+        `- TARGET_IDENTITY: ${(audienceProfile?.contactName || contact?.name || 'Unknown')} (${audienceProfile?.contactTitle || contactTitle}) at ${companyName}`,
         `- COMPANY_OUTREACH_NAME: ${companyName}`,
         contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
         siteAddress ? `- SITE_ADDRESS: ${siteAddress}` : null,
@@ -596,9 +642,11 @@ export default async function handler(req, res) {
         accountNotes ? `- ACCOUNT_NOTES: ${accountNotes}` : null,
         relatedEntityContext ? `- RELATED_ENTITY_CONTEXT: ${relatedEntityContext}` : null,
         researchLinks.length ? `- RELATED_RESEARCH_LINKS: ${researchLinks.join('; ')}` : null,
+        audienceProfileBlock ? `- AUDIENCE_PROFILE: ${audienceProfileBlock}` : null,
+        decisionMakerProfileBlock ? `- DECISION_MAKER_PROFILE: ${decisionMakerProfileBlock}` : null,
         callContext ? `- CALL_CONTEXT: ${callContext}` : null,
         employeeCount ? `- COMPANY_SCALE: ${employeeCount} employees` : null,
-        `- ROLE: ${contactTitle}`,
+        `- ROLE: ${audienceProfile?.contactTitle || contactTitle}`,
         `- LOCATION: ${contactLocation}`,
         `- VECTOR_STATE: energy_enabled=${hasEnergyVector}`,
         hasEnergyVector
@@ -721,6 +769,10 @@ export default async function handler(req, res) {
             - If ACCOUNT_NOTES are present, you may use one note only when it makes the email more specific. Never dump internal notes into the body.
             - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
+          18A. PERSONA RULE:
+            - If AUDIENCE_PROFILE exists, it is the person you are writing to. Use their first name once in the opener and match the angle to their title and role family.
+            - If DECISION_MAKER_PROFILE also exists and it is a different person, treat it as supporting context only. The sequence contact wins over the decision-maker card.
+            - LinkedIn/about/work-history signals are research only. Never mention scraping, LinkedIn, or profile data in the email.
           19. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, utility territory, TDU, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.

@@ -15,6 +15,7 @@ import { getTexasEnergyContext } from '../lib/texas-territory.ts'
 import { getBurnerFromEmail } from '../lib/burner-email.ts'
 import { buildSequenceTemplateVariables, renderSequenceTemplate } from '../lib/sequence-template.ts'
 import { buildIntelligenceBriefContext } from '../lib/intelligence-brief-context.ts'
+import { buildAudienceProfile, buildAudienceLead } from '../lib/contact-persona.ts'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!)
 
@@ -642,31 +643,58 @@ function pickValueLane(member: any): string {
     return 'whether the current electricity setup is still priced and timed correctly';
 }
 
-function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null, utilityTerritory?: string | null): string {
+function buildMemberAudienceProfile(member: any, source: 'sequence' | 'decision_maker_card' | 'account_primary' | 'protocol_task' | 'fallback' = 'sequence') {
+    return buildAudienceProfile(
+        {
+            id: member?.contact_id || member?.id || null,
+            contactId: member?.contact_id || member?.id || null,
+            name: [member?.firstName, member?.lastName].filter(Boolean).join(' ') || member?.contact_name || null,
+            firstName: member?.firstName || null,
+            lastName: member?.lastName || null,
+            title: member?.contact_title || member?.title || null,
+            linkedinUrl: member?.contact_linkedin_url || member?.linkedin_url || null,
+            notes: member?.contact_notes || member?.notes || null,
+            metadata: member?.contact_metadata || member?.metadata || null,
+            company: member?.company_name || member?.company || null,
+            companyName: member?.company_name || member?.company || null,
+            accountName: member?.company_name || member?.company || null,
+            industry: member?.account_industry || member?.industry || null,
+        },
+        {
+            name: member?.company_name || member?.company || null,
+            industry: member?.account_industry || member?.industry || null,
+            description: member?.account_description || member?.description || null,
+        },
+        source
+    );
+}
+
+function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null, utilityTerritory?: string | null, audienceLead?: string | null): string {
     const stage = normalizeReplyStage(replyStage);
     const firstName = String(member?.firstName || '').trim();
     const companyName = cleanCompanyName(member?.company_name || member?.company || member?.account_name || 'your company');
     const companyPhrase = location
         ? `${companyName} in ${location}${utilityTerritory ? ` (${utilityTerritory})` : ''}`
-        : utilityTerritory
+            : utilityTerritory
             ? `${companyName} (${utilityTerritory})`
             : companyName;
     const opener = firstName ? `${firstName},\n\n` : '';
     const valueLane = pickValueLane(member);
+    const leadSentence = String(audienceLead || '').trim();
 
     if (stage === 'no_reply') {
-        return `${opener}I think I have the right person for ${companyPhrase}. The first question I would check is ${valueLane}.\n\nReply yes and I'll send what I'd check first.`;
+        return `${opener}${leadSentence || `I think I have the right person for ${companyPhrase}`}. The first question I would check is ${valueLane}.\n\nReply yes and I'll send what I'd check first.`;
     }
 
     if (stage === 'follow_up') {
-        return `${opener}Following up on ${companyPhrase}. The thing that seems worth isolating first is ${valueLane}.\n\nWant me to send the quick breakdown?`;
+        return `${opener}${leadSentence || `Following up on ${companyPhrase}`}. The thing that seems worth isolating first is ${valueLane}.\n\nWant me to send the quick breakdown?`;
     }
 
     if (stage === 'first_touch') {
-        return `${opener}${companyPhrase} stood out because ${valueLane} usually shows up quietly on the bill.\n\nWant me to send what I'd check first?`;
+        return `${opener}${leadSentence || `${companyPhrase} stood out because ${valueLane} usually shows up quietly on the bill`}. The first thing I would check is ${valueLane}.\n\nWant me to send what I'd check first?`;
     }
 
-    return `${opener}${companyPhrase} stood out because of ${valueLane}. I can send a quick breakdown first, and if it matters, we can confirm the hard numbers later.`;
+    return `${opener}${leadSentence || `${companyPhrase} stood out because of ${valueLane}`}. I can send a quick breakdown first, and if it matters, we can confirm the hard numbers later.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -909,6 +937,7 @@ async function handleGeneration(execution, job) {
            a.address as account_address,
            a.service_addresses as account_service_addresses,
            a.metadata as account_metadata,
+           a."primaryContactId" as account_primary_contact_id,
            a.electricity_supplier as account_supplier,
            a.current_rate as account_current_rate,
            a.contract_end_date as account_contract_end_date,
@@ -1006,6 +1035,41 @@ async function handleGeneration(execution, job) {
             .filter((row: any) => hierarchyIds.subsidiaryAccountIds.includes(row.id))
             .map((row: any) => normalizeWebsiteUrl(row.website || row.domain))),
     ]);
+    const audienceProfile = buildMemberAudienceProfile(member, 'sequence');
+    const audienceLead = buildAudienceLead(audienceProfile);
+    const decisionMakerContact = member.account_primary_contact_id && member.account_primary_contact_id !== member.contact_id
+        ? (await sql`
+            SELECT id, "firstName", "lastName", title, "linkedinUrl", notes, metadata, email
+            FROM contacts
+            WHERE id = ${member.account_primary_contact_id}
+            LIMIT 1
+        `)?.[0]
+        : null;
+    const decisionMakerProfile = decisionMakerContact
+        ? buildAudienceProfile(
+            {
+                id: decisionMakerContact.id,
+                contactId: decisionMakerContact.id,
+                name: [decisionMakerContact.firstName, decisionMakerContact.lastName].filter(Boolean).join(' ') || null,
+                firstName: decisionMakerContact.firstName || null,
+                lastName: decisionMakerContact.lastName || null,
+                title: decisionMakerContact.title || null,
+                linkedinUrl: decisionMakerContact.linkedinUrl || null,
+                notes: decisionMakerContact.notes || null,
+                metadata: decisionMakerContact.metadata || null,
+                company: member.company_name || null,
+                companyName: member.company_name || null,
+                accountName: member.company_name || null,
+                industry: member.account_industry || null,
+            },
+            {
+                name: member.company_name || null,
+                industry: member.account_industry || null,
+                description: member.account_description || null,
+            },
+            'decision_maker_card'
+        )
+        : null;
     const sourceTruthLine = website
         ? 'SOURCE_TRUTH: Company website/public company info is available. You may reference the website or public company facts once. LinkedIn is research-only and must never be mentioned.'
         : linkedInUrl
@@ -1123,6 +1187,45 @@ async function handleGeneration(execution, job) {
                 name: `${member.firstName} ${member.lastName}`,
                 email: member.contact_email,
                 company: member.company_name,
+                company_name: member.company_name,
+                audience_profile: audienceProfile ? {
+                    source: audienceProfile.source,
+                    source_label: audienceProfile.sourceLabel,
+                    contact_id: audienceProfile.contactId,
+                    name: audienceProfile.contactName,
+                    first_name: audienceProfile.contactFirstName,
+                    title: audienceProfile.contactTitle,
+                    company_name: audienceProfile.companyName,
+                    industry: audienceProfile.industry,
+                    role_family: audienceProfile.roleFamily,
+                    role_summary: audienceProfile.roleSummary,
+                    care_abouts: audienceProfile.careAbouts,
+                    opener_hint: audienceProfile.openerHint,
+                    question_hint: audienceProfile.questionHint,
+                    background_signals: audienceProfile.backgroundSignals,
+                    evidence: audienceProfile.evidence,
+                    guardrails: audienceProfile.guardrails,
+                    linked_in_url: audienceProfile.linkedInUrl,
+                } : null,
+                decision_maker_profile: decisionMakerProfile ? {
+                    source: decisionMakerProfile.source,
+                    source_label: decisionMakerProfile.sourceLabel,
+                    contact_id: decisionMakerProfile.contactId,
+                    name: decisionMakerProfile.contactName,
+                    first_name: decisionMakerProfile.contactFirstName,
+                    title: decisionMakerProfile.contactTitle,
+                    company_name: decisionMakerProfile.companyName,
+                    industry: decisionMakerProfile.industry,
+                    role_family: decisionMakerProfile.roleFamily,
+                    role_summary: decisionMakerProfile.roleSummary,
+                    care_abouts: decisionMakerProfile.careAbouts,
+                    opener_hint: decisionMakerProfile.openerHint,
+                    question_hint: decisionMakerProfile.questionHint,
+                    background_signals: decisionMakerProfile.backgroundSignals,
+                    evidence: decisionMakerProfile.evidence,
+                    guardrails: decisionMakerProfile.guardrails,
+                    linked_in_url: decisionMakerProfile.linkedInUrl,
+                } : null,
                     website: member.account_website || website || null,
                     linkedin_url: member.account_linkedin_url || linkedInUrl || null,
                     company_description: member.account_description || null,
@@ -1193,7 +1296,7 @@ async function handleGeneration(execution, job) {
     const subject = result.subject || defaultSubject
 
     if (!body) {
-        body = buildContextualFallbackBody(member, replyStage, location, utilityTerritory);
+        body = buildContextualFallbackBody(member, replyStage, location, utilityTerritory, audienceLead);
     }
 
     const templateVariables = buildSequenceTemplateVariables({
@@ -1358,7 +1461,8 @@ async function handleSend(execution, job) {
 
     const [member] = await sql`
     SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
-           a.name as company_name, a.city as account_city, a.state as account_state, a.industry as account_industry,
+           c.title as contact_title, c.notes as contact_notes, c.metadata as contact_metadata, c."linkedinUrl" as contact_linkedin_url,
+           a.name as company_name, a.description as account_description, a.city as account_city, a.state as account_state, a.industry as account_industry,
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
            u.first_name as owner_first_name,
            COALESCE(
@@ -1512,7 +1616,13 @@ async function handleSend(execution, job) {
     );
     const generationPrompt = String(metadata?.prompt || metadata?.label || metadata?.name || 'Draft a personalized follow-up').trim();
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
-        buildContextualFallbackBody(member, replyStage, member.account_city || null, utilityTerritory);
+        buildContextualFallbackBody(
+            member,
+            replyStage,
+            member.account_city || null,
+            utilityTerritory,
+            buildAudienceLead(buildMemberAudienceProfile(member, 'sequence'))
+        );
 
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',
@@ -1704,10 +1814,17 @@ async function handleCallTask(execution, job) {
            c."firstName",
            c."lastName",
            c.phone as contact_phone,
+           c.title as contact_title,
+           c.notes as contact_notes,
+           c.metadata as contact_metadata,
+           a.name as company_name,
+           a.description as account_description,
+           a.industry as account_industry,
            s."ownerId" as owner_id,
            u.email as owner_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
+    LEFT JOIN accounts a ON c."accountId" = a.id
     LEFT JOIN sequences s ON s.id = m."sequenceId"
     LEFT JOIN users u ON (u.id = s."ownerId" OR u.email = s."ownerId")
     WHERE m.id = ${execution.member_id}
@@ -1718,6 +1835,8 @@ async function handleCallTask(execution, job) {
         throw new Error(`Call task requires a valid contact for member ${execution.member_id}`);
     }
 
+    const audienceProfile = buildMemberAudienceProfile(member, 'sequence');
+    const audienceLead = buildAudienceLead(audienceProfile);
     const existingTasks = await sql`
     SELECT id, status
     FROM tasks
@@ -1797,6 +1916,9 @@ async function handleCallTask(execution, job) {
         const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
         const label = (metadata?.label || 'Call Step').trim();
         const taskOwnerId = resolveTaskOwnerId(member);
+        const callScript = audienceLead
+            ? `${audienceLead}. The one thing I would focus on is ${pickValueLane(member)}.`
+            : `I was curious how ${contactName} is looking at the bill at ${member.company_name || 'the company'}. The one thing I would focus on is ${pickValueLane(member)}.`;
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -1815,7 +1937,7 @@ async function handleCallTask(execution, job) {
       ) VALUES (
         gen_random_uuid()::text,
         ${`Call - ${label} (${contactName})`},
-        ${'Drop a voicemail for this contact as part of the outreach sequence.'},
+        ${callScript},
         'Pending',
         'Protocol',
         NOW(),

@@ -53,6 +53,9 @@ export type ProtocolTaskLike = {
     firstName?: string | null
     lastName?: string | null
     title?: string | null
+    linkedinUrl?: string | null
+    notes?: string | null
+    metadata?: Record<string, unknown> | null
   } | null
   accounts?: {
     id?: string | null
@@ -62,6 +65,7 @@ export type ProtocolTaskLike = {
     city?: string | null
     state?: string | null
     address?: string | null
+    industry?: string | null
   } | null
 }
 
@@ -73,6 +77,8 @@ export interface ProtocolContextData extends Record<string, unknown> {
   stepSummary?: string[]
   targetContactId?: string | null
   targetContactName?: string | null
+  targetContactTitle?: string | null
+  targetContactIndustry?: string | null
   targetAccountId?: string | null
   targetAccountName?: string | null
   decisionMakerId?: string | null
@@ -256,6 +262,19 @@ export function buildProtocolContextFromTask(
     task.contacts?.name,
     [task.contacts?.firstName, task.contacts?.lastName].filter(Boolean).join(' ')
   ) || null
+  const targetContactTitle = firstText(
+    extras.targetContactTitle,
+    metadata.targetContactTitle,
+    metadata.target_contact_title,
+    task.contacts?.title
+  ) || null
+  const targetContactIndustry = firstText(
+    extras.targetContactIndustry,
+    metadata.targetContactIndustry,
+    metadata.target_contact_industry,
+    task.contacts?.metadata && isRecord(task.contacts.metadata) ? task.contacts.metadata.industry : undefined,
+    task.accounts?.industry
+  ) || null
 
   const parentAccountId = firstText(
     extras.parentAccountId,
@@ -360,6 +379,8 @@ export function buildProtocolContextFromTask(
             : undefined,
     targetContactId,
     targetContactName,
+    targetContactTitle,
+    targetContactIndustry,
     targetAccountId,
     targetAccountName,
     decisionMakerId: firstText(extras.decisionMakerId, metadata.decisionMakerId, metadata.decision_maker_id, targetContactId) || null,
@@ -410,6 +431,8 @@ export function buildProtocolTaskMetadata(
     stepSummary: Array.isArray(data.stepSummary) ? data.stepSummary : [],
     targetContactId: data.targetContactId ?? undefined,
     targetContactName: data.targetContactName ?? undefined,
+    targetContactTitle: data.targetContactTitle ?? undefined,
+    targetContactIndustry: data.targetContactIndustry ?? undefined,
     targetAccountId: data.targetAccountId ?? data.parentAccountId ?? data.parentCompanyId ?? undefined,
     targetAccountName: data.targetAccountName ?? data.parentCompanyName ?? undefined,
     decisionMakerId: data.decisionMakerId ?? undefined,
@@ -464,6 +487,8 @@ export function buildProtocolContext(
       stepSummary,
       targetContactId: extras.targetContactId ?? null,
       targetContactName: extras.targetContactName ?? null,
+      targetContactTitle: extras.targetContactTitle ?? null,
+      targetContactIndustry: extras.targetContactIndustry ?? null,
       targetAccountId: extras.targetAccountId ?? null,
       targetAccountName: extras.targetAccountName ?? null,
       decisionMakerId: extras.decisionMakerId ?? null,

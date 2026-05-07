@@ -12,6 +12,7 @@ import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { SignalStrengthBadge } from '@/components/ui/SignalStrengthBadge'
 import { formatPhoneNumber } from '@/lib/formatPhone'
+import { buildAudienceProfile } from '@/lib/contact-persona'
 import { cn } from '@/lib/utils'
 import { type ContactSignalCollection, getSignalForValue } from '@/lib/contact-signals'
 
@@ -26,6 +27,9 @@ interface HolderContact {
   companyPhone?: string
   phone?: string
   avatarUrl?: string
+  linkedinUrl?: string | null
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
   communicationSignals?: ContactSignalCollection | null
 }
@@ -120,6 +124,27 @@ export function AccountHolderCard({
 
   const handleEmail = () => {
     if (!holder?.email) return
+    const audienceProfile = buildAudienceProfile(
+      {
+        id: holder.id,
+        contactId: holder.id,
+        name: holder.name,
+        firstName: holder.name.split(/\s+/)[0] || holder.name,
+        lastName: holder.name.split(/\s+/).slice(1).join(' ') || null,
+        title: holder.title || null,
+        email: holder.email || null,
+        linkedinUrl: holder.linkedinUrl || null,
+        notes: holder.notes || null,
+        metadata: holder.metadata || null,
+        accountId: accountId,
+      },
+      {
+        name: composeContext?.accountName || accountName,
+        industry: composeContext?.industry || undefined,
+        description: composeContext?.accountDescription || undefined,
+      },
+      'decision_maker_card',
+    )
     openCompose({
       to: holder.email,
       context: {
@@ -127,6 +152,7 @@ export function AccountHolderCard({
         contactId: holder.id,
         contactName: holder.name,
         contactTitle: holder.title,
+        audienceProfile,
         accountId: composeContext?.accountId || accountId,
         accountName: composeContext?.accountName || accountName,
       },

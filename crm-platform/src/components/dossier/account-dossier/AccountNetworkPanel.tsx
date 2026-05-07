@@ -12,6 +12,7 @@ import { useUpdateAccount } from '@/hooks/useAccounts'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 import { buildUsableCallContextBlock } from '@/lib/call-context'
 import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context'
+import { buildAudienceProfile } from '@/lib/contact-persona'
 
 const StakeholderMap = dynamic(
     () => import('@/components/accounts/StakeholderMap').then((mod) => mod.StakeholderMap),
@@ -66,6 +67,32 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
 
     const composeContext = useMemo((): ComposeContext | null => {
         if (!account) return null
+        const decisionMaker = account?.primaryContactId
+            ? (contacts || []).find((contact: any) => contact?.id === account.primaryContactId)
+            : null
+        const audienceProfile = decisionMaker
+            ? buildAudienceProfile(
+                {
+                    id: decisionMaker.id,
+                    contactId: decisionMaker.id,
+                    name: decisionMaker.name,
+                    firstName: decisionMaker.firstName,
+                    lastName: decisionMaker.lastName,
+                    title: decisionMaker.title,
+                    email: decisionMaker.email,
+                    linkedinUrl: decisionMaker.linkedinUrl,
+                    notes: decisionMaker.notes,
+                    metadata: decisionMaker.metadata,
+                    accountId: decisionMaker.accountId,
+                },
+                {
+                    name: account.name,
+                    industry: account.industry,
+                    description: account.description,
+                },
+                'account_primary',
+            )
+            : null
 
         const noteEntries = buildForensicNoteEntries([
             {
@@ -111,6 +138,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
             companyName: account.name,
             industry: account.industry || undefined,
             accountDescription: account.description || undefined,
+            audienceProfile,
             contextForAi: contextForAi.trim() || undefined,
         }
     }, [account, calls, contacts])

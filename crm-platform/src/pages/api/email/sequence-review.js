@@ -8,6 +8,7 @@ import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 import { buildSequenceTemplateVariables, renderSequenceTemplate } from '@/lib/sequence-template';
 import { getBurnerFromEmail } from '@/lib/burner-email';
 import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context';
+import { buildAudienceProfile, buildAudienceProfileBlock } from '@/lib/contact-persona';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -82,7 +83,14 @@ function buildHierarchyResearchSummary(organizationRole, hierarchySummary, relat
   return lines.join('\n');
 }
 
-function buildExecutionPromptOverlay({ replyStage, hasBrief, hasAccountNotes, organizationRole }) {
+function buildExecutionPromptOverlay({
+  replyStage,
+  hasBrief,
+  hasAccountNotes,
+  organizationRole,
+  audienceProfileBlock,
+  decisionMakerProfileBlock,
+}) {
   const lines = [
     'EXECUTION OVERLAY:',
     hasBrief
@@ -102,6 +110,14 @@ function buildExecutionPromptOverlay({ replyStage, hasBrief, hasAccountNotes, or
 
   if (replyStage === 'first_touch') {
     lines.push('6. First touch should earn a reply with a clear business question, not just an offer.');
+  }
+
+  if (audienceProfileBlock) {
+    lines.push(`7. Audience profile (target person, internal use only):\n${audienceProfileBlock}`);
+  }
+
+  if (decisionMakerProfileBlock) {
+    lines.push(`8. Decision-maker card (supporting context only):\n${decisionMakerProfileBlock}`);
   }
 
   return lines.join('\n');
@@ -509,7 +525,7 @@ export default async function handler(req, res) {
 
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('id, email, notes, "firstName", "lastName", title, city, state, "linkedinUrl", "accountId"')
+      .select('id, email, notes, "firstName", "lastName", title, city, state, "linkedinUrl", "accountId", metadata')
       .eq('id', memberData.targetId)
       .maybeSingle();
 
@@ -521,11 +537,25 @@ export default async function handler(req, res) {
     if (contact.accountId) {
       const { data: acc } = await supabase
         .from('accounts')
-        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_confidence_level, intelligence_brief_status')
+        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata, "primaryContactId", intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_confidence_level, intelligence_brief_status')
         .eq('id', contact.accountId)
         .maybeSingle();
       account = acc || null;
     }
+
+    const audienceProfile = buildAudienceProfile(contact, account, 'sequence');
+    const { data: decisionMakerContact } = account?.primaryContactId && account.primaryContactId !== contact.id
+      ? await supabase
+        .from('contacts')
+        .select('id, email, notes, "firstName", "lastName", name, title, city, state, "linkedinUrl", "accountId", metadata')
+        .eq('id', account.primaryContactId)
+        .maybeSingle()
+      : { data: null };
+    const decisionMakerProfile = decisionMakerContact
+      ? buildAudienceProfile(decisionMakerContact, account, 'decision_maker_card')
+      : null;
+    const audienceProfileBlock = buildAudienceProfileBlock(audienceProfile);
+    const decisionMakerProfileBlock = buildAudienceProfileBlock(decisionMakerProfile);
 
     const hierarchyIds = extractHierarchyIds(account?.metadata);
     const relatedIds = [hierarchyIds.parentAccountId, ...(hierarchyIds.subsidiaryAccountIds || [])].filter(isLikelyUuid);
@@ -712,6 +742,8 @@ export default async function handler(req, res) {
       hasBrief: Boolean(briefContext),
       hasAccountNotes: Boolean(accountNoteText),
       organizationRole,
+      audienceProfileBlock,
+      decisionMakerProfileBlock,
     });
 
     const optimizeRes = await fetch(optimizeUrl, {
@@ -738,6 +770,44 @@ export default async function handler(req, res) {
           research_summary: researchFacts || null,
           title: contact.title || null,
           industry: account?.industry || null,
+          audience_profile: audienceProfile ? {
+            source: audienceProfile.source,
+            source_label: audienceProfile.sourceLabel,
+            contact_id: audienceProfile.contactId,
+            name: audienceProfile.contactName,
+            first_name: audienceProfile.contactFirstName,
+            title: audienceProfile.contactTitle,
+            company_name: audienceProfile.companyName,
+            industry: audienceProfile.industry,
+            role_family: audienceProfile.roleFamily,
+            role_summary: audienceProfile.roleSummary,
+            care_abouts: audienceProfile.careAbouts,
+            opener_hint: audienceProfile.openerHint,
+            question_hint: audienceProfile.questionHint,
+            background_signals: audienceProfile.backgroundSignals,
+            evidence: audienceProfile.evidence,
+            guardrails: audienceProfile.guardrails,
+            linked_in_url: audienceProfile.linkedInUrl,
+          } : null,
+          decision_maker_profile: decisionMakerProfile ? {
+            source: decisionMakerProfile.source,
+            source_label: decisionMakerProfile.sourceLabel,
+            contact_id: decisionMakerProfile.contactId,
+            name: decisionMakerProfile.contactName,
+            first_name: decisionMakerProfile.contactFirstName,
+            title: decisionMakerProfile.contactTitle,
+            company_name: decisionMakerProfile.companyName,
+            industry: decisionMakerProfile.industry,
+            role_family: decisionMakerProfile.roleFamily,
+            role_summary: decisionMakerProfile.roleSummary,
+            care_abouts: decisionMakerProfile.careAbouts,
+            opener_hint: decisionMakerProfile.openerHint,
+            question_hint: decisionMakerProfile.questionHint,
+            background_signals: decisionMakerProfile.backgroundSignals,
+            evidence: decisionMakerProfile.evidence,
+            guardrails: decisionMakerProfile.guardrails,
+            linked_in_url: decisionMakerProfile.linkedInUrl,
+          } : null,
           electricity_supplier: account?.electricity_supplier || null,
           current_rate: account?.current_rate || null,
           contract_end_date: account?.contract_end_date || null,

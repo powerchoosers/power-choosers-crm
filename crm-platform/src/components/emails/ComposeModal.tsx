@@ -20,6 +20,7 @@ import { ScanlineLoader } from '@/components/chat/ScanlineLoader'
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
 import { buildFoundryContext, generateSystemPrompt, FoundryContext } from '@/lib/foundry-prompt'
+import { buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
@@ -848,6 +849,8 @@ export interface ComposeContext {
   accountDescription?: string
   /** Notes + call/transcript summary + news for AI. Injected into system prompt when present. */
   contextForAi?: string
+  /** Human recipient profile used to tailor the note to the actual decision maker or sequence contact. */
+  audienceProfile?: AudienceProfile | null
   /** When 'cold_plaintext', send first-touch cold as plain text only (no HTML/signature) for deliverability. */
   deliverabilityMode?: 'cold_plaintext' | 'normal'
 }
@@ -1155,6 +1158,10 @@ function ComposePanel({
         const isEnergyManager = /energy\s*manager|director\s*of\s*energy|energy\s*director|sustainability\s*manager|facility\s*energy|utility\s*manager/.test(title)
         if (isEnergyManager) lines.push('- Audience: energy manager / energy-focused role — you may use precise terms (4CP, ratchet, TDU, pass-through) when helpful.')
         else lines.push('- Audience: general (ops, finance, facility) — use plain English only; avoid industry jargon.')
+      }
+      if (context.audienceProfile) {
+        lines.push('AUDIENCE PROFILE (internal only; use this to tailor the opener to the actual person):')
+        lines.push(buildAudienceProfileBlock(context.audienceProfile))
       }
       // Industry-specific angle (automatic, invisible to user) — always inject for cold/outreach types
       const isColdOrOutreach = effectiveConfig.id === 'cold_first_touch' || effectiveConfig.id === 'cold_followup'
