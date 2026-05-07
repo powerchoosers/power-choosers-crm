@@ -39,9 +39,13 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   )
 }
 
-function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
+const TableFooter = React.forwardRef<
+  HTMLTableSectionElement,
+  React.ComponentPropsWithoutRef<"tfoot">
+>(function TableFooter({ className, ...props }, ref) {
   return (
     <tfoot
+      ref={ref}
       data-slot="table-footer"
       className={cn(
         "bg-muted/50 border-t font-medium [&>tr]:last:border-b-0",
@@ -50,11 +54,15 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
       {...props}
     />
   )
-}
+})
 
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+const TableRow = React.forwardRef<
+  HTMLTableRowElement,
+  React.ComponentPropsWithoutRef<"tr">
+>(function TableRow({ className, ...props }, ref) {
   return (
     <tr
+      ref={ref}
       data-slot="table-row"
       className={cn(
         "hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors",
@@ -63,11 +71,15 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
       {...props}
     />
   )
-}
+})
 
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+const TableHead = React.forwardRef<
+  HTMLTableCellElement,
+  React.ComponentPropsWithoutRef<"th">
+>(function TableHead({ className, ...props }, ref) {
   return (
     <th
+      ref={ref}
       data-slot="table-head"
       className={cn(
         "text-foreground sticky top-0 z-20 h-10 px-2 text-left align-middle font-medium whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px] nodal-table-header",
@@ -76,11 +88,15 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
       {...props}
     />
   )
-}
+})
 
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+const TableCell = React.forwardRef<
+  HTMLTableCellElement,
+  React.ComponentPropsWithoutRef<"td">
+>(function TableCell({ className, ...props }, ref) {
   return (
     <td
+      ref={ref}
       data-slot="table-cell"
       className={cn(
         "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
@@ -89,7 +105,12 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       {...props}
     />
   )
-}
+})
+
+TableFooter.displayName = "TableFooter"
+TableRow.displayName = "TableRow"
+TableHead.displayName = "TableHead"
+TableCell.displayName = "TableCell"
 
 function TableCaption({
   className,
