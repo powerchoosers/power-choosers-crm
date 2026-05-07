@@ -2419,7 +2419,6 @@ Output rules:
       return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)} kWh`;
     };
 
-    /* Grounded CRM auto-routing disabled.
     const respondGrounded = (content, diagnostics) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -2964,9 +2963,6 @@ Output rules:
 
       return false;
     };
-
-    // Grounded CRM auto-routing is disabled. The chat now goes straight to the model.
-    */
 
     const buildSystemPrompt = () => {
       return `
