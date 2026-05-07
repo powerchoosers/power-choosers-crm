@@ -1,5 +1,6 @@
 'use client';
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount';
 import { Gauge, Layers, Zap, Activity, X, ChevronRight } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useExpiringAccounts, type ExpiringAccount } from '@/hooks/useExpiringAccounts';
@@ -254,7 +255,7 @@ export function KPIGrid() {
                             : 'text-white'
                     }`}
                 >
-                  {m.value}
+                  {(m.key === "liability") ? m.value : <AnimatedCount value={parseInt(m.value.replace(/[^\d]/g, "")) || 0} duration={1000} />}
                 </span>
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                   {m.sub}
