@@ -1,5 +1,7 @@
 'use client'
 
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
+
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   ReactFlow,
@@ -2466,7 +2468,7 @@ function ProtocolArchitectInner() {
             <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
               <span>Sync_Block 01-0{nodes.length}</span>
               <div className="h-1 w-1 rounded-full bg-black/40" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{nodes.length}</span></span>
+              <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={nodes.length} className="text-zinc-400 tabular-nums" /></span>
             </div>
           </div>
           <div className="flex items-center gap-4">

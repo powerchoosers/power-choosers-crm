@@ -1,3 +1,6 @@
+'use client'
+
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
 import InfrastructureMap from '@/components/infrastructure/InfrastructureMap';
 
 export default function InfrastructurePage() {
@@ -36,7 +39,7 @@ export default function InfrastructurePage() {
                 <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
                   <span>Sync_Block 01–01</span>
                   <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">01</span></span>
+                  <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={1} className="text-zinc-400 tabular-nums" /></span>
                 </div>
             </div>
             <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
