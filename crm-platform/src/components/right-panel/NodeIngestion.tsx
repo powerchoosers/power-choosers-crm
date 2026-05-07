@@ -33,6 +33,172 @@ const resolveCurrentOwnerId = async (): Promise<string | null> => {
   return session?.user?.email?.toLowerCase() || null;
 };
 
+const pickText = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return '';
+};
+
+const normalizeDomain = (value: unknown): string => {
+  const text = pickText(value).toLowerCase();
+  if (!text) return '';
+  return text
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0]
+    .split(':')[0]
+    .trim();
+};
+
+const buildCompanySnapshot = (scanResult: any) => {
+  const organization = scanResult?.organization && typeof scanResult.organization === 'object'
+    ? scanResult.organization
+    : {};
+
+  const name = pickText(scanResult?.companyName, scanResult?.name, organization.name);
+  const website = pickText(scanResult?.companyWebsite, scanResult?.website, organization.website, organization.website_url);
+  const domain = normalizeDomain(
+    scanResult?.companyDomain ||
+    scanResult?.fqdn ||
+    scanResult?.domain ||
+    organization.domain ||
+    organization.primary_domain ||
+    website
+  );
+  const linkedin = pickText(scanResult?.companyLinkedin, scanResult?.linkedin, organization.linkedin, organization.linkedin_url);
+  const description = pickText(
+    scanResult?.companyDescription,
+    scanResult?.description,
+    organization.description,
+    organization.short_description,
+    organization.seo_description
+  );
+  const industry = pickText(scanResult?.companyIndustry, scanResult?.industry, organization.industry);
+  const employees = scanResult?.companyEmployees ?? scanResult?.employees ?? organization.employees ?? organization.estimated_num_employees ?? organization.employee_count ?? null;
+
+  return {
+    name,
+    domain,
+    website: website || (domain ? `https://${domain}` : ''),
+    description,
+    industry,
+    employees,
+    revenue: pickText(scanResult?.companyRevenue, scanResult?.revenue, organization.revenue, organization.annual_revenue_printed),
+    address: pickText(
+      scanResult?.companyAddress,
+      scanResult?.address,
+      organization.address,
+      organization.formatted_address,
+      organization.raw_address,
+      organization.street_address
+    ),
+    city: pickText(scanResult?.companyCity, scanResult?.city, organization.city),
+    state: pickText(scanResult?.companyState, scanResult?.state, organization.state),
+    country: pickText(scanResult?.companyCountry, scanResult?.country, organization.country),
+    zip: pickText(scanResult?.companyZip, scanResult?.zip, organization.zip, organization.postal_code),
+    phone: pickText(scanResult?.companyPhone, scanResult?.phone, organization.phone, organization.sanitized_phone, organization.primary_phone?.number),
+    linkedin,
+    logoUrl: pickText(scanResult?.companyLogoUrl, scanResult?.logoUrl, organization.logoUrl, organization.logo_url),
+  };
+};
+
+const findExistingAccount = async (company: ReturnType<typeof buildCompanySnapshot>) => {
+  if (!company.domain && !company.linkedin && !company.name) return null;
+
+  if (company.domain) {
+    const { data } = await supabase.from('accounts').select('id, ownerId, metadata').eq('domain', company.domain).maybeSingle();
+    if (data) return data;
+  }
+
+  if (company.linkedin) {
+    const { data } = await supabase.from('accounts').select('id, ownerId, metadata').ilike('linkedin_url', company.linkedin).maybeSingle();
+    if (data) return data;
+  }
+
+  if (company.name) {
+    const { data } = await supabase.from('accounts').select('id, ownerId, metadata').ilike('name', company.name).maybeSingle();
+    if (data) return data;
+  }
+
+  return null;
+};
+
+const buildContactAccountPayload = (company: ReturnType<typeof buildCompanySnapshot>, currentOwnerId: string | null, now: string) => {
+  const parsedHeadcount = parseHeadcount(company.employees);
+  const serviceAddresses = [];
+
+  if (company.address || company.city || company.state) {
+    serviceAddresses.push({
+      address: company.address || '',
+      city: company.city || '',
+      state: company.state || '',
+      country: company.country || '',
+      type: 'headquarters',
+      isPrimary: true,
+    });
+  }
+
+  const meters = company.address ? [{
+    id: crypto.randomUUID(),
+    esiId: '',
+    address: company.address,
+    rate: '',
+    endDate: '',
+  }] : [];
+
+  return {
+    name: company.name || company.domain || 'Unknown Account',
+    domain: company.domain || null,
+    website: company.website || (company.domain ? `https://${company.domain}` : null),
+    industry: company.industry || null,
+    description: company.description || null,
+    revenue: company.revenue || null,
+    employees: parsedHeadcount.value,
+    address: company.address || null,
+    city: company.city || null,
+    state: company.state || null,
+    country: company.country || null,
+    zip: company.zip || null,
+    service_addresses: serviceAddresses,
+    logo_url: company.logoUrl || null,
+    phone: formatPhoneNumber(company.phone) || null,
+    linkedin_url: company.linkedin || null,
+    ownerId: currentOwnerId,
+    status: 'active',
+    metadata: {
+      meters,
+      ...headcountMetadata(parsedHeadcount, 'node_ingestion_contact'),
+    },
+    updatedAt: now,
+  };
+};
+
+const resolveOrCreateAccountForContact = async (company: ReturnType<typeof buildCompanySnapshot>, currentOwnerId: string | null, now: string) => {
+  const existingAccount = await findExistingAccount(company);
+  if (existingAccount?.id) {
+    return { accountId: existingAccount.id as string, created: false };
+  }
+
+  if (!company.name && !company.domain && !company.linkedin) {
+    return { accountId: null, created: false };
+  }
+
+  const accountId = crypto.randomUUID();
+  const payload = buildContactAccountPayload(company, currentOwnerId, now);
+  const { error } = await supabase.from('accounts').insert({
+    id: accountId,
+    ...payload,
+    createdAt: now,
+  });
+
+  if (error) throw error;
+
+  return { accountId, created: true };
+};
+
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
   const authHeaders = await getApolloAuthHeaders();
   try {
@@ -45,6 +211,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
         id: data.id,
         name: data.name,
         domain: data.domain,
+        website: data.website,
         industry: data.industry,
         employees: data.employees,
         revenue: data.revenue,
@@ -91,8 +258,22 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
           location: person.location,
           email: person.email,
           phone: person.phone,
-          linkedin: person.linkedin_url,
-          accountId: person.accountId,
+          linkedin: person.linkedin,
+          companyName: person.companyName,
+          companyId: person.companyId,
+          companyDomain: person.companyDomain || person.fqdn,
+          companyWebsite: person.companyWebsite,
+          companyDescription: person.companyDescription,
+          companyIndustry: person.companyIndustry,
+          companyEmployees: person.companyEmployees,
+          companyCity: person.companyCity,
+          companyState: person.companyState,
+          companyCountry: person.companyCountry,
+          companyAddress: person.companyAddress,
+          companyZip: person.companyZip,
+          companyPhone: person.companyPhone,
+          companyLinkedin: person.companyLinkedin,
+          companyLogoUrl: person.companyLogoUrl,
           organization: person.organization
         };
       }
@@ -531,6 +712,7 @@ export function NodeIngestion() {
         const payload = {
           name: entityName,
           domain: domainKey,
+          website: scanResult?.website || (domainKey ? `https://${domainKey}` : null),
           industry: scanResult?.industry,
           description: description || scanResult?.description,
           revenue: revenue,
@@ -558,6 +740,7 @@ export function NodeIngestion() {
           const existingOwnerId = String(existingAccount?.ownerId || '').trim();
           if (entityName) enrichUpdate.name = entityName;
           if (domainKey) enrichUpdate.domain = domainKey;
+          if (scanResult?.website || domainKey) enrichUpdate.website = scanResult?.website || (domainKey ? `https://${domainKey}` : null);
           if (scanResult?.industry) enrichUpdate.industry = scanResult.industry;
           const desc = description || scanResult?.description;
           if (desc) enrichUpdate.description = desc;
@@ -617,14 +800,14 @@ export function NodeIngestion() {
 
       } else {
         // --- DUPLICATE CHECK: email first, then full name ---
-        let existingContact: { id: string; ownerId?: string | null } | null = null;
+        let existingContact: { id: string; ownerId?: string | null; accountId?: string | null } | null = null;
         if (email) {
-          const { data } = await supabase.from('contacts').select('id, ownerId').eq('email', email).maybeSingle();
+          const { data } = await supabase.from('contacts').select('id, ownerId, accountId').eq('email', email).maybeSingle();
           if (data) existingContact = data;
         }
         const trimmedFullName = `${firstName.trim()} ${lastName.trim()}`.trim();
         if (!existingContact && trimmedFullName) {
-          const { data } = await supabase.from('contacts').select('id, ownerId')
+          const { data } = await supabase.from('contacts').select('id, ownerId, accountId')
             .ilike('name', trimmedFullName)
             .maybeSingle();
           if (data) existingContact = data;
@@ -636,6 +819,16 @@ export function NodeIngestion() {
         const fName = firstName.trim();
         const lName = lastName.trim();
         const fullName = (entityName || `${fName} ${lName}`).trim();
+        const companySnapshot = buildCompanySnapshot(scanResult);
+        const canUseCompany = Boolean(companySnapshot.name || companySnapshot.domain || companySnapshot.linkedin);
+        let resolvedAccountId = ingestionContext?.accountId || existingContact?.accountId || null;
+        let createdCompany = false;
+
+        if (!resolvedAccountId && canUseCompany) {
+          const resolution = await resolveOrCreateAccountForContact(companySnapshot, currentOwnerId, now);
+          resolvedAccountId = resolution.accountId;
+          createdCompany = resolution.created;
+        }
 
         if (existingId) {
           // Only update fields that are actually set — never overwrite existing data with empty form values
@@ -656,6 +849,7 @@ export function NodeIngestion() {
           else if (scanResult?.linkedin) enrichUpdate.linkedinUrl = scanResult.linkedin;
           if (city) enrichUpdate.city = city;
           if (state) enrichUpdate.state = state;
+          if (resolvedAccountId) enrichUpdate.accountId = resolvedAccountId;
           if (!existingOwnerId && currentOwnerId) enrichUpdate.ownerId = currentOwnerId;
           const { error } = await supabase.from('contacts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
@@ -676,7 +870,7 @@ export function NodeIngestion() {
             state,
             ownerId: currentOwnerId,
             status: 'active',
-            accountId: ingestionContext?.accountId || null,
+            accountId: resolvedAccountId || null,
             createdAt: now,
             updatedAt: now,
           };
@@ -685,16 +879,19 @@ export function NodeIngestion() {
         }
 
         const displayName = fullName || fName || lName;
+        const companyLabel = companySnapshot.name || (resolvedAccountId ? 'Linked Account' : '');
         toast.success(existingId ? 'Contact Node Enriched' : 'Contact Node Initialized', {
           description: existingId
             ? `${displayName} already exists — record enriched with latest intelligence.`
-            : `${displayName} has been committed to the database.`,
+            : companyLabel
+              ? (createdCompany ? `Created ${companyLabel} and linked the contact.` : `Linked the contact to ${companyLabel}.`)
+              : `${displayName} has been committed to the database.`,
           className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
         });
 
         queryClient.invalidateQueries({ queryKey: ['contacts'] });
-        if (ingestionContext?.accountId) {
-          queryClient.invalidateQueries({ queryKey: ['account-contacts', ingestionContext.accountId] });
+        if (resolvedAccountId) {
+          queryClient.invalidateQueries({ queryKey: ['account-contacts', resolvedAccountId] });
         }
         router.push(`/network/contacts/${id}`);
       }
@@ -1105,6 +1302,15 @@ export function NodeIngestion() {
                         <Building2 className="w-3 h-3 text-zinc-500 shrink-0" />
                         <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Link →</span>
                         <span className="text-xs font-mono text-white truncate">{ingestionContext.accountName}</span>
+                      </div>
+                    )}
+                    {!ingestionContext?.accountName && (scanResult?.companyName || scanResult?.organization?.name) && (
+                      <div className="px-3 py-2 rounded bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-2">
+                        <Building2 className="w-3 h-3 text-zinc-500 shrink-0" />
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Company →</span>
+                        <span className="text-xs font-mono text-white truncate">
+                          {scanResult?.companyName || scanResult?.organization?.name}
+                        </span>
                       </div>
                     )}
                   </>

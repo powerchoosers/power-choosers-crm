@@ -265,6 +265,11 @@ function mapApolloContactToLushaFormat(apolloPerson) {
   const firstName = clean(apolloPerson.first_name);
   const lastName = clean(apolloPerson.last_name);
   const fullName = clean(apolloPerson.name) || [firstName, lastName].filter(Boolean).join(' ').trim();
+  const organization = apolloPerson.organization || {};
+  const companyName = clean(organization.name);
+  const companyDomain = clean(organization.primary_domain || organization.domain);
+  const companyWebsite = clean(organization.website_url);
+  const companyLocation = formatLocation(organization.city, organization.state, organization.country);
 
   return {
     contactId: apolloPerson.id,
@@ -294,6 +299,40 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     // Department/functional area (if Apollo provides it)
     department: apolloPerson.department || '',
     photoUrl: apolloPerson.photo_url || '',
+    companyName,
+    companyId: clean(apolloPerson.organization_id),
+    companyDomain,
+    companyWebsite,
+    companyDescription: clean(organization.short_description || organization.seo_description),
+    companyIndustry: clean(organization.industry || (organization.industries && organization.industries[0]) || ''),
+    companyEmployees: organization.estimated_num_employees || organization.employee_count || null,
+    companyCity: clean(organization.city),
+    companyState: clean(organization.state),
+    companyCountry: clean(organization.country),
+    companyAddress: clean(organization.raw_address || organization.formatted_address || organization.street_address),
+    companyZip: clean(organization.postal_code),
+    companyPhone: clean(organization.phone || (organization.primary_phone && organization.primary_phone.number)),
+    companyLinkedin: clean(organization.linkedin_url),
+    companyLogoUrl: clean(organization.logo_url),
+    companyLocation,
+    organization: {
+      id: clean(apolloPerson.organization_id),
+      name: companyName,
+      domain: companyDomain,
+      website: companyWebsite,
+      description: clean(organization.short_description || organization.seo_description),
+      industry: clean(organization.industry || (organization.industries && organization.industries[0]) || ''),
+      employees: organization.estimated_num_employees || organization.employee_count || null,
+      city: clean(organization.city),
+      state: clean(organization.state),
+      country: clean(organization.country),
+      address: clean(organization.raw_address || organization.formatted_address || organization.street_address),
+      zip: clean(organization.postal_code),
+      phone: clean(organization.phone || (organization.primary_phone && organization.primary_phone.number)),
+      linkedin: clean(organization.linkedin_url),
+      logoUrl: clean(organization.logo_url),
+      location: companyLocation,
+    },
     isSuccess: true
   };
 }
@@ -352,7 +391,6 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     throw error;
   }
 }
-
 
 
 
