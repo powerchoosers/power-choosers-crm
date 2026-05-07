@@ -332,6 +332,12 @@ const INDUSTRY_CLUSTER_VALUES: IndustryCluster[] = [
   'public_sector',
   'unknown',
 ]
+const BROAD_IDENTITY_CLUSTERS = new Set<IndustryCluster>([
+  'unknown',
+  'multi_site',
+  'office_services',
+  'education_nonprofit',
+])
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
@@ -359,6 +365,17 @@ function getAccountMetadata(account: AccountRow) {
     : {}
 }
 
+function isBroadIdentityCluster(cluster: IndustryCluster) {
+  return BROAD_IDENTITY_CLUSTERS.has(cluster)
+}
+
+function resolvePreferredIndustryCluster(baseCluster: IndustryCluster, derivedCluster: IndustryCluster) {
+  if (baseCluster === derivedCluster) return baseCluster
+  if (!isBroadIdentityCluster(baseCluster)) return baseCluster
+  if (derivedCluster && !isBroadIdentityCluster(derivedCluster) && derivedCluster !== 'unknown') return derivedCluster
+  return baseCluster !== 'unknown' ? baseCluster : derivedCluster
+}
+
 function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | null {
   const raw = getAccountMetadata(account).intelligenceProfile
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -366,6 +383,8 @@ function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | n
   const record = raw as Record<string, unknown>
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
+  const stableCluster = inferIndustryClusterFromSignals(account, null)
+  if (cluster !== stableCluster && !isBroadIdentityCluster(stableCluster)) return null
 
   const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
   const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
@@ -1370,7 +1389,9 @@ function buildStructuredIdentityProfile(account: AccountRow, candidates: Researc
     description: cleanText(`${account.description || ''} ${researchText}`),
   }
   const primaryCandidate = candidates[0] || null
-  const cluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
+  const baseCluster = inferIndustryClusterFromSignals(account, null)
+  const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
+  const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${buildIdentityProfileText(account)}`).toLowerCase()
 
