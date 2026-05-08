@@ -382,7 +382,35 @@ function cleanCompanyName(input: any): string {
         .replace(/\s{2,}/g, ' ')
         .trim();
 
-    return cleaned || raw;
+    return toDisplayName(cleaned || raw);
+}
+
+function toDisplayName(input: any): string {
+    const text = String(input || '').trim();
+    if (!text) return '';
+
+    const letters = text.replace(/[^A-Za-z]/g, '');
+    const isMostlyUpper = letters.length >= 4
+        && letters === letters.toUpperCase()
+        && /[A-Z]/.test(letters);
+
+    if (!isMostlyUpper) return text;
+
+    const keepUpper = new Set(['LLC', 'L.L.C.', 'LP', 'L.P.', 'LLP', 'L.L.P.', 'PLC', 'PC', 'PA', 'DBA']);
+    return text
+        .toLowerCase()
+        .replace(/\b([a-z][a-z'.&-]*)\b/g, (word) => {
+            const rawUpper = word.toUpperCase();
+            if (keepUpper.has(rawUpper)) return rawUpper;
+            return word.charAt(0).toUpperCase() + word.slice(1);
+        });
+}
+
+function replaceRawAccountName(input: string, rawName: any, displayName: string): string {
+    const text = String(input || '');
+    const raw = String(rawName || '').trim();
+    if (!text || !raw || !displayName || raw === displayName) return text;
+    return text.split(raw).join(displayName);
 }
 
 function isTexasState(value: any): boolean {
@@ -982,6 +1010,8 @@ async function handleGeneration(execution, job) {
     const accountDomain = member.account_domain || null;
     const website = member.account_website || (accountDomain ? `https://${accountDomain}` : null);
     const sourceLabel = website ? 'website' : (linkedInUrl ? 'linkedin' : 'public_company_info');
+    const rawCompanyName = String(member.company_name || '').trim();
+    const displayCompanyName = cleanCompanyName(rawCompanyName || 'your company');
     const accountCity = member.account_city ? member.account_city.trim() : null;
     const accountState = member.account_state ? member.account_state.trim() : null;
     const contactCity = member.contact_city ? member.contact_city.trim() : null;
@@ -1030,9 +1060,9 @@ async function handleGeneration(execution, job) {
     const primarySiteAddress = primarySite.address;
     const marketContext = texasEnergy.marketContext;
     const hierarchySummary = [
-        `Operating company: ${member.company_name || 'Unknown'}`,
-        `Parent company: ${parentCompany?.name || hierarchyIds.parentAccountId || 'none'}`,
-        `Subsidiaries: ${subsidiaryCompanyNames.length ? subsidiaryCompanyNames.join('; ') : hierarchyIds.subsidiaryAccountIds.length ? `${hierarchyIds.subsidiaryAccountIds.length} linked account(s)` : 'none'}`,
+        `Operating company: ${displayCompanyName || 'Unknown'}`,
+        `Parent company: ${parentCompany?.name ? cleanCompanyName(parentCompany.name) : hierarchyIds.parentAccountId || 'none'}`,
+        `Subsidiaries: ${subsidiaryCompanyNames.length ? subsidiaryCompanyNames.map(cleanCompanyName).join('; ') : hierarchyIds.subsidiaryAccountIds.length ? `${hierarchyIds.subsidiaryAccountIds.length} linked account(s)` : 'none'}`,
         `Role: ${organizationRole}`
     ].join(' | ');
     const hierarchyResearchContext = buildHierarchyResearchSummary(
@@ -1073,13 +1103,13 @@ async function handleGeneration(execution, job) {
                 linkedinUrl: decisionMakerContact.linkedinUrl || null,
                 notes: decisionMakerContact.notes || null,
                 metadata: decisionMakerContact.metadata || null,
-                company: member.company_name || null,
-                companyName: member.company_name || null,
-                accountName: member.company_name || null,
+                company: displayCompanyName || null,
+                companyName: displayCompanyName || null,
+                accountName: displayCompanyName || null,
                 industry: member.account_industry || null,
             },
             {
-                name: member.company_name || null,
+                name: displayCompanyName || null,
                 industry: member.account_industry || null,
                 description: member.account_description || null,
             },
@@ -1120,8 +1150,8 @@ async function handleGeneration(execution, job) {
         member.contact_title ? `Contact title: ${member.contact_title}` : null,
         member.contact_city || member.contact_state ? `Contact location: ${[member.contact_city, member.contact_state].filter(Boolean).join(', ')}` : null,
         marketContext ? `Market context: ${marketContext}` : null,
-        parentCompany?.name ? `Parent company: ${parentCompany.name}` : null,
-        subsidiaryCompanyNames.length ? `Subsidiaries: ${subsidiaryCompanyNames.join('; ')}` : null,
+        parentCompany?.name ? `Parent company: ${cleanCompanyName(parentCompany.name)}` : null,
+        subsidiaryCompanyNames.length ? `Subsidiaries: ${subsidiaryCompanyNames.map(cleanCompanyName).join('; ')}` : null,
         `Organization role: ${organizationRole}`,
         `Hierarchy summary: ${hierarchySummary}`,
         hierarchyResearchContext ? `Related company context:\n${hierarchyResearchContext}` : null,
@@ -1161,7 +1191,7 @@ async function handleGeneration(execution, job) {
             notes: member.contact_notes || null,
         },
         {
-            label: `ACCOUNT NOTE • ${member.company_name || 'UNKNOWN ACCOUNT'}`,
+            label: `ACCOUNT NOTE • ${displayCompanyName || 'UNKNOWN ACCOUNT'}`,
             notes: accountNoteText || null,
         },
     ]);
@@ -1208,8 +1238,8 @@ async function handleGeneration(execution, job) {
             contact: {
                 name: `${member.firstName} ${member.lastName}`,
                 email: member.contact_email,
-                company: member.company_name,
-                company_name: member.company_name,
+                company: displayCompanyName,
+                company_name: displayCompanyName,
                 audience_profile: audienceProfile ? {
                     source: audienceProfile.source,
                     source_label: audienceProfile.sourceLabel,
@@ -1274,9 +1304,9 @@ async function handleGeneration(execution, job) {
                 tdu_candidates: texasEnergy.tduCandidates || [],
                 market_context: marketContext,
                 utility_territory: utilityTerritory || null,
-                parent_company: parentCompany?.name || null,
+                parent_company: parentCompany?.name ? cleanCompanyName(parentCompany.name) : null,
                 parent_company_id: hierarchyIds.parentAccountId,
-                subsidiary_companies: subsidiaryCompanyNames,
+                subsidiary_companies: subsidiaryCompanyNames.map(cleanCompanyName),
                 subsidiary_count: subsidiaryCompanyNames.length,
                 organization_role: organizationRole,
                 hierarchy_summary: hierarchySummary,
@@ -1335,7 +1365,7 @@ async function handleGeneration(execution, job) {
             linkedinUrl: member.contact_linkedin_url || null,
             website: member.account_website || website || null,
             notes: member.contact_notes || null,
-            companyName: member.company_name || null,
+            companyName: displayCompanyName || null,
             industry: member.account_industry || null,
             electricitySupplier: member.account_supplier || null,
             annualUsage: member.account_annual_usage || null,
@@ -1345,7 +1375,7 @@ async function handleGeneration(execution, job) {
             metadata: member.contact_metadata || null,
         },
         account: {
-            name: member.company_name || null,
+            name: displayCompanyName || null,
             industry: member.account_industry || null,
             domain: member.account_domain || null,
             description: member.account_description || null,
@@ -1372,8 +1402,8 @@ async function handleGeneration(execution, job) {
         },
     });
 
-    body = renderSequenceTemplate(body, templateVariables);
-    const renderedSubject = renderSequenceTemplate(subject, templateVariables);
+    body = replaceRawAccountName(renderSequenceTemplate(body, templateVariables), rawCompanyName, displayCompanyName);
+    const renderedSubject = replaceRawAccountName(renderSequenceTemplate(subject, templateVariables), rawCompanyName, displayCompanyName);
 
     if (/\{\{\s*[^}]+\s*\}\}/.test(body) || /\{\{\s*[^}]+\s*\}\}/.test(renderedSubject)) {
         throw new Error('Sequence template still contains unresolved variables after rendering');
