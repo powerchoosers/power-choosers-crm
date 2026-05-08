@@ -2394,8 +2394,10 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const sourceLead = buildSourceLead(account, candidate)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const text = `${candidate?.title || ''} ${candidate?.snippet || ''}`.toLowerCase()
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)}`).toLowerCase()
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const futureOpen = isFutureOpenLocationSignal(candidateText)
+  const accountLooksLikeOperatingHospital = /(acute care hospital|medical\/surgical beds|intensive care unit|women[’']?s center|emergency room|operating rooms?|medical imaging|hospital district|owned by|operated by)/i.test(accountText)
   const openingIndustryLine = buildOpeningIndustryLine(
     inferIndustryCluster(account, candidate),
     alreadyOpen,
@@ -2416,6 +2418,20 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         focus: ['inherited contracts', 'duplicate sites or meters', 'utility cleanup after the deal'],
       }
     case 'new_location':
+      if (accountLooksLikeOperatingHospital && futureOpen && !alreadyOpen) {
+        return {
+          label: 'Hospital operations',
+          angle: 'Emergency care, surgery, imaging, and 24/7 HVAC shaping the load at an existing hospital.',
+          question: 'Which parts of the hospital are carrying the biggest usage spikes right now?',
+          openers: [
+            sourceLead,
+            `North Texas Medical Center is already an operating hospital in Gainesville, so the useful question is which parts of the building are driving the load today rather than treating it like a coming-soon project.`,
+            `With emergency care, surgery, imaging, lab work, and HVAC all under one roof, the bigger question is which areas are carrying the heaviest usage.`,
+          ],
+          focus: ['emergency care', 'surgery', 'imaging', 'lab work', 'HVAC', 'existing hospital load'],
+        }
+      }
+
       const isHospitalityOpening = /\b(hotel|resort|lodging|motel|inn|boutique property|hospitality|guest rooms|event space|banquet|caravan court)\b/i.test(text)
       if (isHospitalityOpening) {
         return {
