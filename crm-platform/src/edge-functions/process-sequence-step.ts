@@ -616,7 +616,11 @@ function pickValueLane(member: any): string {
         return 'classroom occupancy, lighting, and cooling during peak hours';
     }
 
-    if (/(health|clinic|medical|dental|home health|healthcare)/.test(combined)) {
+    if (/(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|dso|dpo|practice manager|office manager|hygienist|hygiene|operatories?|patient chairs?|chairside)/.test(combined)) {
+        return 'operatories, imaging, sterilization, patient flow, and keeping the office comfortable';
+    }
+
+    if (/(health|clinic|medical|home health|healthcare)/.test(combined)) {
         return 'reliability, comfort cooling, and steady daily operating hours';
     }
 
