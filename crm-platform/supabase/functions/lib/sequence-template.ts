@@ -19,6 +19,27 @@ function firstText(...values: TemplateValue[]): string {
   return ''
 }
 
+function toDisplayName(value: TemplateValue): string {
+  const text = toText(value)
+  if (!text) return ''
+
+  const letters = text.replace(/[^A-Za-z]/g, '')
+  const isMostlyUpper = letters.length >= 4
+    && letters === letters.toUpperCase()
+    && /[A-Z]/.test(letters)
+
+  if (!isMostlyUpper) return text
+
+  const keepUpper = new Set(['LLC', 'L.L.C.', 'LP', 'L.P.', 'LLP', 'L.L.P.', 'PLC', 'PC', 'PA', 'DBA'])
+  return text
+    .toLowerCase()
+    .replace(/\b([a-z][a-z'.&-]*)\b/g, (word) => {
+      const rawUpper = word.toUpperCase()
+      if (keepUpper.has(rawUpper)) return rawUpper
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+}
+
 function joinLocation(city?: TemplateValue, state?: TemplateValue): string {
   return [toText(city), toText(state)].filter(Boolean).join(', ')
 }
@@ -43,14 +64,14 @@ export function buildSequenceTemplateVariables(source: TemplateContext = {}): Re
   const account = source.account || {}
   const site = source.site || {}
 
-  const companyName = firstText(
+  const companyName = toDisplayName(firstText(
     account.name,
     contact.companyName,
     contact.company,
     account.domain,
     site.companyName,
     'your company',
-  )
+  ))
   const contactName = firstText(
     contact.name,
     [contact.firstName, contact.lastName].filter(Boolean).join(' '),

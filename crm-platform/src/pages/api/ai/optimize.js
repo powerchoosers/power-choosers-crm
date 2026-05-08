@@ -149,7 +149,28 @@ function cleanCompanyName(input) {
   }
   cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
 
-  return cleaned || raw;
+  return toDisplayName(cleaned || raw);
+}
+
+function toDisplayName(input) {
+  const text = String(input || '').trim();
+  if (!text) return '';
+
+  const letters = text.replace(/[^A-Za-z]/g, '');
+  const isMostlyUpper = letters.length >= 4
+    && letters === letters.toUpperCase()
+    && /[A-Z]/.test(letters);
+
+  if (!isMostlyUpper) return text;
+
+  const keepUpper = new Set(['LLC', 'L.L.C.', 'LP', 'L.P.', 'LLP', 'L.L.P.', 'PLC', 'PC', 'PA', 'DBA']);
+  return text
+    .toLowerCase()
+    .replace(/\b([a-z][a-z'.&-]*)\b/g, (word) => {
+      const rawUpper = word.toUpperCase();
+      if (keepUpper.has(rawUpper)) return rawUpper;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    });
 }
 
 function normalizeListOfStrings(value) {
@@ -509,20 +530,20 @@ export default async function handler(req, res) {
       const tduCandidates = explicitTduCandidates.length ? explicitTduCandidates : texasEnergy.tduCandidates;
       const tduDisplay = explicitTduDisplay || texasEnergy.tduDisplay;
       const parentCompany = typeof contact?.parent_company === 'string' && contact.parent_company.trim()
-        ? contact.parent_company.trim()
+        ? cleanCompanyName(contact.parent_company)
         : typeof contact?.parentCompany === 'string' && contact.parentCompany.trim()
-          ? contact.parentCompany.trim()
+          ? cleanCompanyName(contact.parentCompany)
           : typeof contact?.parent_company_name === 'string' && contact.parent_company_name.trim()
-            ? contact.parent_company_name.trim()
+            ? cleanCompanyName(contact.parent_company_name)
             : typeof contact?.metadata?.relationships?.parentCompanyName === 'string' && contact.metadata.relationships.parentCompanyName.trim()
-              ? contact.metadata.relationships.parentCompanyName.trim()
+              ? cleanCompanyName(contact.metadata.relationships.parentCompanyName)
             : null;
       const subsidiaryCompanies = [
         ...(Array.isArray(contact?.subsidiary_companies) ? contact.subsidiary_companies : []),
         ...(Array.isArray(contact?.subsidiaryCompanies) ? contact.subsidiaryCompanies : []),
         ...(Array.isArray(contact?.metadata?.relationships?.subsidiaryCompanies) ? contact.metadata.relationships.subsidiaryCompanies : []),
       ]
-        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .map((item) => (typeof item === 'string' ? cleanCompanyName(item) : ''))
         .filter(Boolean);
       const organizationRole = typeof contact?.organization_role === 'string' && contact.organization_role.trim()
         ? contact.organization_role.trim()
@@ -622,7 +643,7 @@ export default async function handler(req, res) {
       const dataVectors = [
         `- TARGET_IDENTITY: ${(audienceProfile?.contactName || contact?.name || 'Unknown')} (${audienceProfile?.contactTitle || contactTitle}) at ${companyName}`,
         `- COMPANY_OUTREACH_NAME: ${companyName}`,
-        contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
+        contact?.company && companyName.toLowerCase() !== String(contact.company).trim().toLowerCase() ? `- COMPANY_LEGAL_NAME: ${cleanCompanyName(contact.company)}` : null,
         siteAddress ? `- SITE_ADDRESS: ${siteAddress}` : null,
         siteCity ? `- SITE_CITY: ${siteCity}` : null,
         siteState ? `- SITE_STATE: ${siteState}` : null,
