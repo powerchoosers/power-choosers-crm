@@ -412,6 +412,10 @@ function hasStrongAutomotiveSignals(text: string) {
   return /(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
 }
 
+function hasStrongDmeSignals(text: string) {
+  return /(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/i.test(text)
+}
+
 function hasStrongRestaurantSignals(text: string) {
   return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging)/i.test(text)
 }
@@ -434,8 +438,13 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
 
   const healthcareSignals = hasStrongHealthcareSignals(accountText)
   const dentalSignals = hasStrongDentalSignals(accountText)
+  const dmeSignals = hasStrongDmeSignals(accountText)
   const restaurantSignals = hasStrongRestaurantSignals(accountText)
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
+
+  if (dmeSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)/i.test(profileText)) {
+    return true
+  }
 
   if (dentalSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|guest rooms?|laundry)/i.test(profileText)) {
     return true
@@ -1308,6 +1317,9 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'education_nonprofit':
       return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
+      if (hasStrongDmeSignals(accountText)) {
+        return `${prefix}, the main factor is usually how equipment deliveries, inventory, service turnaround, and storage are landing on that location.`
+      }
       if (hasStrongDentalSignals(accountText)) {
         return `${prefix}, the main factor is usually how operatories, imaging, sterilization, patient flow, and HVAC are landing on that dental office meter.`
       }
@@ -1320,6 +1332,9 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
       }
       return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'logistics':
+      if (hasStrongDmeSignals(accountText)) {
+        return `${prefix}, the main factor is usually how equipment deliveries, inventory, service turnaround, and storage are landing on that location.`
+      }
       return `${prefix}, the focus is usually on whether dock activity, automation, and HVAC are creating expensive usage spikes.`
     case 'office_services':
       return `${prefix}, the concern is usually whether occupancy and HVAC are creating summer spikes that stay on the bill.`
@@ -1370,6 +1385,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
   }
 
+  if (hasStrongDmeSignals(text)) {
+    return `For ${company}, the useful check is whether equipment deliveries, inventory, service turnaround, and storage are what is actually driving the bill.`
+  }
+
   if (hasStrongAutomotiveSignals(text)) {
     return `For ${company}, the useful check is whether showroom traffic, service bays, parts, and lot lighting are what is actually driving the bill.`
   }
@@ -1415,6 +1434,9 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
   }
 
   if (multiLocation) {
+    if (hasStrongDmeSignals(accountText)) {
+      return `For a multi-location equipment network, the useful check is whether each direct-service location is being reviewed on its own meter, because deliveries, inventory, storage, and service turnaround can hide different cost patterns by branch.`
+    }
     if (context.industryCluster === 'restaurant') {
       return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
     }
@@ -1668,6 +1690,7 @@ function buildStructuredIdentityProfile(
   const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
   const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
   const isDentalPractice = hasStrongDentalSignals(text)
+  const isDmeProvider = hasStrongDmeSignals(text)
   const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
   const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|foodservice|production facilities)/i.test(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
@@ -1685,6 +1708,16 @@ function buildStructuredIdentityProfile(
 
   switch (cluster) {
     case 'healthcare':
+      if (isDmeProvider) {
+        companyType = multiSiteInfo.isMultiSite ? 'durable medical equipment network' : 'durable medical equipment provider'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site DME distribution network' : 'direct-service equipment support site'
+        facilityType = 'distribution / service location'
+        identityKeywords = selectIdentityKeywords(text, ['durable medical equipment', 'medical supplies', 'hospice DME', 'equipment logistics', 'direct-service locations', 'inventory management'], ['durable medical equipment', 'medical supplies', 'equipment logistics'])
+        powerKeywords = selectIdentityKeywords(text, ['warehouse climate control', 'inventory storage', 'equipment maintenance', '24/7 distribution', 'delivery turnaround', 'vehicle/route load'], ['warehouse climate control', 'inventory storage', 'equipment maintenance'])
+        talkTrackGuardrails = ['No hospital language', 'No clinic language', 'No emergency department language', 'No inpatient language', 'No patient-room language']
+        break
+      }
+
       if (isDentalPractice) {
         companyType = multiSiteInfo.isMultiSite ? 'dental partnership organization' : 'dental practice'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-site dental practice network with centralized support' : 'single dental office'
@@ -1763,6 +1796,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'logistics':
+      if (isDmeProvider) {
+        companyType = multiSiteInfo.isMultiSite ? 'medical equipment distribution network' : 'durable medical equipment provider'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site DME distribution and service network' : 'direct-service equipment support site'
+        facilityType = 'distribution / service location'
+        identityKeywords = selectIdentityKeywords(text, ['durable medical equipment', 'medical supplies', 'hospice DME', 'equipment logistics', 'direct-service locations', 'inventory management'], ['durable medical equipment', 'medical supplies', 'equipment logistics'])
+        powerKeywords = selectIdentityKeywords(text, ['warehouse climate control', 'inventory storage', 'equipment maintenance', '24/7 distribution', 'delivery turnaround'], ['warehouse climate control', 'inventory storage', 'equipment maintenance'])
+        talkTrackGuardrails = ['No clinic language', 'No hospital language', 'No emergency department language', 'No inpatient language']
+        break
+      }
+
       companyType = isFreightForwarder ? 'freight forwarder and logistics operator' : (multiSiteInfo.isMultiSite ? 'distribution network' : 'distribution and logistics operator')
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-site logistics network' : 'distribution support site'
       facilityType = isFreightForwarder ? 'logistics office / yard' : 'warehouse / distribution facility'
@@ -2261,6 +2304,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
+  if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   const hotelProperty = looksLikeHotelProperty(text)
@@ -2687,6 +2731,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'logistics':
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
       const logisticsAcquisitionHeavy = /\b(acquisition|acquisitions|acquired|rollup|distribution|building materials|wholesale|lumber|yards?|branches?)\b/i.test(text)
+
+      if (hasStrongDmeSignals(text)) {
+        if (logisticsMultiSite.isMultiSite && logisticsMultiSite.locationCount && logisticsMultiSite.locationCount >= 3) {
+          const locationDesc = logisticsMultiSite.locationCount >= 10
+            ? `${logisticsMultiSite.locationCount}+ direct-service locations`
+            : `${logisticsMultiSite.locationCount} direct-service locations`
+          const regionDesc = logisticsMultiSite.regions.length > 1
+            ? ` across ${logisticsMultiSite.regions.length} states`
+            : ''
+
+          return {
+            label: 'Equipment support network',
+            angle: `Location-by-location comparison of equipment deliveries, inventory, and service turnaround across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you comparing which locations are carrying the most equipment and storage load, or is that still getting blended together?`,
+            openers: [
+              `Equipment support networks like this usually need a location-by-location view because deliveries, inventory, and turnaround can differ a lot by branch.`,
+              `With that kind of footprint${regionDesc}, one direct-service location can carry a very different load even when the company looks uniform on paper.`,
+              `The question I'd want answered is which locations are carrying the heaviest equipment and storage load.`,
+            ],
+            focus: ['equipment deliveries', 'inventory', 'service turnaround', 'storage', 'branch-level review', 'meter-level exposure'],
+          }
+        }
+
+        return {
+          label: 'Equipment support provider',
+          angle: 'Equipment deliveries, inventory, service turnaround, and storage creating the highest usage moments at the support location.',
+          question: 'Have you looked at whether deliveries, inventory, or service turnaround are what create the biggest spikes on the bill?',
+          openers: [
+            'Equipment support businesses are different because the load comes from inventory, handling, and turnaround rather than patient rooms or clinic space.',
+            'The part I would watch is whether storage, delivery timing, or equipment processing is creating the biggest usage moments.',
+            'For an equipment support provider, the power side usually comes down to which part of the support operation is really driving the charge.',
+          ],
+          focus: ['equipment deliveries', 'inventory', 'service turnaround', 'storage', 'distribution support'],
+        }
+      }
       
       if (logisticsMultiSite.isMultiSite && logisticsMultiSite.locationCount && logisticsMultiSite.locationCount >= 3) {
         const locationDesc = logisticsMultiSite.locationCount >= 10 
@@ -3811,10 +3890,13 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
   const accountIsHealthcare = /\b(healthcare|hospital|clinic|medical|medical practice|acupunctur|functional wellness|doctor|dental|ophthalmology|retina|therapy|patient|wellness care)\b/i.test(accountText)
   const accountIsDental = /\b(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry)\b/i.test(accountText)
+  const accountIsDme = hasStrongDmeSignals(accountText)
   const accountHealthcareHotelJargon = accountIsHealthcare &&
     /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property|property-by-property)\b/i.test(lower)
   const accountDentalHospitalJargon = accountIsDental &&
     /\b(hospital|hospitality|emergency department|emergency room|inpatient|short-stay rooms?|acute care|guest rooms?|laundry|lodging|banquet|event venue|clinic)\b/i.test(lower)
+  const accountDmeHospitalJargon = accountIsDme &&
+    /\b(hospital|hospitality|clinic|medical practice|patient rooms?|patient care|emergency department|emergency room|inpatient|short-stay rooms?|acute care|guest rooms?|laundry|lodging|banquet|event venue)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
@@ -3823,6 +3905,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsFoodProduction = /\b(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice)\b/i.test(accountText)
   const accountFoodLogisticsJargon = accountIsFoodProduction &&
     /\b(warehouse groups?|dock activity|dock work|dock doors?|high-volume logistics|logistics groups?|automation and hvac|warehouse's summer peak)\b/i.test(lower)
+  const accountDmeMedicalAllowance = accountIsDme &&
+    /\b(dme|durable medical equipment|medical equipment|equipment|inventory|delivery|storage|turnaround)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -3832,7 +3916,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
