@@ -53,7 +53,16 @@ export const AccountTableRow = memo(function AccountTableRow({
             }}
         >
             {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="py-3">
+                <TableCell
+                    key={cell.id}
+                    className={cn(
+                        "py-3",
+                        cell.column.id === 'name' && cn(
+                            "sticky left-0 z-20 shadow-[10px_0_18px_-14px_rgba(0,0,0,0.85)] border-r border-white/5",
+                            isSelected ? "bg-[#002FA7]/5" : "bg-zinc-950/95 group-hover:bg-white/[0.03]"
+                        )
+                    )}
+                >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                 </TableCell>
             ))}
