@@ -458,6 +458,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     return true
   }
 
+  if (restaurantSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
+    return true
+  }
+
   if (manufacturingSignals && /(healthcare|hospital|clinic|medical|restaurant|hotel|hospitality|behavioral health|mental health)/i.test(profileText)) {
     return true
   }
@@ -3907,6 +3911,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsHealthcare = /\b(healthcare|hospital|clinic|medical|medical practice|acupunctur|functional wellness|doctor|dental|ophthalmology|retina|therapy|patient|wellness care)\b/i.test(accountText)
   const accountIsDental = /\b(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry)\b/i.test(accountText)
   const accountIsDme = hasStrongDmeSignals(accountText)
+  const accountIsRestaurant = hasStrongRestaurantSignals(accountText)
   const accountHealthcareHotelJargon = accountIsHealthcare &&
     /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property|property-by-property)\b/i.test(lower)
   const accountDentalHospitalJargon = accountIsDental &&
@@ -3923,6 +3928,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(warehouse groups?|dock activity|dock work|dock doors?|high-volume logistics|logistics groups?|automation and hvac|warehouse's summer peak)\b/i.test(lower)
   const accountDmeMedicalAllowance = accountIsDme &&
     /\b(dme|durable medical equipment|medical equipment|equipment|inventory|delivery|storage|turnaround)\b/i.test(lower)
+  const accountRestaurantManufacturingJargon = accountIsRestaurant &&
+    /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -3932,7 +3939,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
