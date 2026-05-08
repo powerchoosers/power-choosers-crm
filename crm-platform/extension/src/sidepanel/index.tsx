@@ -8,6 +8,7 @@ import {
   formatPhone,
   extractDomain,
   normalizeTwilioPhone,
+  isLinkedInPersonPageUrl,
   resolveCallerId,
   STATE_KEY,
   trimText,
@@ -982,7 +983,7 @@ function App() {
   }
 
   const ingestPageAccount = async () => {
-    const response = await sendMessage('INGEST_PAGE_ACCOUNT')
+    const response = await sendMessage(isLinkedInPersonPage ? 'INGEST_PAGE_CONTACT' : 'INGEST_PAGE_ACCOUNT')
     if (response?.state) setState(response.state)
   }
 
@@ -1252,6 +1253,7 @@ function App() {
   const crmPill = `np-pill font-mono ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
   const callPill = `np-pill font-mono ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
   const isLinkedInPage = Boolean(pageDomain && pageDomain.includes('linkedin.com'))
+  const isLinkedInPersonPage = isLinkedInPersonPageUrl(page?.url || page?.origin || '')
   const isContactHero = Boolean(contact?.id && isLinkedInPage)
 
   const heroTitle = (account as any)?.name || (contact as any)?.name || page?.title || 'No record identified'
@@ -1345,15 +1347,18 @@ function App() {
       : !pageStatus || pageStatus === 'idle'
         ? 'startup'
         : null
+  const ingestLabel = isLinkedInPersonPage ? 'LinkedIn contact + company' : 'account'
   const syncTitle =
     loadingMode === 'ingest'
-      ? 'Ingesting account...'
+      ? `Ingesting ${ingestLabel}...`
       : loadingMode === 'capture'
         ? 'Scanning page...'
         : 'Identifying session context...'
   const syncBody =
       loadingMode === 'ingest'
-      ? 'Creating the account in CRM and enriching it with ORG_INTELLIGENCE.'
+      ? isLinkedInPersonPage
+        ? 'Creating the contact, then enriching the company record with ORG_INTELLIGENCE.'
+        : 'Creating the account in CRM and enriching it with ORG_INTELLIGENCE.'
       : loadingMode === 'capture'
         ? 'Reading the active tab before matching it to CRM.'
         : 'Loading the Nodal Point command deck...'
@@ -2151,9 +2156,11 @@ function App() {
                   <EntityAvatar name={page?.title || pageDomain || 'Unmatched page'} imageUrl={null} size={60} className="np-entity-mark np-entity-mark--large" />
                   <div className="np-hero-copy">
                     <div className="np-kicker font-mono">UNMATCHED PAGE</div>
-                    <h2 className="np-hero-title font-sans">{page?.title || pageDomain || 'No CRM record found'}</h2>
+                    <h2 className="np-hero-title font-sans">
+                      {page?.title || pageDomain || (isLinkedInPersonPage ? 'LinkedIn profile not yet in CRM' : 'No CRM record found')}
+                    </h2>
                     <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {pageDomain || 'This site is not in CRM yet.'}
+                      {pageDomain || (isLinkedInPersonPage ? 'This LinkedIn profile is not in CRM yet.' : 'This site is not in CRM yet.')}
                       <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
                     </p>
                   </div>
@@ -2161,7 +2168,9 @@ function App() {
 
                 <div className="np-summary-box-card" style={{ marginTop: 16 }}>
                   <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
-                    Click the plus badge or ingest button to create the account in CRM and enrich it with ORG_INTELLIGENCE.
+                    {isLinkedInPersonPage
+                      ? 'Click the plus badge or ingest button to create the contact, then enrich the company record with ORG_INTELLIGENCE.'
+                      : 'Click the plus badge or ingest button to create the account in CRM and enrich it with ORG_INTELLIGENCE.'}
                   </p>
                 </div>
 
@@ -2192,8 +2201,12 @@ function App() {
                         <Plus size={22} />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className="np-uplink-primary__label">ADD TO CRM</span>
-                        <span className="np-uplink-primary__value font-mono">Ingest account from this site</span>
+                        <span className="np-uplink-primary__label">
+                          {isLinkedInPersonPage ? 'ADD CONTACT + COMPANY' : 'ADD TO CRM'}
+                        </span>
+                        <span className="np-uplink-primary__value font-mono">
+                          {isLinkedInPersonPage ? 'Ingest LinkedIn profile into CRM' : 'Ingest account from this site'}
+                        </span>
                       </div>
                       <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
                     </div>

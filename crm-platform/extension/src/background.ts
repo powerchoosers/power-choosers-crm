@@ -10,6 +10,7 @@ import {
   normalizeAuthPayload,
   normalizeOrigin,
   normalizeTwilioPhone,
+  isLinkedInPersonPageUrl,
   resolveCallerId,
   resolveContactPhotoUrl,
   trimText,
@@ -41,6 +42,7 @@ type CapturedTab = {
 
 type PageBadgePayload = {
   mode: 'matched' | 'ingest'
+  targetType: 'account' | 'contact'
   accountName: string
   accountId: string | null
   domain: string | null
@@ -522,7 +524,9 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.setAttribute(
     'aria-label',
     payload.mode === 'ingest'
-      ? `Ingest ${payload.label || payload.accountName} into Nodal Point`
+      ? payload.targetType === 'contact'
+        ? 'Ingest LinkedIn contact and company into Nodal Point'
+        : `Ingest ${payload.label || payload.accountName} into Nodal Point`
       : `Open Nodal Point for ${payload.accountName}`
   )
   host.style.all = 'unset'
@@ -683,9 +687,18 @@ function renderPageBadge(payload: PageBadgePayload | null) {
     if (isDragging) return
     e.preventDefault()
     e.stopPropagation()
-    chrome.runtime.sendMessage({ type: payload.mode === 'ingest' ? 'INGEST_PAGE_ACCOUNT' : 'OPEN_SIDE_PANEL' }, () => {
+    const messageType =
+      payload.mode === 'ingest'
+        ? payload.targetType === 'contact'
+          ? 'INGEST_PAGE_CONTACT'
+          : 'INGEST_PAGE_ACCOUNT'
+        : 'OPEN_SIDE_PANEL'
+    chrome.runtime.sendMessage(
+      { type: messageType },
+      () => {
        void chrome.runtime.lastError
-    })
+      }
+    )
   })
 
   root.appendChild(host)
@@ -826,6 +839,7 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
         args: [
           {
             mode: 'matched',
+            targetType: matchedContact ? 'contact' : 'account',
             accountName: matchedContact?.name || matchedAccount?.name || 'Open CRM',
             accountId: matchedContact?.id || matchedAccount?.id || null,
             domain: matchedAccount?.domain || matchedAccount?.website || matchedContact?.accountDomain || null,
@@ -859,11 +873,12 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
       args: [
         {
           mode: 'ingest',
+          targetType: isLinkedInPersonPageUrl(snapshot.url) ? 'contact' : 'account',
           accountName: snapshot.title || extractDomain(snapshot.url) || 'Unknown page',
           accountId: null,
           domain: snapshot.origin || snapshot.url || null,
           contactCount: 0,
-          label: 'Add to CRM',
+          label: isLinkedInPersonPageUrl(snapshot.url) ? 'Add LinkedIn Contact' : 'Add to CRM',
         },
       ],
     })
@@ -910,8 +925,16 @@ async function captureAndMatch(windowId?: number | null) {
 }
 
 async function handleIngestPageAccount(windowId?: number | null) {
+  return ingestActiveTab(windowId, 'account')
+}
+
+async function handleIngestPageContact(windowId?: number | null) {
+  return ingestActiveTab(windowId, 'contact')
+}
+
+async function ingestActiveTab(windowId?: number | null, requestedType: 'account' | 'contact' = 'account') {
   if (!state.auth?.accessToken) {
-    throw new Error('Connect your Nodal Point session before ingesting an account.')
+    throw new Error('Connect your Nodal Point session before ingesting a record.')
   }
 
   await setState((draft) => {
@@ -932,8 +955,11 @@ async function handleIngestPageAccount(windowId?: number | null) {
       draft.accountContacts = []
     })
 
+    const ingestType = requestedType === 'contact' || isLinkedInPersonPageUrl(snapshot.url) ? 'contact' : 'account'
+    const ingestPath = ingestType === 'contact' ? '/api/extension/ingest-contact' : '/api/extension/ingest-account'
+
     const data = await fetchAuthedJson(
-      '/api/extension/ingest-account',
+      ingestPath,
       {
         method: 'POST',
         body: JSON.stringify({
@@ -954,6 +980,8 @@ async function handleIngestPageAccount(windowId?: number | null) {
     return {
       ok: true,
       account: data?.account || null,
+      contact: data?.contact || null,
+      ingestType,
       existing: Boolean(data?.existing),
       match,
       state: cloneState(),
@@ -1977,6 +2005,35 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           draft.pageStatus = 'ingesting'
         })
         const result = await handleIngestPageAccount(sender?.tab?.windowId)
+        sendResponse({ ...result, opened })
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          opened,
+          error: trimText((error as Error)?.message || 'Ingest failed'),
+          state: cloneState(),
+        })
+      }
+    })()
+    return true
+  }
+
+  if (message?.type === 'INGEST_PAGE_CONTACT') {
+    void (async () => {
+      let opened = false
+      try {
+        const openResult = await handleOpenSidePanel(sender)
+        opened = Boolean(openResult?.ok)
+      } catch (error) {
+        console.warn('[Extension] Failed to open side panel before ingest:', error)
+      }
+
+      try {
+        await hydrateState()
+        await setState((draft) => {
+          draft.pageStatus = 'ingesting'
+        })
+        const result = await handleIngestPageContact(sender?.tab?.windowId)
         sendResponse({ ...result, opened })
       } catch (error) {
         sendResponse({
