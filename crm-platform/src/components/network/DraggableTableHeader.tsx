@@ -14,6 +14,7 @@ interface DraggableTableHeaderProps {
 }
 
 export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
+    const isFrozenNameColumn = header.column.id === 'name'
     const {
         attributes,
         listeners,
@@ -66,6 +67,7 @@ export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
             style={style}
             className={cn(
                 "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 relative select-none overflow-hidden cursor-grab active:cursor-grabbing",
+                isFrozenNameColumn && "sticky left-0 z-40 bg-zinc-950/95 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/80 shadow-[10px_0_18px_-14px_rgba(0,0,0,0.9)] border-r border-white/5",
                 isDragging && "bg-zinc-900 border-x border-[#002FA7]/30"
             )}
         >

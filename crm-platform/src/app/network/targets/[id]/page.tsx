@@ -86,6 +86,13 @@ const PAGE_SIZE = 50
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as const
 
+function getFrozenNameCellClass(isSelected: boolean) {
+  return cn(
+    "sticky left-0 z-20 shadow-[10px_0_18px_-14px_rgba(0,0,0,0.85)] border-r border-white/5",
+    isSelected ? "bg-[#002FA7]/5" : "bg-zinc-950/95 group-hover:bg-white/[0.03]"
+  )
+}
+
 export default function TargetDetailPage() {
   const router = useRouter()
   const pathname = usePathname()
@@ -205,7 +212,7 @@ export default function TargetDetailPage() {
   ], [])
 
   const initialAccountOrder = useMemo(() => [
-    'select', 'name', 'industry', 'location', 'owner', 'companyPhone', 'status', 'actions'
+    'select', 'name', 'industry', 'location', 'owner', 'companyPhone', 'employees', 'contractEnd', 'updated', 'status', 'actions'
   ], [])
 
   const [peopleColumnOrder, setPeopleColumnOrder] = useTableColumnOrder('targets_people', initialPeopleOrder)
@@ -771,6 +778,68 @@ export default function TargetDetailPage() {
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('companyPhone')}</div>,
     },
       {
+        accessorKey: 'employees',
+        header: 'Headcount',
+        cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('employees')}</div>,
+      },
+      {
+        accessorKey: 'contractEnd',
+        header: 'Contract End',
+        cell: ({ row }) => {
+          const dateStr = row.getValue('contractEnd') as string
+          if (!dateStr) return <span className="text-zinc-600 font-mono text-xs">--</span>
+
+          try {
+            const date = new Date(dateStr)
+            const threeMonthsAgo = subMonths(new Date(), 3)
+            const isRecent = isAfter(date, threeMonthsAgo)
+
+            return (
+              <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums whitespace-nowrap">
+                <Clock size={12} className="text-zinc-600" />
+                <span>
+                  {isRecent
+                    ? formatDistanceToNow(date, { addSuffix: true })
+                    : format(date, 'MMM d, yyyy')}
+                </span>
+              </div>
+            )
+          } catch (e) {
+            return <span className="text-zinc-600 font-mono text-xs">{dateStr}</span>
+          }
+        },
+      },
+      {
+        accessorKey: 'updated',
+        header: 'Last Update',
+        cell: ({ row }) => {
+          const val = row.original.updated
+          if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
+
+          try {
+            const date = new Date(val)
+            const threeMonthsAgo = subMonths(new Date(), 3)
+            const isRecent = isAfter(date, threeMonthsAgo)
+
+            return (
+              <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums whitespace-nowrap">
+                <div className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  isRecent ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : "bg-zinc-600"
+                )} />
+                <span>
+                  {isRecent
+                    ? formatDistanceToNow(date, { addSuffix: true })
+                    : format(date, 'MMM d, yyyy')}
+                </span>
+              </div>
+            )
+          } catch (e) {
+            return <span className="text-zinc-600 font-mono text-xs">{val}</span>
+          }
+        },
+      },
+      {
         id: 'status',
         header: 'Status',
         filterFn: () => true, // Server-side filtered
@@ -1043,15 +1112,21 @@ export default function TargetDetailPage() {
                       saveScroll()
                       router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
                     }}
-                    className={cn(
-                      "cursor-pointer border-b border-white/5 border-l-2 transition-colors",
-                      row.getIsSelected()
-                        ? "border-l-[#002FA7] bg-[#002FA7]/8 hover:bg-[#002FA7]/10"
-                        : "border-l-transparent hover:bg-white/[0.03]"
-                    )}
-                  >
+                  className={cn(
+                    "cursor-pointer border-b border-white/5 border-l-2 transition-colors",
+                    row.getIsSelected()
+                      ? "border-l-[#002FA7] bg-[#002FA7]/8 hover:bg-[#002FA7]/10"
+                      : "border-l-transparent hover:bg-white/[0.03]"
+                  )}
+                >
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="py-3">
+                      <TableCell
+                        key={cell.id}
+                        className={cn(
+                          "py-3",
+                          cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
+                        )}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     ))}
