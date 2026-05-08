@@ -424,6 +424,10 @@ function hasStrongManufacturingSignals(text: string) {
   return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
 }
 
+function hasStrongSchoolSignals(text: string) {
+  return /(school district|independent school district|isd\b|public school|charter school|k-12|school campus|students|classrooms|teachers|students|school\b)/i.test(text)
+}
+
 function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountText: string) {
   const profileText = cleanText([
     profile.companyType,
@@ -441,6 +445,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const dmeSignals = hasStrongDmeSignals(accountText)
   const restaurantSignals = hasStrongRestaurantSignals(accountText)
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
+  const schoolSignals = hasStrongSchoolSignals(accountText)
 
   if (dmeSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)/i.test(profileText)) {
     return true
@@ -459,6 +464,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (restaurantSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
+    return true
+  }
+
+  if (schoolSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
     return true
   }
 
@@ -3912,12 +3921,15 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsDental = /\b(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry)\b/i.test(accountText)
   const accountIsDme = hasStrongDmeSignals(accountText)
   const accountIsRestaurant = hasStrongRestaurantSignals(accountText)
+  const accountIsSchool = hasStrongSchoolSignals(accountText)
   const accountHealthcareHotelJargon = accountIsHealthcare &&
     /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property|property-by-property)\b/i.test(lower)
   const accountDentalHospitalJargon = accountIsDental &&
     /\b(hospital|hospitality|emergency department|emergency room|inpatient|short-stay rooms?|acute care|guest rooms?|laundry|lodging|banquet|event venue|clinic)\b/i.test(lower)
   const accountDmeHospitalJargon = accountIsDme &&
     /\b(hospital|hospitality|clinic|medical practice|patient rooms?|patient care|emergency department|emergency room|inpatient|short-stay rooms?|acute care|guest rooms?|laundry|lodging|banquet|event venue)\b/i.test(lower)
+  const accountSchoolManufacturingJargon = accountIsSchool &&
+    /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|shift(?:s)?|bake line)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
@@ -3939,7 +3951,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
