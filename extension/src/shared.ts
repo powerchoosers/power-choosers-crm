@@ -235,6 +235,18 @@ export function extractDomain(value: string | null | undefined): string | null {
   return normal || null
 }
 
+export function isLinkedInPersonPageUrl(value: string | null | undefined): boolean {
+  const raw = trimText(value).toLowerCase()
+  if (!raw) return false
+  return /linkedin\.com\/in\/[^/?#]+/i.test(raw) || /linkedin\.com\/in\//i.test(raw)
+}
+
+export function isLinkedInCompanyPageUrl(value: string | null | undefined): boolean {
+  const raw = trimText(value).toLowerCase()
+  if (!raw) return false
+  return /linkedin\.com\/company\/[^/?#]+/i.test(raw) || /linkedin\.com\/company\//i.test(raw)
+}
+
 export function normalizeDigits(value: string | null | undefined): string {
   return trimText(value).replace(/\D/g, '')
 }
