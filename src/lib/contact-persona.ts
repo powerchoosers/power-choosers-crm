@@ -211,8 +211,13 @@ function inferRoleFamily(title: string, industry: string, signals: string[]): Au
   return 'other'
 }
 
+function looksAutomotiveBusiness(text: string) {
+  return /(auto group|automotive|dealership|dealerships|car dealer|auto dealer|service bays?|service department|parts department|showroom|showrooms?|vehicle inventory|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
+}
+
 function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyName: string): string[] {
   const baseTitle = title || 'this person'
+  const automotiveBusiness = looksAutomotiveBusiness(`${title} ${companyName}`)
   const generic = [
     'plain-English answer',
     'who owns the decision',
@@ -232,7 +237,9 @@ function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyN
     public_sector: ['stewardship', 'budget protection', 'critical services', 'avoiding surprises'],
     nonprofit: ['mission funds', 'budget protection', 'service continuity', 'avoiding surprises'],
     hospitality: ['guest comfort', 'laundry and HVAC', 'site-level usage', 'which property is the outlier'],
-    retail: ['store-level peaks', 'showroom or floor load', 'which locations are different', 'whether the bill lines up with traffic'],
+    retail: automotiveBusiness
+      ? ['dealership traffic', 'showroom load', 'service bays', 'which dealerships are different']
+      : ['store-level peaks', 'showroom or floor load', 'which locations are different', 'whether the bill lines up with traffic'],
     logistics: ['dock activity', 'refrigeration if any', 'site usage timing', 'which locations are driving peaks'],
     manufacturing: ['production schedules', 'equipment start times', 'which lines create the spikes', 'whether the plant timing is still right'],
     other: generic,
@@ -248,6 +255,7 @@ function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyN
 function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, companyName: string): string {
   const company = companyName || 'the company'
   const base = title || 'this contact'
+  const automotiveBusiness = looksAutomotiveBusiness(`${title} ${companyName}`)
   switch (roleFamily) {
     case 'finance':
       return `${base} usually cares about budget surprises and whether the bill is still making sense at ${company}.`
@@ -273,7 +281,9 @@ function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, company
     case 'hospitality':
       return `${base} usually cares about guest comfort, laundry, HVAC, and site-level usage at ${company}.`
     case 'retail':
-      return `${base} usually cares about store-level traffic, lighting, HVAC, and which locations are the outliers at ${company}.`
+      return automotiveBusiness
+        ? `${base} usually cares about dealership traffic, showroom load, service bays, and which locations are the outliers at ${company}.`
+        : `${base} usually cares about store-level traffic, lighting, HVAC, and which locations are the outliers at ${company}.`
     case 'logistics':
       return `${base} usually cares about dock timing, refrigeration if any, and which sites are carrying the peaks at ${company}.`
     case 'manufacturing':
@@ -286,6 +296,7 @@ function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, company
 function buildOpenerHint(profile: AudienceProfile): string {
   const firstName = profile.contactFirstName || profile.contactName.split(/\s+/)[0] || 'there'
   const company = profile.companyName || 'the company'
+  const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
   switch (profile.roleFamily) {
     case 'finance':
       return `I was curious how ${firstName} is looking at the budget side at ${company}.`
@@ -311,7 +322,9 @@ function buildOpenerHint(profile: AudienceProfile): string {
     case 'hospitality':
       return `I was curious how ${firstName} is thinking about guest comfort and usage at ${company}.`
     case 'retail':
-      return `I was curious how ${firstName} is comparing store-level usage at ${company}.`
+      return automotiveBusiness
+        ? `I was curious how ${firstName} is comparing dealership-level usage at ${company}.`
+        : `I was curious how ${firstName} is comparing store-level usage at ${company}.`
     case 'logistics':
       return `I was curious how ${firstName} is thinking about dock timing at ${company}.`
     case 'manufacturing':
@@ -322,6 +335,7 @@ function buildOpenerHint(profile: AudienceProfile): string {
 }
 
 function buildQuestionHint(profile: AudienceProfile): string {
+  const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
   switch (profile.roleFamily) {
     case 'finance':
       return 'Have you been able to separate which sites are carrying the biggest peaks?'
@@ -347,7 +361,9 @@ function buildQuestionHint(profile: AudienceProfile): string {
     case 'hospitality':
       return 'Have you been able to tell which property is setting the highest charge?'
     case 'retail':
-      return 'Have you seen which stores are driving the bill the hardest?'
+      return automotiveBusiness
+        ? 'Have you seen which dealerships are driving the bill the hardest?'
+        : 'Have you seen which stores are driving the bill the hardest?'
     case 'logistics':
       return 'Have you mapped which sites are creating the peak charges?'
     case 'manufacturing':
@@ -364,6 +380,7 @@ function buildGuardrails(profile: AudienceProfile): string[] {
     'Do not mention LinkedIn, profiles, or scraping in the output.',
     'Keep the note to one business problem and one question.',
   ]
+  const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
 
   const byRole: Record<AudienceRoleFamily, string[]> = {
     finance: ['Focus on budget surprises, timing, and site-level variance.'],
@@ -378,7 +395,9 @@ function buildGuardrails(profile: AudienceProfile): string[] {
     public_sector: ['Focus on stewardship and budget protection.'],
     nonprofit: ['Focus on mission funds and avoiding surprise costs.'],
     hospitality: ['Focus on guest comfort, laundry, and HVAC.'],
-    retail: ['Focus on store-level usage and traffic patterns.'],
+    retail: automotiveBusiness
+      ? ['Focus on dealership traffic, showroom load, service bays, and location-by-location differences.']
+      : ['Focus on store-level usage and traffic patterns.'],
     logistics: ['Focus on dock activity, refrigeration if any, and site timing.'],
     manufacturing: ['Focus on production timing, equipment starts, and the plant peak.'],
     other: ['Focus on the business problem that would matter to this person.'],
@@ -566,4 +585,3 @@ export function buildAudienceLead(profile: AudienceProfile | null | undefined): 
   if (!profile) return ''
   return profile.openerHint || ''
 }
-
