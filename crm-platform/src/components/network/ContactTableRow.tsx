@@ -30,6 +30,13 @@ export const ContactTableRow = memo(function ContactTableRow({
     isSelected
 }: ContactTableRowProps) {
     const isAnimated = index < 12
+    const frozenSelectCellClass = cn(
+        "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/60 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50"
+    )
+    const frozenNameCellClass = cn(
+        "sticky left-12 z-20 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50 shadow-[14px_0_26px_-20px_rgba(0,0,0,0.95)] border-r border-white/5",
+        isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/60 group-hover:bg-white/[0.03]"
+    )
     return (
         <motion.tr
             initial={isAnimated ? { opacity: 0 } : false}
@@ -61,10 +68,8 @@ export const ContactTableRow = memo(function ContactTableRow({
                     key={cell.id}
                     className={cn(
                         "py-3",
-                        cell.column.id === 'name' && cn(
-                            "sticky left-0 z-20 shadow-[10px_0_18px_-14px_rgba(0,0,0,0.85)] border-r border-white/5",
-                            isSelected ? "bg-[#002FA7]/5" : "bg-zinc-950/95 group-hover:bg-white/[0.03]"
-                        )
+                        cell.column.id === 'select' && frozenSelectCellClass,
+                        cell.column.id === 'name' && frozenNameCellClass
                     )}
                 >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

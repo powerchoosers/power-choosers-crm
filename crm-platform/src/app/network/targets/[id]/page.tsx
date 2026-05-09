@@ -88,8 +88,14 @@ const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as 
 
 function getFrozenNameCellClass(isSelected: boolean) {
   return cn(
-    "sticky left-0 z-20 shadow-[10px_0_18px_-14px_rgba(0,0,0,0.85)] border-r border-white/5",
-    isSelected ? "bg-[#002FA7]/5" : "bg-zinc-950/95 group-hover:bg-white/[0.03]"
+    "sticky left-12 z-20 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50 shadow-[14px_0_26px_-20px_rgba(0,0,0,0.95)] border-r border-white/5",
+    isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/60 group-hover:bg-white/[0.03]"
+  )
+}
+
+function getFrozenSelectCellClass() {
+  return cn(
+    "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/60 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50"
   )
 }
 
@@ -1124,6 +1130,7 @@ export default function TargetDetailPage() {
                         key={cell.id}
                         className={cn(
                           "py-3",
+                          cell.column.id === 'select' && getFrozenSelectCellClass(),
                           cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
                         )}
                       >
