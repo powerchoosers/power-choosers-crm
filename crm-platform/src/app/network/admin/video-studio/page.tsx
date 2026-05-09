@@ -6,23 +6,19 @@ import { formatDistanceToNow } from 'date-fns'
 import {
   AlertTriangle,
   ArrowRight,
-  Copy,
-  ExternalLink,
   Film,
   ImagePlus,
-  Layers3,
   Loader2,
   Play,
   RefreshCw,
   ShieldCheck,
   Sparkles,
-  Upload,
-  WandSparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { TimelineEditor } from '@/components/video-studio/TimelineEditor'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,6 +26,13 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useUIStore, type RightPanelMode } from '@/store/uiStore'
+import {
+  createClipFromJob,
+  createDefaultTimeline,
+  normalizeTimeline,
+  type TimelineJob,
+  type TimelineState,
+} from '@/components/video-studio/timelineTypes'
 
 type VideoModelInfo = {
   id: string
@@ -71,10 +74,12 @@ type VideoJob = {
     cost?: number | null
     is_byok?: boolean | null
   } | null
+  timeline?: TimelineState | null
 }
 
 type StudioResponse = {
   models?: VideoModelInfo[]
+  jobs?: VideoJob[]
   job?: Record<string, any>
   prompt?: string
   error?: string
@@ -102,8 +107,6 @@ const FALLBACK_MODELS: VideoModelInfo[] = [
     pricing_skus: { generate: '0.25' },
   },
 ]
-
-const STORAGE_KEY = 'nodal-video-studio-jobs'
 
 function formatAge(value: string) {
   try {
@@ -163,16 +166,20 @@ function makeJobId() {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `job_${Date.now()}`
 }
 
-function loadStoredJobs(): VideoJob[] {
-  if (typeof window === 'undefined') return []
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
+function timelineFromJob(job: TimelineJob) {
+  const normalized = normalizeTimeline(job.timeline || undefined)
+  if (normalized.clips.length > 0) {
+    return normalized
   }
+
+  if (job.outputUrl || job.sourceClipUrl) {
+    return normalizeTimeline({
+      ...normalized,
+      clips: [createClipFromJob(job)],
+    })
+  }
+
+  return normalized
 }
 
 export default function VideoStudioPage() {
@@ -189,8 +196,11 @@ export default function VideoStudioPage() {
   const [models, setModels] = useState<VideoModelInfo[]>(FALLBACK_MODELS)
   const [isLoadingModels, setIsLoadingModels] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<VideoJob[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [timeline, setTimeline] = useState<TimelineState>(() => createDefaultTimeline())
   const [projectName, setProjectName] = useState('Nodal Point Brand Cut')
   const [editGoal, setEditGoal] = useState('Generate a cinematic clip that matches the forensic Nodal Point brand.')
   const [editBrief, setEditBrief] = useState('Use this for a short hero clip, B-roll replacement, or opening sting.')
@@ -239,24 +249,12 @@ export default function VideoStudioPage() {
   }, [])
 
   useEffect(() => {
-    setJobs(loadStoredJobs())
-  }, [])
-
-  useEffect(() => {
     return () => {
       if (sourceVideoPreviewUrl) {
         URL.revokeObjectURL(sourceVideoPreviewUrl)
       }
     }
   }, [sourceVideoPreviewUrl])
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs))
-    } catch {
-      // Ignore storage errors. The page still works without persistence.
-    }
-  }, [jobs])
 
   useEffect(() => {
     if (loading || !isAdmin) return
@@ -270,7 +268,12 @@ export default function VideoStudioPage() {
         const data = await fetchStudioJson('/api/admin/video-studio')
         if (!mounted) return
         const fetchedModels = Array.isArray(data.models) && data.models.length > 0 ? data.models : FALLBACK_MODELS
+        const fetchedJobs = Array.isArray(data.jobs) ? data.jobs : []
         setModels(fetchedModels)
+        setJobs(fetchedJobs)
+        if (data.error) {
+          setError(data.error)
+        }
         if (!fetchedModels.some((model) => model.id === modelId) && fetchedModels[0]) {
           setModelId(fetchedModels[0].id)
         }
@@ -310,6 +313,7 @@ export default function VideoStudioPage() {
               outputUrl: fresh.unsigned_urls?.[0] || job.outputUrl || null,
               error: fresh.error || job.error || null,
               usage: fresh.usage || job.usage || null,
+              timeline: fresh.timeline ? normalizeTimeline(fresh.timeline) : job.timeline || null,
             } as VideoJob
           } catch {
             return job
@@ -329,7 +333,12 @@ export default function VideoStudioPage() {
     try {
       const data = await fetchStudioJson('/api/admin/video-studio')
       const fetchedModels = Array.isArray(data.models) && data.models.length > 0 ? data.models : FALLBACK_MODELS
+      const fetchedJobs = Array.isArray(data.jobs) ? data.jobs : []
       setModels(fetchedModels)
+      setJobs(fetchedJobs)
+      if (data.error) {
+        setError(data.error)
+      }
       if (!fetchedModels.some((model) => model.id === modelId) && fetchedModels[0]) {
         setModelId(fetchedModels[0].id)
       }
@@ -444,6 +453,8 @@ export default function VideoStudioPage() {
 
     try {
       const payload = {
+        jobId: activeProjectId || undefined,
+        action: 'generate',
         subject: projectName,
         projectName,
         editGoal,
@@ -460,6 +471,7 @@ export default function VideoStudioPage() {
         referenceRole,
         referenceImage: referenceImageDataUrl,
         referenceImageName,
+        timeline,
       }
 
       const prompt = buildPrompt({
@@ -504,9 +516,12 @@ export default function VideoStudioPage() {
         outputUrl: Array.isArray(job.unsigned_urls) ? job.unsigned_urls[0] || null : null,
         error: job.error || null,
         usage: job.usage || null,
+        timeline: job.timeline ? normalizeTimeline(job.timeline) : timeline,
       }
 
       setJobs((current) => [nextJob, ...current.filter((item) => item.id !== nextJob.id)])
+      setActiveProjectId(nextJob.id)
+      setTimeline(nextJob.timeline ? normalizeTimeline(nextJob.timeline) : timeline)
       toast.success('Video job submitted')
     } catch (err: any) {
       setError(err?.message || 'Failed to submit video job')
@@ -516,12 +531,92 @@ export default function VideoStudioPage() {
     }
   }
 
-  const copyText = async (value: string) => {
-    await navigator.clipboard.writeText(value)
-    toast.success('Copied')
+  const handleSaveDraft = async () => {
+    if (!modelId) return
+    setIsSavingDraft(true)
+    setError(null)
+
+    try {
+      const payload = {
+        jobId: activeProjectId || undefined,
+        action: 'save',
+        subject: projectName,
+        projectName,
+        editGoal,
+        editBrief,
+        styleNotes,
+        safetyNotes,
+        sourceClipUrl,
+        sourceVideoName: sourceVideoName || undefined,
+        model: modelId,
+        aspectRatio,
+        duration: Number(duration),
+        resolution,
+        referenceMode,
+        referenceRole,
+        referenceImage: referenceImageDataUrl,
+        referenceImageName,
+        timeline,
+      }
+
+      const prompt = buildPrompt({
+        projectName,
+        editGoal,
+        editBrief,
+        styleNotes,
+        safetyNotes,
+        sourceClipUrl,
+        sourceVideoName: sourceVideoName || undefined,
+      })
+
+      const data = await fetchStudioJson('/api/admin/video-studio', {
+        method: 'POST',
+        body: JSON.stringify({ ...payload, prompt }),
+      })
+
+      const job = (data.job || {}) as Record<string, any>
+      const nextJob: VideoJob = {
+        id: String(job.id || activeProjectId || makeJobId()),
+        generation_id: job.generation_id || null,
+        polling_url: job.polling_url || null,
+        status: String(job.status || 'draft'),
+        model: modelId,
+        prompt: data.prompt || prompt,
+        projectName,
+        editGoal,
+        editBrief,
+        styleNotes,
+        safetyNotes,
+        sourceClipUrl,
+        sourceVideoName: sourceVideoName || null,
+        createdAt: String(job.createdAt || job.created_at || new Date().toISOString()),
+        updatedAt: String(job.updatedAt || job.updated_at || new Date().toISOString()),
+        aspectRatio,
+        duration: Number(duration),
+        resolution,
+        referenceMode,
+        referenceRole,
+        referenceImageName: referenceImageName || null,
+        unsigned_urls: Array.isArray(job.unsigned_urls) ? job.unsigned_urls : null,
+        outputUrl: Array.isArray(job.unsigned_urls) ? job.unsigned_urls[0] || null : null,
+        error: job.error || null,
+        usage: job.usage || null,
+        timeline: job.timeline ? normalizeTimeline(job.timeline) : timeline,
+      }
+
+      setJobs((current) => [nextJob, ...current.filter((item) => item.id !== nextJob.id)])
+      setActiveProjectId(nextJob.id)
+      setTimeline(nextJob.timeline ? normalizeTimeline(nextJob.timeline) : timeline)
+      toast.success('Draft saved')
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save draft')
+      toast.error(err?.message || 'Failed to save draft')
+    } finally {
+      setIsSavingDraft(false)
+    }
   }
 
-  const reopenProject = (job: VideoJob) => {
+  const reopenProject = (job: TimelineJob) => {
     setProjectName(job.projectName || 'Nodal Point Brand Cut')
     setEditGoal(job.editGoal || '')
     setEditBrief(job.editBrief || '')
@@ -536,21 +631,22 @@ export default function VideoStudioPage() {
     setReferenceImageDataUrl('')
     setReferenceImageName(job.referenceImageName || '')
     setModelId(job.model)
-    setAspectRatio(job.aspectRatio)
-    setDuration(String(job.duration) as '5' | '8')
-    setResolution(job.resolution)
+    setAspectRatio(job.aspectRatio || '16:9')
+    setDuration(String(job.duration || 8) as '5' | '8')
+    setResolution(job.resolution || '720p')
     if (job.referenceImageName) setReferenceImageName(job.referenceImageName)
-    setReferenceMode(job.referenceMode)
-    setReferenceRole(job.referenceRole)
+    setReferenceMode(job.referenceMode || 'frame')
+    setReferenceRole(job.referenceRole || 'first_frame')
+    setTimeline(timelineFromJob(job))
+    setActiveProjectId(job.id)
     toast.success('Project reopened')
   }
 
   const totals = useMemo(() => {
     const pending = jobs.filter((job) => ['pending', 'in_progress'].includes(job.status)).length
     const completed = jobs.filter((job) => job.status === 'completed').length
-    const failed = jobs.filter((job) => ['failed', 'cancelled', 'expired'].includes(job.status)).length
     const totalCost = jobs.reduce((sum, job) => sum + Number(job.usage?.cost || 0), 0)
-    return { pending, completed, failed, totalCost }
+    return { pending, completed, totalCost }
   }, [jobs])
 
   if (!loading && !isAdmin) {
@@ -576,7 +672,7 @@ export default function VideoStudioPage() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <CollapsiblePageHeader
         title="Video Studio"
-        description="Admin-only AI clip builder for Nodal Point. Veo is the polished lane. Wan is the faster draft lane."
+        description="Admin-only timeline editor for Nodal Point. Veo is the polished lane. Wan is the faster draft lane."
         backHref="/network/admin"
         primaryAction={{ label: 'Generate', onClick: handleGenerate, icon: <Play className="w-4 h-4" />, disabled: isSubmitting }}
         secondaryAction={{ label: 'Refresh Models', onClick: refreshModels, icon: <RefreshCw className="w-4 h-4" />, disabled: isLoadingModels }}
@@ -1003,171 +1099,21 @@ export default function VideoStudioPage() {
             </CardContent>
           </Card>
 
-          <Card className="nodal-glass border border-white/5">
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Job Queue</div>
-                  <h2 className="mt-1 text-lg font-semibold text-white">Rendered clips and polling state</h2>
-                </div>
-                <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                  {jobs.length} items · {totals.failed} failed
-                </Badge>
-              </div>
-
-              <div className="space-y-3 max-h-[760px] overflow-y-auto pr-1">
-                {jobs.length === 0 ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-zinc-500">
-                    No jobs yet. Build a brief, choose a model, and hit Generate.
-                  </div>
-                ) : jobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className={cn(
-                      'rounded-2xl border p-4 space-y-3 nodal-glass',
-                      job.status === 'completed'
-                        ? 'border-emerald-500/20 bg-emerald-500/[0.03]'
-                        : ['failed', 'cancelled', 'expired'].includes(job.status)
-                          ? 'border-rose-500/20 bg-rose-500/[0.03]'
-                          : 'border-white/10 bg-white/[0.02]'
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-zinc-100 truncate">{job.projectName}</span>
-                          <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[9px] font-mono">
-                            {job.status}
-                          </Badge>
-                        </div>
-                        <div className="mt-1 text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">
-                          {job.model} · {job.aspectRatio} · {job.duration}s · {job.resolution}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void copyText(job.prompt)}
-                        className="icon-button-forensic h-8 w-8 shrink-0"
-                        aria-label="Copy prompt"
-                        title="Copy prompt"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    <div className="text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                      {job.prompt}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
-                        {formatAge(job.createdAt)}
-                      </span>
-                      {job.outputUrl ? (
-                        <>
-                          <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 uppercase tracking-[0.2em] text-[9px] font-mono">
-                            Ready
-                          </Badge>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => void copyText(job.outputUrl || '')}
-                            className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                          >
-                            Copy video URL
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.open(job.outputUrl || '', '_blank')}
-                            className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Open
-                          </Button>
-                        </>
-                      ) : job.status === 'failed' ? (
-                        <span className="text-xs text-rose-300">{job.error || 'Generation failed.'}</span>
-                      ) : job.status === 'completed' ? (
-                        <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-300 uppercase tracking-[0.2em] text-[9px] font-mono">
-                          Polling complete
-                        </Badge>
-                      ) : (
-                        <Badge className="border border-[#002FA7]/20 bg-[#002FA7]/10 text-[#9db7ff] uppercase tracking-[0.2em] text-[9px] font-mono">
-                          Polling
-                        </Badge>
-                      )}
-                    </div>
-
-                    {job.outputUrl ? (
-                      <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/60">
-                        <video src={job.outputUrl} controls className="w-full max-h-[420px] bg-black" />
-                      </div>
-                    ) : null}
-
-                    {job.referenceImageName ? (
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">
-                        Reference: {job.referenceImageName}
-                      </div>
-                    ) : null}
-
-                    {job.usage?.cost != null ? (
-                      <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">
-                        Cost: ${Number(job.usage.cost).toFixed(2)}
-                      </div>
-                    ) : null}
-
-                    {['pending', 'in_progress'].includes(job.status) ? (
-                      <div className="flex items-center gap-2 text-xs text-zinc-500">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Waiting on OpenRouter to finish the clip.
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-3">
-        <Card className="nodal-glass border border-white/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <WandSparkles className="w-4 h-4 text-zinc-500 mt-0.5" />
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">How to use it</div>
-              <p className="mt-2 text-sm text-zinc-400">
-                Use Veo when you want cleaner polish. Use Wan when you want faster alternatives or rougher passes.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="nodal-glass border border-white/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <Layers3 className="w-4 h-4 text-zinc-500 mt-0.5" />
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">What this is not</div>
-              <p className="mt-2 text-sm text-zinc-400">
-                It is not a full timeline editor. It is a clip factory for generating pieces you can cut into a real edit.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="nodal-glass border border-white/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <Upload className="w-4 h-4 text-zinc-500 mt-0.5" />
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">OpenRouter</div>
-              <p className="mt-2 text-sm text-zinc-400">
-                Jobs are sent from the server, so your API key stays out of the browser.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <TimelineEditor
+        projectName={projectName}
+        jobs={jobs}
+        timeline={timeline}
+        onTimelineChange={setTimeline}
+        onOpenJob={reopenProject}
+        onSaveDraft={handleSaveDraft}
+        onGenerate={handleGenerate}
+        isSaving={isSavingDraft}
+        isGenerating={isSubmitting}
+        activeProjectId={activeProjectId}
+      />
     </div>
   )
 }
