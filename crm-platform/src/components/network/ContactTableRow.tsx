@@ -31,11 +31,11 @@ export const ContactTableRow = memo(function ContactTableRow({
 }: ContactTableRowProps) {
     const isAnimated = index < 12
     const frozenSelectCellClass = cn(
-        "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/60 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50"
+        "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40"
     )
     const frozenNameCellClass = cn(
-        "sticky left-12 z-20 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/50 shadow-[14px_0_26px_-20px_rgba(0,0,0,0.95)] border-r border-white/5",
-        isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/60 group-hover:bg-white/[0.03]"
+        "sticky left-12 z-20 relative backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40 shadow-[22px_0_34px_-26px_rgba(0,0,0,0.95)] border-r border-white/5 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-5 after:w-5 after:bg-gradient-to-r after:from-black/75 after:to-transparent",
+        isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/50 group-hover:bg-white/[0.04]"
     )
     return (
         <motion.tr
