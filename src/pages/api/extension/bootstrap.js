@@ -103,6 +103,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
+      role: auth.isAdmin ? 'admin' : 'employee',
       profile,
     })
   } catch (error) {
