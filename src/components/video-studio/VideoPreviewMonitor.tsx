@@ -60,7 +60,8 @@ export function VideoPreviewMonitor({
     if (!player) return
 
     if (sourceUrl) {
-      player.src({ src: sourceUrl })
+      const type = sourceUrl.startsWith('blob:') ? 'video/mp4' : undefined
+      player.src(type ? { src: sourceUrl, type } : { src: sourceUrl })
       if (posterUrl) player.poster(posterUrl)
     } else {
       player.pause()
