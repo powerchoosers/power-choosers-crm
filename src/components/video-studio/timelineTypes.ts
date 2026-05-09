@@ -1,5 +1,6 @@
 export type TimelineTrackKind = 'video' | 'audio' | 'title'
 export type TimelineClipKind = 'source' | 'generated' | 'title' | 'audio'
+export type TimelineOverlayKind = 'text' | 'image' | 'icon'
 
 export type TimelineTrack = {
   id: string
@@ -26,6 +27,28 @@ export type TimelineClip = {
   locked?: boolean
 }
 
+export type TimelineOverlay = {
+  id: string
+  kind: TimelineOverlayKind
+  label: string
+  start: number
+  duration: number
+  x: number
+  y: number
+  width: number
+  height: number
+  text?: string
+  sourceUrl?: string | null
+  icon?: 'target' | 'bolt' | 'circle' | 'square'
+  fontFamily?: string
+  fontSize?: number
+  fontWeight?: string
+  color?: string
+  backgroundColor?: string
+  opacity?: number
+  locked?: boolean
+}
+
 export type TimelineState = {
   duration: number
   zoom: number
@@ -33,6 +56,7 @@ export type TimelineState = {
   fps: number
   tracks: TimelineTrack[]
   clips: TimelineClip[]
+  overlays: TimelineOverlay[]
 }
 
 export type TimelineJob = {
@@ -101,6 +125,7 @@ export function createDefaultTimeline(): TimelineState {
     fps: 24,
     tracks: DEFAULT_TRACKS.map((track) => ({ ...track })),
     clips: [],
+    overlays: [],
   }
 }
 
@@ -108,6 +133,7 @@ export function normalizeTimeline(input?: Partial<TimelineState> | null): Timeli
   const base = createDefaultTimeline()
   const tracks = Array.isArray(input?.tracks) && input.tracks.length > 0 ? input.tracks : base.tracks
   const clips = Array.isArray(input?.clips) ? input.clips : []
+  const overlays = Array.isArray(input?.overlays) ? input.overlays : []
   const safeClips = clips
     .filter((clip) => clip && clip.trackId)
     .map((clip) => ({
@@ -124,7 +150,34 @@ export function normalizeTimeline(input?: Partial<TimelineState> | null): Timeli
     }))
     .sort((a, b) => a.start - b.start)
 
-  const maxEnd = safeClips.reduce((sum, clip) => Math.max(sum, clip.start + clip.duration), 0)
+  const safeOverlays = overlays
+    .filter((overlay) => overlay)
+    .map((overlay) => ({
+      ...overlay,
+      id: overlay.id || makeId('overlay'),
+      kind: overlay.kind || 'text',
+      label: String(overlay.label || 'Overlay'),
+      start: Math.max(0, Number(overlay.start || 0)),
+      duration: Math.max(0.5, Number(overlay.duration || 4)),
+      x: clamp(Number(overlay.x ?? 96), 0, 960),
+      y: clamp(Number(overlay.y ?? 96), 0, 540),
+      width: clamp(Number(overlay.width ?? 260), 24, 960),
+      height: clamp(Number(overlay.height ?? 96), 24, 540),
+      text: overlay.text || 'Text layer',
+      sourceUrl: overlay.sourceUrl || null,
+      icon: overlay.icon || 'target',
+      fontFamily: overlay.fontFamily || 'IBM Plex Mono, monospace',
+      fontSize: Number(overlay.fontSize || 32),
+      fontWeight: overlay.fontWeight || '600',
+      color: overlay.color || '#f4f4f5',
+      backgroundColor: overlay.backgroundColor || 'transparent',
+      opacity: overlay.opacity ?? 1,
+    }))
+    .sort((a, b) => a.start - b.start)
+
+  const maxClipEnd = safeClips.reduce((sum, clip) => Math.max(sum, clip.start + clip.duration), 0)
+  const maxOverlayEnd = safeOverlays.reduce((sum, overlay) => Math.max(sum, overlay.start + overlay.duration), 0)
+  const maxEnd = Math.max(maxClipEnd, maxOverlayEnd)
 
   return {
     duration: Math.max(base.duration, Number(input?.duration || 0), maxEnd > 0 ? maxEnd + 4 : base.duration),
@@ -139,6 +192,7 @@ export function normalizeTimeline(input?: Partial<TimelineState> | null): Timeli
       color: String(track.color || DEFAULT_TRACKS[index % DEFAULT_TRACKS.length].color),
     })),
     clips: safeClips,
+    overlays: safeOverlays,
   }
 }
 
