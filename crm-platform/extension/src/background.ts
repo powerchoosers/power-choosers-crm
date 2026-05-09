@@ -342,6 +342,7 @@ async function loadBootstrapProfile(fallbackOrigin?: string | null) {
     await setState((draft) => {
       if (!draft.auth) return
       draft.auth.appOrigin = normalizeOrigin(data?.appOrigin || fallbackOrigin || draft.auth.appOrigin || DEFAULT_APP_ORIGIN)
+      draft.auth.role = data?.role === 'admin' || data?.role === 'employee' ? data.role : draft.auth.role || null
       draft.auth.profile = profile ? {
         email: profile.email || draft.auth.email || null,
         name: profile.name || null,
