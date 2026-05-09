@@ -24,6 +24,7 @@ export type ExtensionAuth = {
   refreshToken: string | null
   email: string | null
   userId: string | null
+  role: 'admin' | 'employee' | null
   fullName: string | null
   firstName: string | null
   lastName: string | null
@@ -428,6 +429,11 @@ export function normalizeAuthPayload(payload: any, appOrigin?: string | null): E
     refreshToken: trimText(source?.refresh_token ?? source?.refreshToken) || null,
     email,
     userId,
+    role: (() => {
+      const value = trimText(payload?.role ?? source?.role ?? user?.role).toLowerCase()
+      if (value === 'admin' || value === 'employee') return value as 'admin' | 'employee'
+      return null
+    })(),
     fullName: fullNameRaw || inferred.fullName,
     firstName: trimText(payload?.firstName ?? inferred.firstName) || null,
     lastName: trimText(payload?.lastName ?? inferred.lastName) || null,
