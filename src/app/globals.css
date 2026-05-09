@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "video.js/dist/video-js.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -809,4 +810,23 @@
     to {
       opacity: 1;
     }
+  }
+
+  .nodal-video-monitor .video-js {
+    height: 100%;
+    width: 100%;
+    background: #000;
+    color: #f4f4f5;
+    font-family: inherit;
+  }
+
+  .nodal-video-monitor .vjs-control-bar {
+    background: rgba(10, 10, 10, 0.86);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+  }
+
+  .nodal-video-monitor .vjs-play-progress,
+  .nodal-video-monitor .vjs-volume-level {
+    background: #002FA7;
   }
