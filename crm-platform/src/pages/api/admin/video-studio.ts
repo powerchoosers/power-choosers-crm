@@ -248,9 +248,6 @@ export default async function handler(req: any, res: any) {
   }
 
   const apiKey = getOpenRouterKey()
-  if (!apiKey) {
-    return res.status(500).json({ error: 'OpenRouter API key not configured' })
-  }
 
   if (req.method === 'GET') {
     const jobId = normalizeText(req.query?.jobId)
@@ -259,11 +256,29 @@ export default async function handler(req: any, res: any) {
       const jobs = await loadJobsForUser(user.id)
 
       if (jobId) {
+        if (!apiKey) {
+          const localJob = jobs.find((job) => job.id === jobId) || null
+          return res.status(200).json({
+            models: FALLBACK_MODELS,
+            job: localJob,
+            jobs,
+            error: 'OpenRouter API key not configured',
+          })
+        }
+
         const job = await syncJobStatus(user.id, jobId, apiKey)
         return res.status(200).json({
           models: [],
           job,
           jobs,
+        })
+      }
+
+      if (!apiKey) {
+        return res.status(200).json({
+          models: FALLBACK_MODELS,
+          jobs,
+          error: 'OpenRouter API key not configured',
         })
       }
 
@@ -372,6 +387,10 @@ export default async function handler(req: any, res: any) {
           error: error?.message || 'Failed to save video draft',
         })
       }
+    }
+
+    if (!apiKey) {
+      return res.status(500).json({ error: 'OpenRouter API key not configured' })
     }
 
     const payload: Record<string, unknown> = {

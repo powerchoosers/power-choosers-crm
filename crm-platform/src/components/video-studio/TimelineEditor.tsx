@@ -4,17 +4,24 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { Rnd } from 'react-rnd'
 import {
   ArrowRight,
+  Circle,
   Copy,
+  ImagePlus,
   Layers3,
   Loader2,
+  Music,
   Pause,
   Play,
   Plus,
   Scissors,
+  Square,
+  Target,
   Trash2 as DeleteIcon,
   Save,
+  Type,
   Video,
   WandSparkles,
+  Zap,
   ZoomIn,
   ZoomOut,
 } from 'lucide-react'
@@ -33,10 +40,13 @@ import {
   normalizeTimeline,
   snap,
   type TimelineClip,
+  type TimelineOverlay,
   type TimelineJob,
   type TimelineState,
   type TimelineTrack,
 } from './timelineTypes'
+import { AudioWaveform } from './AudioWaveform'
+import { VideoPreviewMonitor } from './VideoPreviewMonitor'
 
 type TimelineEditorProps = {
   projectName: string
@@ -55,6 +65,9 @@ const TRACK_LABEL_WIDTH = 172
 const RULER_HEIGHT = 38
 const TRACK_HEIGHT = 78
 const BASE_PIXELS_PER_SECOND = 84
+const STAGE_WIDTH = 960
+const STAGE_HEIGHT = 540
+const FONT_OPTIONS = ['IBM Plex Mono, monospace', 'Georgia, serif', 'Impact, sans-serif', 'Courier New, monospace']
 
 function makeLocalId(prefix: string) {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -82,8 +95,14 @@ export function TimelineEditor({
   activeProjectId,
 }: TimelineEditorProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const stageRef = useRef<HTMLDivElement | null>(null)
+  const overlayImageInputRef = useRef<HTMLInputElement | null>(null)
+  const videoInputRef = useRef<HTMLInputElement | null>(null)
+  const audioInputRef = useRef<HTMLInputElement | null>(null)
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
+  const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [stageSize, setStageSize] = useState({ width: STAGE_WIDTH, height: STAGE_HEIGHT })
 
   const pxPerSecond = BASE_PIXELS_PER_SECOND * timeline.zoom
   const selectedClip = useMemo(
@@ -96,17 +115,49 @@ export function TimelineEditor({
     return timeline.clips.find((clip) => timeline.playhead >= clip.start && timeline.playhead <= clip.start + clip.duration) || null
   }, [selectedClip, timeline.clips, timeline.playhead])
 
+  const selectedOverlay = useMemo(
+    () => timeline.overlays.find((overlay) => overlay.id === selectedOverlayId) || null,
+    [selectedOverlayId, timeline.overlays]
+  )
+
+  const activeOverlays = useMemo(() => {
+    return timeline.overlays.filter((overlay) => {
+      const visibleAtPlayhead = timeline.playhead >= overlay.start && timeline.playhead <= overlay.start + overlay.duration
+      return visibleAtPlayhead || overlay.id === selectedOverlayId
+    })
+  }, [selectedOverlayId, timeline.overlays, timeline.playhead])
+
   const orderedTracks = useMemo(() => {
     return [...timeline.tracks].sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name))
   }, [timeline.tracks])
 
   const visibleJobs = useMemo(() => jobs.slice(0, 8), [jobs])
+  const overlayScale = stageSize.width > 0 ? stageSize.width / STAGE_WIDTH : 1
 
   useEffect(() => {
     if (selectedClipId && !timeline.clips.some((clip) => clip.id === selectedClipId)) {
       setSelectedClipId(null)
     }
   }, [selectedClipId, timeline.clips])
+
+  useEffect(() => {
+    if (selectedOverlayId && !timeline.overlays.some((overlay) => overlay.id === selectedOverlayId)) {
+      setSelectedOverlayId(null)
+    }
+  }, [selectedOverlayId, timeline.overlays])
+
+  useEffect(() => {
+    const node = stageRef.current
+    if (!node) return
+
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width || STAGE_WIDTH
+      setStageSize({ width, height: width * (STAGE_HEIGHT / STAGE_WIDTH) })
+    })
+
+    resizeObserver.observe(node)
+    return () => resizeObserver.disconnect()
+  }, [])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -135,6 +186,82 @@ export function TimelineEditor({
       }
       return normalizeTimeline(next)
     })
+  }
+
+  const updateOverlay = (overlayId: string, updates: Partial<TimelineOverlay>) => {
+    onTimelineChange((current) => normalizeTimeline({
+      ...current,
+      overlays: current.overlays.map((overlay) => (overlay.id === overlayId ? { ...overlay, ...updates } : overlay)),
+    }))
+  }
+
+  const addOverlay = (kind: TimelineOverlay['kind'], sourceUrl?: string) => {
+    const overlay: TimelineOverlay = {
+      id: makeLocalId('overlay'),
+      kind,
+      label: kind === 'text' ? 'Text Overlay' : kind === 'image' ? 'Image Overlay' : 'Icon Overlay',
+      start: snap(timeline.playhead, 0.25),
+      duration: 5,
+      x: 120,
+      y: 120,
+      width: kind === 'text' ? 360 : 140,
+      height: kind === 'text' ? 88 : 140,
+      text: kind === 'text' ? 'Nodal Point' : '',
+      sourceUrl: sourceUrl || null,
+      icon: 'target',
+      fontFamily: FONT_OPTIONS[0],
+      fontSize: 32,
+      fontWeight: '600',
+      color: '#f4f4f5',
+      backgroundColor: kind === 'text' ? 'rgba(0,0,0,0.32)' : 'transparent',
+      opacity: 1,
+    }
+
+    onTimelineChange((current) => normalizeTimeline({
+      ...current,
+      duration: Math.max(current.duration, overlay.start + overlay.duration + 4),
+      overlays: [...current.overlays, overlay],
+    }))
+    setSelectedOverlayId(overlay.id)
+    setSelectedClipId(null)
+  }
+
+  const addImageOverlay = async (file: File | null) => {
+    if (!file) return
+    addOverlay('image', URL.createObjectURL(file))
+  }
+
+  const addLocalMediaClip = (file: File | null, mediaType: 'video' | 'audio') => {
+    if (!file) return
+    const track = timeline.tracks.find((item) => item.kind === mediaType) || timeline.tracks[0]
+    if (!track) return
+
+    const clip: TimelineClip = {
+      id: makeLocalId('clip'),
+      kind: mediaType === 'audio' ? 'audio' : 'source',
+      label: file.name,
+      start: snap(timeline.playhead, 0.25),
+      duration: 8,
+      trackId: track.id,
+      color: track.color || (mediaType === 'audio' ? '#a855f7' : '#002FA7'),
+      sourceUrl: URL.createObjectURL(file),
+      sourceName: file.name,
+      volume: 1,
+      opacity: 1,
+    }
+
+    onTimelineChange((current) => normalizeTimeline(addClipToTimeline(current, clip)))
+    setSelectedClipId(clip.id)
+    setSelectedOverlayId(null)
+  }
+
+  const deleteSelectedOverlay = () => {
+    if (!selectedOverlay) return
+    onTimelineChange((current) => normalizeTimeline({
+      ...current,
+      overlays: current.overlays.filter((overlay) => overlay.id !== selectedOverlay.id),
+    }))
+    setSelectedOverlayId(null)
   }
 
   const addBlankClip = (kind: TimelineClip['kind'] = 'generated') => {
@@ -270,7 +397,7 @@ export function TimelineEditor({
               className="bg-[#002FA7] text-white hover:bg-[#002FA7]/90 border border-[#002FA7]/30"
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />}
-              Render
+              AI Clip
             </Button>
           </div>
         </div>
@@ -291,13 +418,14 @@ export function TimelineEditor({
                   </Badge>
                 </div>
 
-                <div className="relative aspect-video bg-zinc-950">
+                <div ref={stageRef} className="relative aspect-video bg-zinc-950 overflow-hidden">
                   {activeClip?.sourceUrl ? (
-                    <video
-                      key={activeClip.sourceUrl}
-                      src={activeClip.sourceUrl}
-                      controls
-                      className="h-full w-full object-cover bg-black"
+                    <VideoPreviewMonitor
+                      sourceUrl={activeClip.sourceUrl}
+                      onTimeUpdate={(seconds) => {
+                        if (!isPlaying) return
+                        onTimelineChange((current) => ({ ...current, playhead: clamp(activeClip.start + seconds, 0, current.duration) }))
+                      }}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center px-8 text-center">
@@ -312,6 +440,66 @@ export function TimelineEditor({
                       </div>
                     </div>
                   )}
+
+                  {activeOverlays.map((overlay) => {
+                    const selected = overlay.id === selectedOverlayId
+                    const Icon = overlay.icon === 'bolt' ? Zap : overlay.icon === 'circle' ? Circle : overlay.icon === 'square' ? Square : Target
+                    return (
+                      <Rnd
+                        key={overlay.id}
+                        bounds="parent"
+                        size={{ width: overlay.width * overlayScale, height: overlay.height * overlayScale }}
+                        position={{ x: overlay.x * overlayScale, y: overlay.y * overlayScale }}
+                        minWidth={24}
+                        minHeight={24}
+                        disableDragging={overlay.locked}
+                        onDragStop={(_, data) => updateOverlay(overlay.id, {
+                          x: clamp(data.x / overlayScale, 0, STAGE_WIDTH),
+                          y: clamp(data.y / overlayScale, 0, STAGE_HEIGHT),
+                        })}
+                        onResizeStop={(_, __, ref, ___, position) => updateOverlay(overlay.id, {
+                          x: clamp(position.x / overlayScale, 0, STAGE_WIDTH),
+                          y: clamp(position.y / overlayScale, 0, STAGE_HEIGHT),
+                          width: clamp(parseInt(ref.style.width, 10) / overlayScale, 24, STAGE_WIDTH),
+                          height: clamp(parseInt(ref.style.height, 10) / overlayScale, 24, STAGE_HEIGHT),
+                        })}
+                        onMouseDown={() => {
+                          setSelectedOverlayId(overlay.id)
+                          setSelectedClipId(null)
+                        }}
+                        className="group"
+                      >
+                        <div
+                          className={cn(
+                            'flex h-full w-full items-center justify-center overflow-hidden border transition-all',
+                            selected ? 'border-[#002FA7]/70 shadow-[0_0_0_1px_rgba(0,47,167,0.55)]' : 'border-white/10'
+                          )}
+                          style={{
+                            color: overlay.color,
+                            background: overlay.backgroundColor,
+                            opacity: overlay.opacity,
+                          }}
+                        >
+                          {overlay.kind === 'image' && overlay.sourceUrl ? (
+                            <img src={overlay.sourceUrl} alt={overlay.label} className="h-full w-full object-cover" />
+                          ) : overlay.kind === 'icon' ? (
+                            <Icon className="h-2/3 w-2/3 text-current" />
+                          ) : (
+                            <div
+                              className="w-full px-3 text-center leading-tight"
+                              style={{
+                                fontFamily: overlay.fontFamily,
+                                fontSize: overlay.fontSize ? overlay.fontSize * overlayScale : 32 * overlayScale,
+                                fontWeight: overlay.fontWeight,
+                              }}
+                            >
+                              {overlay.text}
+                            </div>
+                          )}
+                        </div>
+                      </Rnd>
+                    )
+                  })}
                 </div>
               </div>
 
@@ -376,6 +564,54 @@ export function TimelineEditor({
                       </Button>
                     </div>
 
+                    <input
+                      ref={overlayImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => void addImageOverlay(event.target.files?.[0] || null)}
+                    />
+                    <input
+                      ref={videoInputRef}
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'video')}
+                    />
+                    <input
+                      ref={audioInputRef}
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'audio')}
+                    />
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <Button variant="outline" onClick={() => addOverlay('text')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
+                        <Type className="w-4 h-4" />
+                        Text
+                      </Button>
+                      <Button variant="outline" onClick={() => overlayImageInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
+                        <ImagePlus className="w-4 h-4" />
+                        Image
+                      </Button>
+                      <Button variant="outline" onClick={() => addOverlay('icon')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
+                        <Target className="w-4 h-4" />
+                        Icon
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={() => videoInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
+                        <Video className="w-4 h-4" />
+                        Video
+                      </Button>
+                      <Button variant="outline" onClick={() => audioInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
+                        <Music className="w-4 h-4" />
+                        Audio
+                      </Button>
+                    </div>
+
                     <Button variant="outline" onClick={() => adjustZoom(-0.25)} className="w-full border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
                       <ZoomOut className="w-4 h-4" />
                       Zoom out
@@ -388,7 +624,7 @@ export function TimelineEditor({
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Timeline Stats</div>
-                        <div className="mt-1 text-sm text-zinc-200">{timeline.clips.length} clips across {timeline.tracks.length} tracks</div>
+                        <div className="mt-1 text-sm text-zinc-200">{timeline.clips.length} clips / {timeline.overlays.length} overlays</div>
                       </div>
                       <Badge className="border border-[#002FA7]/20 bg-[#002FA7]/10 text-[#9db7ff] uppercase tracking-[0.2em] text-[10px] font-mono">
                         Zoom {timeline.zoom.toFixed(2)}x
@@ -513,7 +749,10 @@ export function TimelineEditor({
                                     duration: nextDuration,
                                   })
                                 }}
-                                onMouseDown={() => setSelectedClipId(clip.id)}
+                                onMouseDown={() => {
+                                  setSelectedClipId(clip.id)
+                                  setSelectedOverlayId(null)
+                                }}
                                 data-timeline-clip="true"
                                 className="group"
                               >
@@ -526,7 +765,10 @@ export function TimelineEditor({
                                     backgroundImage: `linear-gradient(180deg, ${trackColor}22, ${trackColor}0f)`,
                                     boxShadow: selected ? `0 0 0 1px ${trackColor}55, 0 18px 30px rgba(0,0,0,0.25)` : undefined,
                                   }}
-                                  onClick={() => setSelectedClipId(clip.id)}
+                                  onClick={() => {
+                                    setSelectedClipId(clip.id)
+                                    setSelectedOverlayId(null)
+                                  }}
                                 >
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="min-w-0">
@@ -645,12 +887,137 @@ export function TimelineEditor({
                         className="min-h-24 w-full rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#002FA7]/40"
                       />
                     </label>
+
+                    {selectedClip.kind === 'audio' && selectedClip.sourceUrl ? (
+                      <AudioWaveform sourceUrl={selectedClip.sourceUrl} />
+                    ) : null}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-sm text-zinc-500">
                     Select a clip to edit its timing and track.
                   </div>
                 )}
+
+                {selectedOverlay ? (
+                  <div className="border-t border-white/5 pt-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Overlay Layer</div>
+                        <div className="mt-1 text-sm text-zinc-200">{selectedOverlay.label}</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={deleteSelectedOverlay}
+                        className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
+                      >
+                        <DeleteIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    {selectedOverlay.kind === 'text' ? (
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Text</span>
+                        <Input
+                          value={selectedOverlay.text || ''}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { text: event.target.value })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                    ) : null}
+
+                    {selectedOverlay.kind === 'icon' ? (
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Icon</span>
+                        <Select
+                          value={selectedOverlay.icon || 'target'}
+                          onValueChange={(value) => updateOverlay(selectedOverlay.id, { icon: value as TimelineOverlay['icon'] })}
+                        >
+                          <SelectTrigger className="w-full nodal-glass border-white/10 bg-white/[0.02] text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-zinc-950 text-white">
+                            <SelectItem value="target">Target</SelectItem>
+                            <SelectItem value="bolt">Bolt</SelectItem>
+                            <SelectItem value="circle">Circle</SelectItem>
+                            <SelectItem value="square">Square</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    ) : null}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Start</span>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          value={selectedOverlay.start}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { start: clamp(Number(event.target.value || 0), 0, timeline.duration) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Duration</span>
+                        <Input
+                          type="number"
+                          step="0.25"
+                          value={selectedOverlay.duration}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { duration: clamp(Number(event.target.value || 0.5), 0.5, timeline.duration) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Color</span>
+                        <Input
+                          type="color"
+                          value={selectedOverlay.color || '#f4f4f5'}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { color: event.target.value })}
+                          className="nodal-glass h-10 border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Opacity</span>
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="1"
+                          value={selectedOverlay.opacity ?? 1}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { opacity: clamp(Number(event.target.value || 1), 0, 1) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                    </div>
+
+                    {selectedOverlay.kind === 'text' ? (
+                      <div className="grid grid-cols-[1fr_92px] gap-3">
+                        <Select
+                          value={selectedOverlay.fontFamily || FONT_OPTIONS[0]}
+                          onValueChange={(value) => updateOverlay(selectedOverlay.id, { fontFamily: value })}
+                        >
+                          <SelectTrigger className="w-full nodal-glass border-white/10 bg-white/[0.02] text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-zinc-950 text-white">
+                            {FONT_OPTIONS.map((font) => (
+                              <SelectItem key={font} value={font}>{font.split(',')[0]}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          type="number"
+                          value={selectedOverlay.fontSize || 32}
+                          onChange={(event) => updateOverlay(selectedOverlay.id, { fontSize: clamp(Number(event.target.value || 32), 8, 120) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
