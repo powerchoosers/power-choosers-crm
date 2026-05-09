@@ -982,9 +982,65 @@ function App() {
     }
   }
 
+  const ingestLinkedInContactDirect = async () => {
+    const auth = state?.auth
+    const pageSnapshot = state?.page
+
+    if (!auth?.accessToken) {
+      throw new Error('Connect your Nodal Point session first.')
+    }
+
+    if (!pageSnapshot?.url) {
+      throw new Error('No LinkedIn page snapshot is available.')
+    }
+
+    const origin = auth.appOrigin || 'https://www.nodalpoint.io'
+    const response = await fetch(`${origin}/api/extension/ingest-contact`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${auth.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        snapshot: pageSnapshot,
+        appOrigin: origin,
+      }),
+    })
+
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      const message = typeof payload === 'object' && payload
+        ? payload.message || payload.error
+        : ''
+      throw new Error(String(message || `LinkedIn ingest failed (${response.status})`))
+    }
+
+    return payload
+  }
+
   const ingestPageAccount = async () => {
-    const response = await sendMessage(isLinkedInPersonPage ? 'INGEST_PAGE_CONTACT' : 'INGEST_PAGE_ACCOUNT')
-    if (response?.state) setState(response.state)
+    try {
+      const response = await sendMessage(isLinkedInPersonPage ? 'INGEST_PAGE_CONTACT' : 'INGEST_PAGE_ACCOUNT')
+      if (response?.state) setState(response.state)
+      return response
+    } catch (error) {
+      const message = String((error as Error | undefined)?.message ?? error ?? '')
+
+      if (isLinkedInPersonPage && message.includes('Unknown message type: INGEST_PAGE_CONTACT')) {
+        const fallbackResponse = await ingestLinkedInContactDirect()
+
+        try {
+          const refreshed = await sendMessage('CAPTURE_AND_MATCH')
+          if (refreshed?.state) setState(refreshed.state)
+        } catch (refreshError) {
+          console.warn('[Extension] Failed to refresh page state after direct LinkedIn ingest:', refreshError)
+        }
+
+        return fallbackResponse
+      }
+
+      throw error
+    }
   }
 
   const requestMicrophone = async () => {
