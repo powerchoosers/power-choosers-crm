@@ -403,9 +403,9 @@ export function TimelineEditor({
         </div>
 
         <div className="grid xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="border-r border-white/5 p-5 space-y-5">
-            <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-              <div className="rounded-3xl border border-white/10 bg-black/50 overflow-hidden">
+          <div className="flex min-w-0 flex-col space-y-5 border-r border-white/5 p-5">
+            <div className="grid items-start gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+              <div className="flex min-w-0 flex-col overflow-hidden rounded-3xl border border-white/10 bg-black/50">
                 <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Preview</div>
@@ -418,7 +418,7 @@ export function TimelineEditor({
                   </Badge>
                 </div>
 
-                <div ref={stageRef} className="relative aspect-video bg-zinc-950 overflow-hidden">
+                <div ref={stageRef} className="relative w-full aspect-video bg-zinc-950 overflow-hidden">
                   {activeClip?.sourceUrl ? (
                     <VideoPreviewMonitor
                       sourceUrl={activeClip.sourceUrl}
