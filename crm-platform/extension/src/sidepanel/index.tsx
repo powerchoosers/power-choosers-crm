@@ -1500,6 +1500,18 @@ function App() {
               <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
                 Open Platform Profile
               </button>
+              {auth?.role === 'admin' ? (
+                <button
+                  className="np-button np-button--sm np-button--ghost np-button--full"
+                  style={{ marginTop: 8 }}
+                  onClick={() => {
+                    if (!auth?.appOrigin) return
+                    window.open(`${auth.appOrigin}/network/admin/video-studio`, '_blank')
+                  }}
+                >
+                  Open Video Studio
+                </button>
+              ) : null}
               <button className="np-button np-button--sm np-button--ghost np-button--full" style={{ marginTop: 8, color: '#fca5a5' }} onClick={() => sendMessage('AUTH_CLEAR')}>
                 Disconnect Session
               </button>

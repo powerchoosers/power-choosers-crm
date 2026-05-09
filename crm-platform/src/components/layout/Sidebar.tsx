@@ -24,6 +24,7 @@ import {
   Settings,
   UserCog,
   ShieldCheck,
+  Film,
   LogOut,
   Plus,
   Zap,
@@ -87,6 +88,7 @@ const navigationStructure = [
     group: "System",
     items: [
       { name: 'Admin', href: '/network/admin', icon: ShieldCheck, roles: ['admin', 'dev'] },
+      { name: 'Video Studio', href: '/network/admin/video-studio', icon: Film, roles: ['admin'] },
       { name: 'Agents', href: '/network/agents', icon: UserCog, roles: ['admin', 'dev'] },
       { name: 'Settings', href: '/network/settings', icon: Settings }
     ]
