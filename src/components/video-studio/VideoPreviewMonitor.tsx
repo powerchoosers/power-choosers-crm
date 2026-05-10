@@ -44,42 +44,30 @@ export function VideoPreviewMonitor({
     playerRef.current.seekTo(targetFrame)
   }, [timeline.playhead, fps, isPlaying])
 
-  // While playing, push current frame back to the timeline playhead
-  useEffect(() => {
-    const player = playerRef.current
-    if (!player || !isPlaying) return
-
-    console.log('[VideoPreviewMonitor] Starting frame tick loop')
-    let raf: number
-    const tick = () => {
-      const currentSeconds = player.getCurrentFrame() / fps
-      // console.log('[VideoPreviewMonitor] tick:', currentSeconds.toFixed(3))
-      onTimeUpdateRef.current?.(currentSeconds)
-      raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => {
-      console.log('[VideoPreviewMonitor] Stopping frame tick loop')
-      cancelAnimationFrame(raf)
-    }
-  }, [isPlaying, fps])
-
-  // Native play/pause events → sync state back
+  // Native play/pause/frame events → sync state back
   useEffect(() => {
     const player = playerRef.current
     if (!player) return
 
     const onPlay = () => onPlayStateChange?.(true)
     const onPause = () => onPlayStateChange?.(false)
+    const onFrameUpdate = (e: any) => {
+      // Remotion's frameupdate event payload has the frame in e.detail.frame
+      const frame = e.detail.frame
+      const currentSeconds = frame / fps
+      onTimeUpdateRef.current?.(currentSeconds)
+    }
 
     player.addEventListener('play', onPlay)
     player.addEventListener('pause', onPause)
+    player.addEventListener('frameupdate', onFrameUpdate)
 
     return () => {
       player.removeEventListener('play', onPlay)
       player.removeEventListener('pause', onPause)
+      player.removeEventListener('frameupdate', onFrameUpdate)
     }
-  }, [onPlayStateChange])
+  }, [onPlayStateChange, fps])
 
   return (
     <div className="h-full w-full nodal-video-monitor overflow-hidden bg-black flex items-center justify-center">
