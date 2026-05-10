@@ -126,7 +126,7 @@ export function formatTimelineTime(seconds: number) {
 
 export function createDefaultTimeline(): TimelineState {
   return {
-    duration: 60,
+    duration: 15,
     zoom: 1,
     playhead: 0,
     fps: 24,
@@ -185,11 +185,13 @@ export function normalizeTimeline(input?: Partial<TimelineState> | null): Timeli
   const maxClipEnd = safeClips.reduce((sum, clip) => Math.max(sum, clip.start + clip.duration), 0)
   const maxOverlayEnd = safeOverlays.reduce((sum, overlay) => Math.max(sum, overlay.start + overlay.duration), 0)
   const maxEnd = Math.max(maxClipEnd, maxOverlayEnd)
+  const defaultDuration = 15
+  const suggestedDuration = maxEnd > 0 ? maxEnd + 4 : defaultDuration
 
   return {
-    duration: Math.max(base.duration, Number(input?.duration || 0), maxEnd > 0 ? maxEnd + 4 : base.duration),
+    duration: Math.max(suggestedDuration, Number(input?.duration || 0)),
     zoom: clamp(Number(input?.zoom || base.zoom), 0.5, 3),
-    playhead: clamp(Number(input?.playhead || 0), 0, Math.max(base.duration, maxEnd)),
+    playhead: clamp(Number(input?.playhead || 0), 0, Math.max(suggestedDuration, Number(input?.duration || 0))),
     fps: Number(input?.fps || base.fps) || base.fps,
     aspectRatio: input?.aspectRatio || '16:9',
     tracks: tracks.map((track, index) => ({

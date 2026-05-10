@@ -195,6 +195,7 @@ export function TimelineEditor({
     if (!isPlaying) return
     const frameSeconds = 1 / Math.max(12, timeline.fps || 24)
     const intervalMs = 1000 / Math.max(12, timeline.fps || 24)
+    console.log('[TimelineEditor] Playback started')
     const timer = window.setInterval(() => {
       onTimelineChange((current) => {
         const activeAtPlayhead = current.clips.find((clip) => current.playhead >= clip.start && current.playhead <= clip.start + clip.duration)
@@ -202,23 +203,26 @@ export function TimelineEditor({
         // If we have a source URL (video or audio), let the VideoPreviewMonitor drive the playhead.
         if (activeAtPlayhead?.sourceUrl) {
           if (current.playhead < activeAtPlayhead.start + activeAtPlayhead.duration - 0.05) {
+            // console.log('[TimelineEditor] Timer yielding to video monitor at', current.playhead.toFixed(3))
             return current
           }
         }
 
         const nextPlayhead = current.playhead + frameSeconds
         if (nextPlayhead >= current.duration) {
+          console.log('[TimelineEditor] Reached end of timeline')
           setIsPlaying(false)
           return { ...current, playhead: current.duration }
         }
         
-        // During playback, we do NOT snap the playhead to allow smooth movement.
-        // Snapping is reserved for manual scrubbing and clip dragging.
         return { ...current, playhead: nextPlayhead }
       })
     }, intervalMs)
 
-    return () => window.clearInterval(timer)
+    return () => {
+      console.log('[TimelineEditor] Playback stopped')
+      window.clearInterval(timer)
+    }
   }, [isPlaying, onTimelineChange, timeline.fps])
 
   const updateClip = (clipId: string, updates: Partial<TimelineClip>) => {
