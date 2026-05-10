@@ -198,8 +198,9 @@ export function TimelineEditor({
     const timer = window.setInterval(() => {
       onTimelineChange((current) => {
         const activeAtPlayhead = current.clips.find((clip) => current.playhead >= clip.start && current.playhead <= clip.start + clip.duration)
-        if (activeAtPlayhead?.sourceUrl && activeAtPlayhead?.kind === 'source') {
-          // If video is driving, skip incrementing unless we're near the clip boundary to ensure we transition
+        
+        // If we have a source URL (video or audio), let the VideoPreviewMonitor drive the playhead.
+        if (activeAtPlayhead?.sourceUrl) {
           if (current.playhead < activeAtPlayhead.start + activeAtPlayhead.duration - 0.05) {
             return current
           }
@@ -210,7 +211,10 @@ export function TimelineEditor({
           setIsPlaying(false)
           return { ...current, playhead: current.duration }
         }
-        return { ...current, playhead: snap(nextPlayhead) }
+        
+        // During playback, we do NOT snap the playhead to allow smooth movement.
+        // Snapping is reserved for manual scrubbing and clip dragging.
+        return { ...current, playhead: nextPlayhead }
       })
     }, intervalMs)
 
