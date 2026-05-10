@@ -4,22 +4,36 @@ import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateActio
 import { Rnd } from 'react-rnd'
 import {
   ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   Copy,
+  Eye,
+  EyeOff,
+  Gauge,
   ImagePlus,
+  Keyboard,
   Layers3,
   Loader2,
+  Lock,
+  Magnet,
+  Maximize2,
   Music,
   Pause,
   Play,
   Plus,
   Scissors,
+  SkipBack,
+  SkipForward,
   Square,
   Target,
   Trash2 as DeleteIcon,
   Save,
   Type,
+  Unlock,
   Video,
+  Volume2,
+  VolumeX,
   WandSparkles,
   Zap,
   ZoomIn,
@@ -44,6 +58,7 @@ import {
   type TimelineJob,
   type TimelineState,
   type TimelineTrack,
+  type TimelineTransition,
 } from './timelineTypes'
 import { AudioWaveform } from './AudioWaveform'
 import { VideoPreviewMonitor } from './VideoPreviewMonitor'
@@ -103,6 +118,9 @@ export function TimelineEditor({
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [stageSize, setStageSize] = useState({ width: STAGE_WIDTH, height: STAGE_HEIGHT })
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  const [activeTool, setActiveTool] = useState<'select' | 'blade'>('select')
 
   const pxPerSecond = BASE_PIXELS_PER_SECOND * timeline.zoom
   const selectedClip = useMemo(
@@ -165,9 +183,16 @@ export function TimelineEditor({
     const intervalMs = 1000 / Math.max(12, timeline.fps || 24)
     const timer = window.setInterval(() => {
       onTimelineChange((current) => {
+        const activeAtPlayhead = current.clips.find((clip) => current.playhead >= clip.start && current.playhead <= clip.start + clip.duration)
+        if (activeAtPlayhead?.sourceUrl && activeAtPlayhead?.kind === 'source') {
+          // If video is driving, skip incrementing unless we're near the clip boundary to ensure we transition
+          if (current.playhead < activeAtPlayhead.start + activeAtPlayhead.duration - 0.05) {
+            return current
+          }
+        }
+
         const nextPlayhead = current.playhead + frameSeconds
         if (nextPlayhead >= current.duration) {
-          window.clearInterval(timer)
           setIsPlaying(false)
           return { ...current, playhead: current.duration }
         }
@@ -369,38 +394,279 @@ export function TimelineEditor({
     }))
   }
 
+  const fitToView = () => {
+    const scrollElement = scrollRef.current
+    if (!scrollElement || timeline.duration <= 0) return
+    const availableWidth = scrollElement.clientWidth - TRACK_LABEL_WIDTH - 24
+    const idealZoom = clamp(availableWidth / (timeline.duration * BASE_PIXELS_PER_SECOND), 0.5, 3)
+    onTimelineChange((current) => ({ ...current, zoom: Number(idealZoom.toFixed(2)) }))
+  }
+
+  const stepFrame = (direction: 1 | -1) => {
+    const frameSeconds = 1 / Math.max(12, timeline.fps || 24)
+    onTimelineChange((current) => ({
+      ...current,
+      playhead: clamp(snap(current.playhead + frameSeconds * direction, frameSeconds), 0, current.duration),
+    }))
+  }
+
+  const toggleTrackMute = (trackId: string) => {
+    onTimelineChange((current) => normalizeTimeline({
+      ...current,
+      tracks: current.tracks.map((t) => (t.id === trackId ? { ...t, muted: !t.muted } : t)),
+    }))
+  }
+
+  const toggleTrackLock = (trackId: string) => {
+    onTimelineChange((current) => normalizeTimeline({
+      ...current,
+      tracks: current.tracks.map((t) => (t.id === trackId ? { ...t, locked: !t.locked } : t)),
+    }))
+  }
+
+  const updateClipSpeed = (clipId: string, speed: number) => {
+    updateClip(clipId, { speed: clamp(speed, 0.1, 4) })
+  }
+
+  const updateClipTransition = (clipId: string, transitionIn: TimelineTransition, transitionDuration = 0.5) => {
+    updateClip(clipId, { transitionIn, transitionDuration })
+  }
+
+  // Keyboard shortcuts — J/K/L transport, B blade, N snap, Space play, etc.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT') return
+
+      switch (e.key) {
+        case ' ':
+          e.preventDefault()
+          setIsPlaying((c) => !c)
+          break
+        case 'k':
+        case 'K':
+          setIsPlaying(false)
+          break
+        case 'j':
+        case 'J':
+          stepFrame(-1)
+          break
+        case 'l':
+        case 'L':
+          stepFrame(1)
+          break
+        case 'b':
+        case 'B':
+          if (!e.ctrlKey && !e.metaKey) {
+            setActiveTool((t) => (t === 'blade' ? 'select' : 'blade'))
+          }
+          break
+        case 'n':
+        case 'N':
+          setSnapEnabled((s) => !s)
+          break
+        case 'a':
+        case 'A':
+          setActiveTool('select')
+          break
+        case 'Delete':
+        case 'Backspace':
+          if (selectedClip) deleteSelectedClip()
+          else if (selectedOverlay) deleteSelectedOverlay()
+          break
+        case '?':
+          setShowShortcuts((s) => !s)
+          break
+        case '=':
+        case '+':
+          if (e.ctrlKey || e.metaKey) { e.preventDefault(); adjustZoom(0.25) }
+          break
+        case '-':
+          if (e.ctrlKey || e.metaKey) { e.preventDefault(); adjustZoom(-0.25) }
+          break
+        case 'Home':
+          onTimelineChange((c) => ({ ...c, playhead: 0 }))
+          break
+        case 'End':
+          onTimelineChange((c) => ({ ...c, playhead: c.duration }))
+          break
+      }
+    }
+
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
+
   return (
     <Card className="nodal-glass border border-white/5">
       <CardContent className="p-0">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 px-5 py-4">
-          <div>
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Timeline Editor</div>
-            <h2 className="mt-1 text-xl font-semibold text-white">Arrange clips, trim edges, and build the edit</h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Project: <span className="text-zinc-200">{projectName || 'Untitled project'}</span>
-              {activeProjectId ? <span className="text-zinc-600"> · Saved job {activeProjectId.slice(0, 8)}</span> : null}
-            </p>
+        {/* ─── Header ─── */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/5 px-5 py-3">
+          <div className="flex items-center gap-4">
+            <div>
+              <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Timeline Editor</div>
+              <div className="mt-0.5 text-sm text-zinc-200">
+                {projectName || 'Untitled project'}
+                {activeProjectId ? <span className="text-zinc-600 ml-2 font-mono text-[10px]">{activeProjectId.slice(0, 8)}</span> : null}
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
               onClick={onSaveDraft}
               disabled={isSaving || isGenerating}
               className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
             >
-              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <SaveIcon />}
-              Save Draft
+              {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <SaveIcon />}
+              Save
             </Button>
             <Button
+              size="sm"
               onClick={onGenerate}
               disabled={isGenerating}
               className="bg-[#002FA7] text-white hover:bg-[#002FA7]/90 border border-[#002FA7]/30"
             >
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <WandSparkles className="w-4 h-4" />}
+              {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <WandSparkles className="w-3.5 h-3.5" />}
               AI Clip
             </Button>
           </div>
         </div>
+
+        {/* ─── Toolbar ─── */}
+        <div className="flex flex-wrap items-center gap-1 border-b border-white/5 px-4 py-1.5 bg-zinc-950/60">
+          {/* Transport */}
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button type="button" onClick={() => onTimelineChange((c) => ({ ...c, playhead: 0 }))} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Go to start (Home)">
+              <SkipBack className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={() => stepFrame(-1)} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Previous frame (J)">
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPlaying((c) => !c)}
+              className={cn('p-1.5 rounded-lg transition-all', isPlaying ? 'bg-[#002FA7]/20 text-[#9db7ff]' : 'hover:bg-white/5 text-zinc-400 hover:text-white')}
+              title="Play / Pause (Space)"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            </button>
+            <button type="button" onClick={() => stepFrame(1)} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Next frame (L)">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={() => onTimelineChange((c) => ({ ...c, playhead: c.duration }))} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Go to end (End)">
+              <SkipForward className="w-3.5 h-3.5" />
+            </button>
+            <div className="ml-1.5 font-mono text-[11px] text-zinc-300 tabular-nums min-w-[110px]">
+              {formatTimelineTime(timeline.playhead)} <span className="text-zinc-600">/</span> {formatTimelineTime(timeline.duration)}
+            </div>
+          </div>
+
+          {/* Tools */}
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button
+              type="button"
+              onClick={() => setActiveTool('select')}
+              className={cn('p-1.5 rounded-lg transition-all text-[10px] font-mono uppercase tracking-wider flex items-center gap-1', activeTool === 'select' ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5')}
+              title="Selection tool (A)"
+            >
+              <Target className="w-3 h-3" /> Sel
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTool('blade')}
+              className={cn('p-1.5 rounded-lg transition-all text-[10px] font-mono uppercase tracking-wider flex items-center gap-1', activeTool === 'blade' ? 'bg-amber-500/20 text-amber-300' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5')}
+              title="Blade tool (B)"
+            >
+              <Scissors className="w-3 h-3" /> Cut
+            </button>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button type="button" onClick={splitSelectedClip} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Split at playhead">
+              <Scissors className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={duplicateSelectedClip} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Duplicate clip">
+              <Copy className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={deleteSelectedClip} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-red-400 transition-all" title="Delete (Del)">
+              <DeleteIcon className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Snap & Zoom */}
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button
+              type="button"
+              onClick={() => setSnapEnabled((s) => !s)}
+              className={cn('p-1.5 rounded-lg transition-all flex items-center gap-1 text-[10px] font-mono uppercase tracking-wider', snapEnabled ? 'bg-[#002FA7]/15 text-[#9db7ff]' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5')}
+              title="Snap to grid (N)"
+            >
+              <Magnet className="w-3 h-3" /> Snap
+            </button>
+          </div>
+
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button type="button" onClick={() => adjustZoom(-0.25)} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Zoom out (Ctrl+-)">
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <div className="font-mono text-[10px] text-zinc-500 min-w-[32px] text-center">{timeline.zoom.toFixed(1)}x</div>
+            <button type="button" onClick={() => adjustZoom(0.25)} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Zoom in (Ctrl++)">
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={fitToView} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Fit timeline to view">
+              <Maximize2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Add */}
+          <div className="flex items-center gap-0.5 pr-2 mr-2 border-r border-white/5">
+            <button type="button" onClick={() => addBlankClip('generated')} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Add clip">
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={() => addBlankClip('title')} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Add title card">
+              <Layers3 className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={() => videoInputRef.current?.click()} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Import video">
+              <Video className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={() => audioInputRef.current?.click()} className="icon-button-forensic p-1.5 rounded-lg hover:bg-white/5 text-zinc-400 hover:text-white transition-all" title="Import audio">
+              <Music className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Shortcuts legend */}
+          <button
+            type="button"
+            onClick={() => setShowShortcuts((s) => !s)}
+            className={cn('p-1.5 rounded-lg transition-all ml-auto', showShortcuts ? 'bg-white/10 text-white' : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5')}
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* ─── Shortcuts Legend ─── */}
+        {showShortcuts ? (
+          <div className="border-b border-white/5 bg-zinc-950/80 px-5 py-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-1.5 text-[10px] font-mono text-zinc-400">
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">Space</kbd>Play/Pause</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">J</kbd>Prev frame</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">K</kbd>Stop</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">L</kbd>Next frame</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">B</kbd>Blade tool</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">A</kbd>Select tool</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">N</kbd>Snap toggle</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">Del</kbd>Delete</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">Home</kbd>Go to start</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">End</kbd>Go to end</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">Ctrl±</kbd>Zoom</div>
+              <div><kbd className="text-zinc-200 bg-white/5 px-1.5 py-0.5 rounded mr-1.5">?</kbd>This panel</div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid xl:grid-cols-[1.2fr_0.8fr]">
           <div className="flex min-w-0 flex-col space-y-5 border-r border-white/5 p-5">
@@ -422,6 +688,9 @@ export function TimelineEditor({
                   {activeClip?.sourceUrl ? (
                     <VideoPreviewMonitor
                       sourceUrl={activeClip.sourceUrl}
+                      isPlaying={isPlaying}
+                      currentTime={timeline.playhead - activeClip.start}
+                      onPlayStateChange={(playing) => setIsPlaying(playing)}
                       onTimeUpdate={(seconds) => {
                         if (!isPlaying) return
                         onTimelineChange((current) => ({ ...current, playhead: clamp(activeClip.start + seconds, 0, current.duration) }))
@@ -504,145 +773,44 @@ export function TimelineEditor({
               </div>
 
               <div className="space-y-3">
+                {/* Hidden file inputs */}
+                <input ref={overlayImageInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void addImageOverlay(event.target.files?.[0] || null)} />
+                <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'video')} />
+                <input ref={audioInputRef} type="file" accept="audio/*" className="hidden" onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'audio')} />
+
+                {/* Overlay controls */}
                 <Card className="nodal-glass border border-white/5">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Transport</div>
-                        <div className="mt-1 text-sm text-zinc-200">Scrub and playback</div>
-                      </div>
-                      <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                        {timeline.fps} fps
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setIsPlaying((current) => !current)}
-                        className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                      >
-                        {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        {isPlaying ? 'Pause' : 'Play'}
+                  <CardContent className="p-3 space-y-2">
+                    <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Overlay Layers</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <Button variant="outline" size="sm" onClick={() => addOverlay('text')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass text-[10px]">
+                        <Type className="w-3 h-3" /> Text
                       </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => onTimelineChange((current) => ({ ...current, playhead: 0 }))}
-                        className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                      >
-                        Start
+                      <Button variant="outline" size="sm" onClick={() => overlayImageInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass text-[10px]">
+                        <ImagePlus className="w-3 h-3" /> Image
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => addOverlay('icon')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass text-[10px]">
+                        <Target className="w-3 h-3" /> Icon
                       </Button>
                     </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" onClick={splitSelectedClip} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Scissors className="w-4 h-4" />
-                        Split
-                      </Button>
-                      <Button variant="outline" onClick={duplicateSelectedClip} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Copy className="w-4 h-4" />
-                        Copy
-                      </Button>
-                      <Button variant="outline" onClick={deleteSelectedClip} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <DeleteIcon className="w-4 h-4" />
-                        Delete
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" onClick={() => addBlankClip('generated')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Plus className="w-4 h-4" />
-                        Clip
-                      </Button>
-                      <Button variant="outline" onClick={() => addBlankClip('title')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Layers3 className="w-4 h-4" />
-                        Title
-                      </Button>
-                      <Button variant="outline" onClick={() => adjustZoom(0.25)} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <ZoomIn className="w-4 h-4" />
-                        Zoom
-                      </Button>
-                    </div>
-
-                    <input
-                      ref={overlayImageInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(event) => void addImageOverlay(event.target.files?.[0] || null)}
-                    />
-                    <input
-                      ref={videoInputRef}
-                      type="file"
-                      accept="video/*"
-                      className="hidden"
-                      onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'video')}
-                    />
-                    <input
-                      ref={audioInputRef}
-                      type="file"
-                      accept="audio/*"
-                      className="hidden"
-                      onChange={(event) => addLocalMediaClip(event.target.files?.[0] || null, 'audio')}
-                    />
-
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button variant="outline" onClick={() => addOverlay('text')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Type className="w-4 h-4" />
-                        Text
-                      </Button>
-                      <Button variant="outline" onClick={() => overlayImageInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <ImagePlus className="w-4 h-4" />
-                        Image
-                      </Button>
-                      <Button variant="outline" onClick={() => addOverlay('icon')} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Target className="w-4 h-4" />
-                        Icon
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => videoInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Video className="w-4 h-4" />
-                        Video
-                      </Button>
-                      <Button variant="outline" onClick={() => audioInputRef.current?.click()} className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                        <Music className="w-4 h-4" />
-                        Audio
-                      </Button>
-                    </div>
-
-                    <Button variant="outline" onClick={() => adjustZoom(-0.25)} className="w-full border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass">
-                      <ZoomOut className="w-4 h-4" />
-                      Zoom out
-                    </Button>
                   </CardContent>
                 </Card>
 
-                <Card className="nodal-glass border border-white/5">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Timeline Stats</div>
-                        <div className="mt-1 text-sm text-zinc-200">{timeline.clips.length} clips / {timeline.overlays.length} overlays</div>
-                      </div>
-                      <Badge className="border border-[#002FA7]/20 bg-[#002FA7]/10 text-[#9db7ff] uppercase tracking-[0.2em] text-[10px] font-mono">
-                        Zoom {timeline.zoom.toFixed(2)}x
-                      </Badge>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm text-zinc-400">
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Playhead</div>
-                        <div className="mt-1 font-mono text-zinc-100">{formatTimelineTime(timeline.playhead)}</div>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3">
-                        <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Length</div>
-                        <div className="mt-1 font-mono text-zinc-100">{formatTimelineTime(timeline.duration)}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Quick stats strip */}
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-[0.25em] text-zinc-600 font-mono">Clips</div>
+                    <div className="font-mono text-sm text-zinc-200">{timeline.clips.length}</div>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-[0.25em] text-zinc-600 font-mono">Overlays</div>
+                    <div className="font-mono text-sm text-zinc-200">{timeline.overlays.length}</div>
+                  </div>
+                  <div className="rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
+                    <div className="text-[9px] uppercase tracking-[0.25em] text-zinc-600 font-mono">FPS</div>
+                    <div className="font-mono text-sm text-zinc-200">{timeline.fps}</div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -693,12 +861,20 @@ export function TimelineEditor({
                           )}
                           style={{ height: TRACK_HEIGHT }}
                         >
-                          <div className="absolute left-0 top-0 flex h-full w-[172px] items-center border-r border-white/10 bg-black/40 px-4">
-                            <div>
-                              <div className="text-sm font-medium text-zinc-100">{track.name}</div>
-                              <div className="mt-1 text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">
-                                {track.kind} track
+                          <div className="absolute left-0 top-0 flex h-full w-[172px] items-center justify-between border-r border-white/10 bg-black/40 px-3">
+                            <div className="min-w-0">
+                              <div className={cn('text-xs font-medium truncate', track.muted ? 'text-zinc-500 line-through' : 'text-zinc-100')}>{track.name}</div>
+                              <div className="mt-0.5 text-[9px] uppercase tracking-[0.25em] text-zinc-600 font-mono">
+                                {track.kind}
                               </div>
+                            </div>
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button type="button" onClick={() => toggleTrackMute(track.id)} className={cn('p-1 rounded transition-all', track.muted ? 'text-red-400/70' : 'text-zinc-500 hover:text-zinc-300')} title={track.muted ? 'Unmute track' : 'Mute track'}>
+                                {track.muted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                              </button>
+                              <button type="button" onClick={() => toggleTrackLock(track.id)} className={cn('p-1 rounded transition-all', track.locked ? 'text-amber-400/70' : 'text-zinc-500 hover:text-zinc-300')} title={track.locked ? 'Unlock track' : 'Lock track'}>
+                                {track.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                              </button>
                             </div>
                           </div>
 
@@ -884,9 +1060,73 @@ export function TimelineEditor({
                       <textarea
                         value={selectedClip.notes || ''}
                         onChange={(event) => updateClip(selectedClip.id, { notes: event.target.value })}
-                        className="min-h-24 w-full rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#002FA7]/40"
+                        className="min-h-16 w-full rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-[#002FA7]/40"
                       />
                     </label>
+
+                    {/* Speed / Retime */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono flex items-center gap-1.5"><Gauge className="w-3 h-3" /> Speed</span>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0.1"
+                            max="4"
+                            value={selectedClip.speed ?? 1}
+                            onChange={(event) => updateClipSpeed(selectedClip.id, Number(event.target.value || 1))}
+                            className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                          />
+                          <span className="text-[10px] text-zinc-500 font-mono shrink-0">×</span>
+                        </div>
+                      </label>
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Transition</span>
+                        <Select
+                          value={selectedClip.transitionIn || 'none'}
+                          onValueChange={(value) => updateClipTransition(selectedClip.id, value as TimelineTransition)}
+                        >
+                          <SelectTrigger className="w-full nodal-glass border-white/10 bg-white/[0.02] text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="border-white/10 bg-zinc-950 text-white">
+                            <SelectItem value="none">None</SelectItem>
+                            <SelectItem value="crossfade">Crossfade</SelectItem>
+                            <SelectItem value="dip-to-black">Dip to Black</SelectItem>
+                            <SelectItem value="wipe">Wipe</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </label>
+                    </div>
+
+                    {/* Volume / Opacity */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono flex items-center gap-1.5"><Volume2 className="w-3 h-3" /> Volume</span>
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="2"
+                          value={selectedClip.volume ?? 1}
+                          onChange={(event) => updateClip(selectedClip.id, { volume: clamp(Number(event.target.value || 1), 0, 2) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                      <label className="space-y-2 block">
+                        <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono flex items-center gap-1.5"><Eye className="w-3 h-3" /> Opacity</span>
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          max="1"
+                          value={selectedClip.opacity ?? 1}
+                          onChange={(event) => updateClip(selectedClip.id, { opacity: clamp(Number(event.target.value || 1), 0, 1) })}
+                          className="nodal-glass border-white/10 bg-white/[0.02] text-white"
+                        />
+                      </label>
+                    </div>
 
                     {selectedClip.kind === 'audio' && selectedClip.sourceUrl ? (
                       <AudioWaveform sourceUrl={selectedClip.sourceUrl} />
@@ -1079,40 +1319,9 @@ export function TimelineEditor({
               </CardContent>
             </Card>
 
-            <Card className="nodal-glass border border-white/5">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Timeline Actions</div>
-                    <h3 className="mt-1 text-lg font-semibold text-white">Build the cut</h3>
-                  </div>
-                  <WandSparkles className="w-4 h-4 text-zinc-500" />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => addBlankClip('generated')}
-                    className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Clip
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => addBlankClip('title')}
-                    className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 nodal-glass"
-                  >
-                    <Layers3 className="w-4 h-4" />
-                    Title
-                  </Button>
-                </div>
-
-                <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-3 text-sm text-zinc-400">
-                  Use the timeline ruler to scrub, drag clips to move them, and pull the edges to trim.
-                </div>
-              </CardContent>
-            </Card>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.01] p-3 text-[10px] font-mono text-zinc-600 text-center uppercase tracking-[0.25em]">
+              Space = play · B = blade · N = snap · ? = shortcuts
+            </div>
           </div>
         </div>
       </CardContent>
@@ -1121,5 +1330,5 @@ export function TimelineEditor({
 }
 
 function SaveIcon() {
-  return <Save className="w-4 h-4" />
+  return <Save className="w-3.5 h-3.5" />
 }
