@@ -36,7 +36,8 @@ export function VideoPreviewMonitor({
 
     const player = videojs(videoRef.current, {
       controls: true,
-      fluid: true,
+      fluid: false, // Disable fluid to avoid forcing an aspect ratio that might overflow
+      fill: true,   // Make the player fill the container
       responsive: true,
       preload: 'metadata',
       playbackRates: [0.5, 1, 1.25, 1.5, 2],
@@ -118,8 +119,13 @@ export function VideoPreviewMonitor({
   }, [currentTime, sourceUrl])
 
   return (
-    <div data-vjs-player className="h-full w-full nodal-video-monitor">
-      <video ref={videoRef} className="video-js vjs-big-play-centered h-full w-full bg-black" playsInline />
+    <div data-vjs-player className="h-full w-full nodal-video-monitor overflow-hidden">
+      <video 
+        ref={videoRef} 
+        className="video-js vjs-big-play-centered vjs-fill bg-black" 
+        style={{ objectFit: 'contain' }}
+        playsInline 
+      />
     </div>
   )
 }
