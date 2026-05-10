@@ -38,6 +38,7 @@ import {
   Zap,
   ZoomIn,
   ZoomOut,
+  Blend,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -981,6 +982,28 @@ export function TimelineEditor({
                                   </div>
                                 </div>
                               </Rnd>
+                            )
+                          })}
+                          {trackClips.map((clip, index) => {
+                            if (index === 0) return null
+                            const prevClip = trackClips[index - 1]
+                            const touches = Math.abs(clip.start - (prevClip.start + prevClip.duration)) < 0.05
+                            if (!touches) return null
+                            const x = TRACK_LABEL_WIDTH + clip.start * pxPerSecond
+                            return (
+                              <button
+                                key={`trans-${clip.id}`}
+                                className="absolute z-40 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded border border-white/20 bg-zinc-800 text-white shadow-lg transition-all hover:border-white/40 hover:bg-zinc-700"
+                                style={{ left: x, top: TRACK_HEIGHT / 2 }}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedClipId(clip.id)
+                                  toast.info('Transition settings selected for ' + clip.label)
+                                }}
+                                title="Edit Transition"
+                              >
+                                <Blend className="h-3.5 w-3.5" />
+                              </button>
                             )
                           })}
                         </div>
