@@ -90,6 +90,12 @@ function makeLocalId(prefix: string) {
     : `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`
 }
 
+const parseAspectRatio = (ratioStr: string = '16:9') => {
+  const [w, h] = ratioStr.split(':').map(Number)
+  if (!w || !h) return 16 / 9
+  return w / h
+}
+
 function getTrackColor(track: TimelineTrack) {
   if (track.color) return track.color
   if (track.kind === 'audio') return '#a855f7'
@@ -168,14 +174,16 @@ export function TimelineEditor({
     const node = stageRef.current
     if (!node) return
 
+    const ratio = parseAspectRatio(timeline.aspectRatio)
+
     const resizeObserver = new ResizeObserver(([entry]) => {
       const width = entry.contentRect.width || STAGE_WIDTH
-      setStageSize({ width, height: width * (STAGE_HEIGHT / STAGE_WIDTH) })
+      setStageSize({ width, height: width / ratio })
     })
 
     resizeObserver.observe(node)
     return () => resizeObserver.disconnect()
-  }, [])
+  }, [timeline.aspectRatio])
 
   useEffect(() => {
     if (!isPlaying) return
@@ -684,7 +692,11 @@ export function TimelineEditor({
                   </Badge>
                 </div>
 
-                <div ref={stageRef} className="relative w-full aspect-video bg-zinc-950 overflow-hidden">
+                <div 
+                  ref={stageRef} 
+                  className="relative w-full bg-zinc-950 overflow-hidden"
+                  style={{ aspectRatio: parseAspectRatio(timeline.aspectRatio) }}
+                >
                   {activeClip?.sourceUrl ? (
                     <VideoPreviewMonitor
                       sourceUrl={activeClip.sourceUrl}
