@@ -395,6 +395,9 @@ export function TimelineEditor({
     const x = clientX - bounds.left + scrollLeft - TRACK_LABEL_WIDTH
     if (x < 0) return
 
+    // Pause playback while scrubbing
+    setIsPlaying(false)
+
     const nextPlayhead = clamp(snap(x / pxPerSecond, 0.25), 0, timeline.duration)
     onTimelineChange((current) => ({ ...current, playhead: nextPlayhead }))
   }
@@ -1033,10 +1036,15 @@ export function TimelineEditor({
                     })}
 
                     <div
-                      className="absolute top-0 bottom-0 z-30 w-px bg-[#002FA7] shadow-[0_0_18px_rgba(0,47,167,0.55)] pointer-events-none"
+                      className="absolute top-0 bottom-0 z-30 pointer-events-none"
                       style={{ left: TRACK_LABEL_WIDTH + timeline.playhead * pxPerSecond }}
                     >
-                      <div className="absolute top-0 -left-2 h-4 w-4 rounded-b-full border border-[#002FA7]/40 bg-[#002FA7] shadow-[0_0_0_4px_rgba(0,47,167,0.18)]" />
+                      {/* Vertical line */}
+                      <div className="absolute top-3 bottom-0 left-0 w-px bg-[#002FA7] shadow-[0_0_18px_rgba(0,47,167,0.55)]" />
+                      {/* Triangle knob */}
+                      <svg width="11" height="14" viewBox="0 0 11 14" className="absolute -left-[5px] top-0">
+                        <path d="M0 0 L11 0 L5.5 14 Z" fill="#002FA7" />
+                      </svg>
                     </div>
                   </div>
                 </div>
