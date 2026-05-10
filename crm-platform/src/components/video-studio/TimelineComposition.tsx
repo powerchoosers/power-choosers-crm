@@ -1,76 +1,10 @@
 import React from 'react'
-import { AbsoluteFill, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from 'remotion'
+import { AbsoluteFill, Audio, Sequence, Video, interpolate, useCurrentFrame, useVideoConfig } from 'remotion'
 import type { TimelineState, TimelineClip, TimelineOverlay } from './timelineTypes'
 
 type TimelineCompositionProps = {
   timeline: TimelineState
   renderOverlays?: boolean
-}
-
-/**
- * Renders a single clip. Handles fade-in / fade-out opacity when
- * transitionInFrames / transitionOutFrames are provided.
- *
- * `from` is the absolute Remotion frame the Sequence starts at.
- * `durationInFrames` is the Sequence length.
- */
-function ClipLayer({
-  clip,
-  from,
-  durationInFrames,
-  transitionInFrames,
-  transitionOutFrames,
-}: {
-  clip: TimelineClip
-  from: number
-  durationInFrames: number
-  transitionInFrames: number
-  transitionOutFrames: number
-}) {
-  const frame = useCurrentFrame()
-
-  // Fade in
-  const opacityIn =
-    transitionInFrames > 0
-      ? interpolate(frame, [0, transitionInFrames], [0, 1], {
-          extrapolateLeft: 'clamp',
-          extrapolateRight: 'clamp',
-        })
-      : 1
-
-  // Fade out
-  const opacityOut =
-    transitionOutFrames > 0
-      ? interpolate(
-          frame,
-          [durationInFrames - transitionOutFrames, durationInFrames],
-          [1, 0],
-          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
-        )
-      : 1
-
-  const opacity = opacityIn * opacityOut
-
-  return (
-    <Sequence from={from} durationInFrames={durationInFrames} layout="none">
-      <AbsoluteFill style={{ opacity }}>
-        {clip.sourceUrl ? (
-          <Video
-            src={clip.sourceUrl}
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-          />
-        ) : (
-          <div
-            style={{
-              backgroundColor: clip.color || '#002FA7',
-              width: '100%',
-              height: '100%',
-            }}
-          />
-        )}
-      </AbsoluteFill>
-    </Sequence>
-  )
 }
 
 function OverlayLayer({
@@ -105,6 +39,7 @@ function OverlayLayer({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          padding: '0 12px',
         }}
       >
         {overlay.kind === 'image' && overlay.sourceUrl ? (
@@ -128,32 +63,21 @@ export function TimelineComposition({
   renderOverlays = true,
 }: TimelineCompositionProps) {
   const { fps, width, height } = useVideoConfig()
-  const videoTracks = timeline.tracks.filter((t) => t.kind === 'video')
-
   const scaleWidth = width / 960
   const scaleHeight = height / 540
 
   return (
     <AbsoluteFill style={{ backgroundColor: 'black' }}>
-      {/* Video Tracks — one AbsoluteFill per track so clips stack naturally */}
-      {videoTracks.map((track) => {
+      {/* All Tracks — one AbsoluteFill per track so clips stack naturally */}
+      {timeline.tracks.map((track) => {
         const trackClips = timeline.clips
           .filter((c) => c.trackId === track.id)
           .sort((a, b) => a.start - b.start)
 
-        /*
-         * Simple approach: each clip gets a Sequence whose `from` equals
-         * its timeline start frame. Clips play back-to-back. When two
-         * clips touch AND the second clip has a transitionIn, the first
-         * clip's Sequence is extended by the transition duration and the
-         * second clip's Sequence starts earlier (overlapping), so both
-         * are visible during the crossfade window.
-         */
         const layers = trackClips.map((clip, idx) => {
           const startFrame = Math.round(clip.start * fps)
           const baseDuration = Math.round(clip.duration * fps)
 
-          // Does the NEXT clip touch us and have a transition?
           const next = trackClips[idx + 1]
           const touchesNext =
             next &&
@@ -166,7 +90,6 @@ export function TimelineComposition({
             ? Math.round((next.transitionDuration || 0.5) * fps)
             : 0
 
-          // Does THIS clip have a transition from the PREVIOUS clip?
           const prev = trackClips[idx - 1]
           const touchesPrev =
             prev &&
@@ -179,21 +102,57 @@ export function TimelineComposition({
             ? Math.round((clip.transitionDuration || 0.5) * fps)
             : 0
 
-          // Shift this clip earlier by its transitionIn so it overlaps
           const adjustedFrom = startFrame - transitionInFrames
-          // Extend duration to cover the overlap with the next clip
           const adjustedDuration =
             baseDuration + transitionInFrames + transitionOutFrames
 
           return (
-            <ClipLayer
+            <Sequence
               key={clip.id}
-              clip={clip}
               from={Math.max(0, adjustedFrom)}
               durationInFrames={adjustedDuration}
-              transitionInFrames={transitionInFrames}
-              transitionOutFrames={transitionOutFrames}
-            />
+              layout="none"
+            >
+              <AbsoluteFill
+                style={{
+                  opacity:
+                    transitionInFrames > 0 || transitionOutFrames > 0
+                      ? interpolate(
+                          useCurrentFrame(),
+                          [
+                            0,
+                            transitionInFrames,
+                            adjustedDuration - transitionOutFrames,
+                            adjustedDuration,
+                          ],
+                          [0, 1, 1, 0],
+                          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+                        )
+                      : clip.opacity ?? 1,
+                }}
+              >
+                {clip.kind === 'audio' && clip.sourceUrl ? (
+                  <Audio src={clip.sourceUrl} volume={clip.volume ?? 1} />
+                ) : clip.sourceUrl ? (
+                  <Video
+                    src={clip.sourceUrl}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      backgroundColor: clip.color || '#002FA7',
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  />
+                )}
+              </AbsoluteFill>
+            </Sequence>
           )
         })
 
