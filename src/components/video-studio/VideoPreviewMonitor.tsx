@@ -1,130 +1,91 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import videojs from 'video.js'
-import type Player from 'video.js/dist/types/player'
+import { Player, type PlayerRef } from '@remotion/player'
+import { TimelineComposition } from './TimelineComposition'
+import type { TimelineState } from './timelineTypes'
 
 type VideoPreviewMonitorProps = {
-  sourceUrl?: string | null
-  posterUrl?: string | null
+  timeline: TimelineState
   isPlaying?: boolean
-  currentTime?: number
   onPlayStateChange?: (playing: boolean) => void
   onTimeUpdate?: (seconds: number) => void
-  onDuration?: (seconds: number) => void
 }
 
 export function VideoPreviewMonitor({
-  sourceUrl,
-  posterUrl,
+  timeline,
   isPlaying,
-  currentTime,
   onPlayStateChange,
   onTimeUpdate,
-  onDuration,
 }: VideoPreviewMonitorProps) {
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const playerRef = useRef<Player | null>(null)
-  const callbacksRef = useRef({ onTimeUpdate, onDuration, onPlayStateChange })
+  const playerRef = useRef<PlayerRef>(null)
+  const fps = timeline.fps || 24
+  const durationInFrames = Math.max(1, Math.round(timeline.duration * fps))
 
+  // Sync isPlaying state to Player
   useEffect(() => {
-    callbacksRef.current = { onTimeUpdate, onDuration, onPlayStateChange }
-  }, [onTimeUpdate, onDuration, onPlayStateChange])
-
-  useEffect(() => {
-    if (!videoRef.current || playerRef.current) return
-
-    const player = videojs(videoRef.current, {
-      controls: true,
-      fluid: false, // Disable fluid to avoid forcing an aspect ratio that might overflow
-      fill: true,   // Make the player fill the container
-      responsive: true,
-      preload: 'metadata',
-      playbackRates: [0.5, 1, 1.25, 1.5, 2],
-      controlBar: {
-        pictureInPictureToggle: false,
-      },
-    })
-
-    player.on('play', () => callbacksRef.current.onPlayStateChange?.(true))
-    player.on('pause', () => callbacksRef.current.onPlayStateChange?.(false))
-
-    player.on('timeupdate', () => {
-      // Regular timeupdate as fallback
-      if (!isPlaying) {
-        callbacksRef.current.onTimeUpdate?.(Number(player.currentTime() || 0))
-      }
-    })
-
-    player.on('loadedmetadata', () => {
-      callbacksRef.current.onDuration?.(Number(player.duration() || 0))
-    })
-
-    playerRef.current = player
-
-    return () => {
-      player.dispose()
-      playerRef.current = null
+    if (!playerRef.current || isPlaying === undefined) return
+    if (isPlaying && !playerRef.current.isPlaying()) {
+      playerRef.current.play()
+    } else if (!isPlaying && playerRef.current.isPlaying()) {
+      playerRef.current.pause()
     }
-  }, [])
+  }, [isPlaying])
 
+  // Sync timeline playhead to Player when NOT playing
+  useEffect(() => {
+    if (!playerRef.current || isPlaying) return
+    const targetFrame = Math.round(timeline.playhead * fps)
+    if (Math.abs(playerRef.current.getCurrentFrame() - targetFrame) > 1) {
+      playerRef.current.seekTo(targetFrame)
+    }
+  }, [timeline.playhead, fps, isPlaying])
+
+  // Monitor frame updates to sync back to timeline
   useEffect(() => {
     const player = playerRef.current
-    if (!player || !isPlaying || !sourceUrl) return
+    if (!player || !isPlaying) return
 
     let frameId: number
     const update = () => {
-      callbacksRef.current.onTimeUpdate?.(Number(player.currentTime() || 0))
+      onTimeUpdate?.(player.getCurrentFrame() / fps)
       frameId = requestAnimationFrame(update)
     }
     frameId = requestAnimationFrame(update)
     return () => cancelAnimationFrame(frameId)
-  }, [isPlaying, sourceUrl])
+  }, [isPlaying, fps, onTimeUpdate])
 
+  // Listen to native play/pause to sync state (if user interacts somehow, though controls are off)
   useEffect(() => {
     const player = playerRef.current
     if (!player) return
-
-    if (sourceUrl) {
-      const type = sourceUrl.startsWith('blob:') ? 'video/mp4' : undefined
-      player.src(type ? { src: sourceUrl, type } : { src: sourceUrl })
-      if (posterUrl) player.poster(posterUrl)
-    } else {
-      player.pause()
-      player.reset()
+    
+    const onPlay = () => onPlayStateChange?.(true)
+    const onPause = () => onPlayStateChange?.(false)
+    
+    player.addEventListener('play', onPlay)
+    player.addEventListener('pause', onPause)
+    
+    return () => {
+      player.removeEventListener('play', onPlay)
+      player.removeEventListener('pause', onPause)
     }
-  }, [posterUrl, sourceUrl])
-
-  useEffect(() => {
-    const player = playerRef.current
-    if (!player || !sourceUrl) return
-
-    if (isPlaying) {
-      player.play()?.catch(() => {
-        // Autoplay/play policy might block this initially
-      })
-    } else {
-      player.pause()
-    }
-  }, [isPlaying, sourceUrl])
-
-  useEffect(() => {
-    const player = playerRef.current
-    if (!player || currentTime === undefined || !sourceUrl) return
-
-    const playerTime = player.currentTime() || 0
-    if (Math.abs(playerTime - currentTime) > 0.15) {
-      player.currentTime(currentTime)
-    }
-  }, [currentTime, sourceUrl])
+  }, [onPlayStateChange])
 
   return (
-    <div data-vjs-player className="h-full w-full nodal-video-monitor overflow-hidden">
-      <video 
-        ref={videoRef} 
-        className="video-js vjs-big-play-centered vjs-fill bg-black" 
-        style={{ objectFit: 'contain' }}
-        playsInline 
+    <div className="h-full w-full nodal-video-monitor overflow-hidden bg-black flex items-center justify-center">
+      <Player
+        ref={playerRef}
+        component={TimelineComposition}
+        inputProps={{ timeline, renderOverlays: false }}
+        durationInFrames={durationInFrames}
+        fps={fps}
+        compositionWidth={1920}
+        compositionHeight={1080}
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        controls={false}
+        spaceKeyToPlayOrPause={false}
+        clickToPlay={false}
       />
     </div>
   )
