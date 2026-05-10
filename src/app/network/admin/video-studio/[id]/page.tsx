@@ -857,7 +857,10 @@ export default function VideoStudioPage() {
                           const nextRatio = model.supported_aspect_ratios?.[0]
                           const nextDuration = model.supported_durations?.[0]
                           const nextResolution = model.supported_resolutions?.[0]
-                          if (nextRatio) setAspectRatio(nextRatio)
+                          if (nextRatio) {
+                            setAspectRatio(nextRatio)
+                            setTimeline((current) => ({ ...current, aspectRatio: nextRatio }))
+                          }
                           if (nextDuration) setDuration(String(nextDuration) as '5' | '8')
                           if (nextResolution) setResolution(nextResolution)
                         }}
@@ -873,7 +876,13 @@ export default function VideoStudioPage() {
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
-                    <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                    <Select 
+                      value={aspectRatio} 
+                      onValueChange={(value) => {
+                        setAspectRatio(value)
+                        setTimeline((current) => ({ ...current, aspectRatio: value }))
+                      }}
+                    >
                       <SelectTrigger className="w-full nodal-glass border-white/10 bg-white/[0.02] text-white"><SelectValue /></SelectTrigger>
                       <SelectContent className="border-white/10 bg-zinc-950 text-white">
                         {modelRatios.map((ratio) => <SelectItem key={ratio} value={ratio}>{ratio}</SelectItem>)}
