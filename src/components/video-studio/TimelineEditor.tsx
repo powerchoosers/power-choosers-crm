@@ -46,6 +46,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import {
   addClipToTimeline,
@@ -136,8 +137,10 @@ export function TimelineEditor({
   )
 
   const activeClip = useMemo(() => {
+    const underPlayhead = timeline.clips.find((clip) => timeline.playhead >= clip.start && timeline.playhead < clip.start + clip.duration)
+    if (underPlayhead) return underPlayhead
     if (selectedClip) return selectedClip
-    return timeline.clips.find((clip) => timeline.playhead >= clip.start && timeline.playhead <= clip.start + clip.duration) || null
+    return null
   }, [selectedClip, timeline.clips, timeline.playhead])
 
   const selectedOverlay = useMemo(
@@ -991,19 +994,24 @@ export function TimelineEditor({
                             if (!touches) return null
                             const x = TRACK_LABEL_WIDTH + clip.start * pxPerSecond
                             return (
-                              <button
-                                key={`trans-${clip.id}`}
-                                className="absolute z-40 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded border border-white/20 bg-zinc-800 text-white shadow-lg transition-all hover:border-white/40 hover:bg-zinc-700"
-                                style={{ left: x, top: TRACK_HEIGHT / 2 }}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedClipId(clip.id)
-                                  toast.info('Transition settings selected for ' + clip.label)
-                                }}
-                                title="Edit Transition"
-                              >
-                                <Blend className="h-3.5 w-3.5" />
-                              </button>
+                              <DropdownMenu key={`trans-${clip.id}`}>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    className="absolute z-40 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded border border-white/20 bg-zinc-800 text-white shadow-lg transition-all hover:border-white/40 hover:bg-zinc-700"
+                                    style={{ left: x, top: TRACK_HEIGHT / 2 }}
+                                    title="Edit Transition"
+                                  >
+                                    <Blend className="h-3.5 w-3.5" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="border-white/10 bg-zinc-950 text-white min-w-[140px]" side="top" sideOffset={8}>
+                                  <DropdownMenuLabel className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-mono">Transition</DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => { updateClipTransition(clip.id, 'none'); toast.success('Transition removed') }} className="text-xs cursor-pointer focus:bg-white/10">None</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { updateClipTransition(clip.id, 'crossfade'); toast.success('Crossfade applied') }} className="text-xs cursor-pointer focus:bg-white/10">Crossfade</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { updateClipTransition(clip.id, 'dip-to-black'); toast.success('Dip to Black applied') }} className="text-xs cursor-pointer focus:bg-white/10">Dip to Black</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => { updateClipTransition(clip.id, 'wipe'); toast.success('Wipe applied') }} className="text-xs cursor-pointer focus:bg-white/10">Wipe</DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             )
                           })}
                         </div>
