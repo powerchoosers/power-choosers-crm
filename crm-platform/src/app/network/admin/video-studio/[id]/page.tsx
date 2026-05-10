@@ -36,6 +36,7 @@ import {
   type TimelineJob,
   type TimelineState,
 } from '@/components/video-studio/timelineTypes'
+import { uploadVideoStudioAsset } from '@/lib/video-studio-upload'
 
 type VideoModelInfo = {
   id: string
@@ -397,21 +398,34 @@ export default function VideoStudioPage() {
     setReferenceImageName(file.name)
   }
 
-  const handleSourceVideoUpload = (file: File | null) => {
+  const handleSourceVideoUpload = async (file: File | null) => {
     if (!file) {
       setSourceVideoName(null)
       setSourceVideoPreviewUrl((current) => {
         if (current) URL.revokeObjectURL(current)
         return null
       })
+      setSourceClipUrl('')
+      return
+    }
+
+    if (!activeProjectId) {
+      toast.error('Save project first to upload source video')
       return
     }
 
     setSourceVideoName(file.name)
-    setSourceVideoPreviewUrl((current) => {
-      if (current) URL.revokeObjectURL(current)
-      return URL.createObjectURL(file)
-    })
+    setIsExtractingFrame(true) // Reuse a loading state or add new one
+    try {
+      const { url } = await uploadVideoStudioAsset(file, activeProjectId)
+      setSourceClipUrl(url)
+      setSourceVideoPreviewUrl(url)
+      toast.success('Source video uploaded')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload source video')
+    } finally {
+      setIsExtractingFrame(false)
+    }
   }
 
   const extractFirstFrame = async () => {
