@@ -1,6 +1,7 @@
 export type TimelineTrackKind = 'video' | 'audio' | 'title'
 export type TimelineClipKind = 'source' | 'generated' | 'title' | 'audio'
 export type TimelineOverlayKind = 'text' | 'image' | 'icon'
+export type TimelineTransition = 'none' | 'crossfade' | 'dip-to-black' | 'wipe'
 
 export type TimelineTrack = {
   id: string
@@ -8,6 +9,8 @@ export type TimelineTrack = {
   kind: TimelineTrackKind
   color: string
   muted?: boolean
+  solo?: boolean
+  locked?: boolean
 }
 
 export type TimelineClip = {
@@ -24,6 +27,9 @@ export type TimelineClip = {
   notes?: string | null
   volume?: number
   opacity?: number
+  speed?: number
+  transitionIn?: TimelineTransition
+  transitionDuration?: number
   locked?: boolean
 }
 
