@@ -842,11 +842,29 @@ export function TimelineEditor({
                     onPointerDown={(event) => {
                       const target = event.target as HTMLElement | null
                       if (target?.closest('[data-timeline-clip]')) return
-                      scrubFromClientX(event.clientX)
+                      
+                      const container = event.currentTarget;
+                      container.setPointerCapture(event.pointerId);
+
+                      const updatePlayhead = (clientX: number) => {
+                        scrubFromClientX(clientX);
+                      };
+
+                      updatePlayhead(event.clientX);
+
+                      const onMove = (e: PointerEvent) => updatePlayhead(e.clientX);
+                      const onUp = () => {
+                        container.releasePointerCapture(event.pointerId);
+                        window.removeEventListener('pointermove', onMove);
+                        window.removeEventListener('pointerup', onUp);
+                      };
+
+                      window.addEventListener('pointermove', onMove);
+                      window.addEventListener('pointerup', onUp);
                     }}
                   >
                     <div
-                      className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/95 backdrop-blur-xl"
+                      className="sticky top-0 z-20 border-b border-white/10 bg-zinc-950/95 backdrop-blur-xl pointer-events-none"
                       style={{ height: RULER_HEIGHT }}
                     >
                       <div className="absolute left-0 top-0 h-full w-[172px] border-r border-white/10 bg-black/50" />
@@ -876,7 +894,7 @@ export function TimelineEditor({
                           )}
                           style={{ height: TRACK_HEIGHT }}
                         >
-                          <div className="absolute left-0 top-0 flex h-full w-[172px] items-center justify-between border-r border-white/10 bg-black/40 px-3">
+                          <div className="absolute left-0 top-0 flex h-full w-[172px] items-center justify-between border-r border-white/10 bg-black/40 px-3 z-10 pointer-events-auto">
                             <div className="min-w-0">
                               <div className={cn('text-xs font-medium truncate', track.muted ? 'text-zinc-500 line-through' : 'text-zinc-100')}>{track.name}</div>
                               <div className="mt-0.5 text-[9px] uppercase tracking-[0.25em] text-zinc-600 font-mono">
@@ -893,7 +911,7 @@ export function TimelineEditor({
                             </div>
                           </div>
 
-                          <div className="absolute inset-y-0 left-[172px] right-0">
+                          <div className="absolute inset-y-0 left-[172px] right-0 pointer-events-none">
                             {Array.from({ length: Math.floor(timeline.duration) + 1 }, (_, tickIndex) => (
                               <div
                                 key={`${track.id}-grid-${tickIndex}`}
@@ -940,25 +958,22 @@ export function TimelineEditor({
                                     duration: nextDuration,
                                   })
                                 }}
-                                onMouseDown={() => {
+                                onMouseDown={(e) => {
+                                  e.stopPropagation()
                                   setSelectedClipId(clip.id)
                                   setSelectedOverlayId(null)
                                 }}
                                 data-timeline-clip="true"
-                                className="group"
+                                className="group z-20"
                               >
                                 <div
                                   className={cn(
-                                    'relative h-full w-full overflow-hidden rounded-2xl border px-3 py-2 text-left shadow-[0_18px_30px_rgba(0,0,0,0.25)] transition-all',
+                                    'relative h-full w-full overflow-hidden rounded-2xl border px-3 py-2 text-left shadow-[0_18px_30px_rgba(0,0,0,0.25)] transition-all pointer-events-auto',
                                     selected ? 'border-[#002FA7]/60' : 'border-white/10'
                                   )}
                                   style={{
                                     backgroundImage: `linear-gradient(180deg, ${trackColor}22, ${trackColor}0f)`,
                                     boxShadow: selected ? `0 0 0 1px ${trackColor}55, 0 18px 30px rgba(0,0,0,0.25)` : undefined,
-                                  }}
-                                  onClick={() => {
-                                    setSelectedClipId(clip.id)
-                                    setSelectedOverlayId(null)
                                   }}
                                 >
                                   <div className="flex items-start justify-between gap-3">
@@ -996,7 +1011,7 @@ export function TimelineEditor({
                               <DropdownMenu key={`trans-${clip.id}`}>
                                 <DropdownMenuTrigger asChild>
                                   <button
-                                    className="absolute z-40 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded border border-white/20 bg-zinc-800 text-white shadow-lg transition-all hover:border-white/40 hover:bg-zinc-700"
+                                    className="absolute z-40 flex h-6 w-6 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded border border-white/20 bg-zinc-800 text-white shadow-lg transition-all hover:border-white/40 hover:bg-zinc-700 pointer-events-auto"
                                     style={{ left: x, top: TRACK_HEIGHT / 2 }}
                                     title="Edit Transition"
                                   >
@@ -1018,10 +1033,10 @@ export function TimelineEditor({
                     })}
 
                     <div
-                      className="absolute top-0 z-30 h-full w-px bg-[#002FA7] shadow-[0_0_18px_rgba(0,47,167,0.55)]"
+                      className="absolute top-0 bottom-0 z-30 w-px bg-[#002FA7] shadow-[0_0_18px_rgba(0,47,167,0.55)] pointer-events-none"
                       style={{ left: TRACK_LABEL_WIDTH + timeline.playhead * pxPerSecond }}
                     >
-                      <div className="absolute -top-2 -left-2 h-4 w-4 rounded-full border border-[#002FA7]/40 bg-[#002FA7] shadow-[0_0_0_4px_rgba(0,47,167,0.18)]" />
+                      <div className="absolute top-0 -left-2 h-4 w-4 rounded-b-full border border-[#002FA7]/40 bg-[#002FA7] shadow-[0_0_0_4px_rgba(0,47,167,0.18)]" />
                     </div>
                   </div>
                 </div>
