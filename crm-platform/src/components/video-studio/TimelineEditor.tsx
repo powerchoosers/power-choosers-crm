@@ -64,6 +64,7 @@ import {
 } from './timelineTypes'
 import { AudioWaveform } from './AudioWaveform'
 import { VideoPreviewMonitor } from './VideoPreviewMonitor'
+import { uploadVideoStudioAsset } from '@/lib/video-studio-upload'
 
 type TimelineEditorProps = {
   projectName: string
@@ -125,6 +126,7 @@ export function TimelineEditor({
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null)
   const [selectedOverlayId, setSelectedOverlayId] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const [stageSize, setStageSize] = useState({ width: STAGE_WIDTH, height: STAGE_HEIGHT })
   const [snapEnabled, setSnapEnabled] = useState(true)
   const [showShortcuts, setShowShortcuts] = useState(false)
@@ -264,32 +266,54 @@ export function TimelineEditor({
   }
 
   const addImageOverlay = async (file: File | null) => {
-    if (!file) return
-    addOverlay('image', URL.createObjectURL(file))
+    if (!file || !activeProjectId) return
+    setIsUploading(true)
+    try {
+      const { url } = await uploadVideoStudioAsset(file, activeProjectId)
+      addOverlay('image', url)
+      toast.success(`Ingested ${file.name}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to ingest image')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
-  const addLocalMediaClip = (file: File | null, mediaType: 'video' | 'audio') => {
-    if (!file) return
-    const track = timeline.tracks.find((item) => item.kind === mediaType) || timeline.tracks[0]
-    if (!track) return
-
-    const clip: TimelineClip = {
-      id: makeLocalId('clip'),
-      kind: mediaType === 'audio' ? 'audio' : 'source',
-      label: file.name,
-      start: snap(timeline.playhead, 0.25),
-      duration: 8,
-      trackId: track.id,
-      color: track.color || (mediaType === 'audio' ? '#a855f7' : '#002FA7'),
-      sourceUrl: URL.createObjectURL(file),
-      sourceName: file.name,
-      volume: 1,
-      opacity: 1,
+  const addLocalMediaClip = async (file: File | null, mediaType: 'video' | 'audio') => {
+    if (!file || !activeProjectId) {
+      if (!activeProjectId) toast.error('Save project first to enable uploads')
+      return
     }
 
-    onTimelineChange((current) => normalizeTimeline(addClipToTimeline(current, clip)))
-    setSelectedClipId(clip.id)
-    setSelectedOverlayId(null)
+    setIsUploading(true)
+    try {
+      const { url } = await uploadVideoStudioAsset(file, activeProjectId)
+      const track = timeline.tracks.find((item) => item.kind === mediaType) || timeline.tracks[0]
+      if (!track) return
+
+      const clip: TimelineClip = {
+        id: makeLocalId('clip'),
+        kind: mediaType === 'audio' ? 'audio' : 'source',
+        label: file.name,
+        start: snap(timeline.playhead, 0.25),
+        duration: 8,
+        trackId: track.id,
+        color: track.color || (mediaType === 'audio' ? '#a855f7' : '#002FA7'),
+        sourceUrl: url,
+        sourceName: file.name,
+        volume: 1,
+        opacity: 1,
+      }
+
+      onTimelineChange((current) => normalizeTimeline(addClipToTimeline(current, clip)))
+      setSelectedClipId(clip.id)
+      setSelectedOverlayId(null)
+      toast.success(`Ingested ${file.name}`)
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to ingest media')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   const deleteSelectedOverlay = () => {
@@ -651,6 +675,13 @@ export function TimelineEditor({
               <Music className="w-3.5 h-3.5" />
             </button>
           </div>
+
+          {isUploading && (
+            <div className="flex items-center gap-2 px-3 border-r border-white/5 animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin text-[#9db7ff]" />
+              <span className="text-[9px] uppercase tracking-[0.25em] text-[#9db7ff] font-mono">Ingesting asset...</span>
+            </div>
+          )}
 
           {/* Shortcuts legend */}
           <button
