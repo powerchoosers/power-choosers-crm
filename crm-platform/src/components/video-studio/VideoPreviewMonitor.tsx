@@ -7,6 +7,9 @@ import type Player from 'video.js/dist/types/player'
 type VideoPreviewMonitorProps = {
   sourceUrl?: string | null
   posterUrl?: string | null
+  isPlaying?: boolean
+  currentTime?: number
+  onPlayStateChange?: (playing: boolean) => void
   onTimeUpdate?: (seconds: number) => void
   onDuration?: (seconds: number) => void
 }
@@ -14,16 +17,19 @@ type VideoPreviewMonitorProps = {
 export function VideoPreviewMonitor({
   sourceUrl,
   posterUrl,
+  isPlaying,
+  currentTime,
+  onPlayStateChange,
   onTimeUpdate,
   onDuration,
 }: VideoPreviewMonitorProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const playerRef = useRef<Player | null>(null)
-  const callbacksRef = useRef({ onTimeUpdate, onDuration })
+  const callbacksRef = useRef({ onTimeUpdate, onDuration, onPlayStateChange })
 
   useEffect(() => {
-    callbacksRef.current = { onTimeUpdate, onDuration }
-  }, [onTimeUpdate, onDuration])
+    callbacksRef.current = { onTimeUpdate, onDuration, onPlayStateChange }
+  }, [onTimeUpdate, onDuration, onPlayStateChange])
 
   useEffect(() => {
     if (!videoRef.current || playerRef.current) return
@@ -39,8 +45,14 @@ export function VideoPreviewMonitor({
       },
     })
 
+    player.on('play', () => callbacksRef.current.onPlayStateChange?.(true))
+    player.on('pause', () => callbacksRef.current.onPlayStateChange?.(false))
+
     player.on('timeupdate', () => {
-      callbacksRef.current.onTimeUpdate?.(Number(player.currentTime() || 0))
+      // Regular timeupdate as fallback
+      if (!isPlaying) {
+        callbacksRef.current.onTimeUpdate?.(Number(player.currentTime() || 0))
+      }
     })
 
     player.on('loadedmetadata', () => {
@@ -57,6 +69,19 @@ export function VideoPreviewMonitor({
 
   useEffect(() => {
     const player = playerRef.current
+    if (!player || !isPlaying || !sourceUrl) return
+
+    let frameId: number
+    const update = () => {
+      callbacksRef.current.onTimeUpdate?.(Number(player.currentTime() || 0))
+      frameId = requestAnimationFrame(update)
+    }
+    frameId = requestAnimationFrame(update)
+    return () => cancelAnimationFrame(frameId)
+  }, [isPlaying, sourceUrl])
+
+  useEffect(() => {
+    const player = playerRef.current
     if (!player) return
 
     if (sourceUrl) {
@@ -68,6 +93,29 @@ export function VideoPreviewMonitor({
       player.reset()
     }
   }, [posterUrl, sourceUrl])
+
+  useEffect(() => {
+    const player = playerRef.current
+    if (!player || !sourceUrl) return
+
+    if (isPlaying) {
+      player.play()?.catch(() => {
+        // Autoplay/play policy might block this initially
+      })
+    } else {
+      player.pause()
+    }
+  }, [isPlaying, sourceUrl])
+
+  useEffect(() => {
+    const player = playerRef.current
+    if (!player || currentTime === undefined || !sourceUrl) return
+
+    const playerTime = player.currentTime() || 0
+    if (Math.abs(playerTime - currentTime) > 0.15) {
+      player.currentTime(currentTime)
+    }
+  }, [currentTime, sourceUrl])
 
   return (
     <div data-vjs-player className="h-full w-full nodal-video-monitor">
