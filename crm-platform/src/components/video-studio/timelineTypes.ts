@@ -60,6 +60,7 @@ export type TimelineState = {
   zoom: number
   playhead: number
   fps: number
+  aspectRatio?: string
   tracks: TimelineTrack[]
   clips: TimelineClip[]
   overlays: TimelineOverlay[]
@@ -190,6 +191,7 @@ export function normalizeTimeline(input?: Partial<TimelineState> | null): Timeli
     zoom: clamp(Number(input?.zoom || base.zoom), 0.5, 3),
     playhead: clamp(Number(input?.playhead || 0), 0, Math.max(base.duration, maxEnd)),
     fps: Number(input?.fps || base.fps) || base.fps,
+    aspectRatio: input?.aspectRatio || '16:9',
     tracks: tracks.map((track, index) => ({
       ...track,
       id: track.id || makeId(`track_${index}`),
