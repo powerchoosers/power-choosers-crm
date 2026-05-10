@@ -701,15 +701,14 @@ export function TimelineEditor({
                   className="relative w-full bg-zinc-950 overflow-hidden"
                   style={{ aspectRatio: parseAspectRatio(timeline.aspectRatio) }}
                 >
-                  {activeClip?.sourceUrl ? (
+                  {timeline.clips.length > 0 ? (
                     <VideoPreviewMonitor
-                      sourceUrl={activeClip.sourceUrl}
+                      timeline={timeline}
                       isPlaying={isPlaying}
-                      currentTime={timeline.playhead - activeClip.start}
                       onPlayStateChange={(playing) => setIsPlaying(playing)}
                       onTimeUpdate={(seconds) => {
                         if (!isPlaying) return
-                        onTimelineChange((current) => ({ ...current, playhead: clamp(activeClip.start + seconds, 0, current.duration) }))
+                        onTimelineChange((current) => ({ ...current, playhead: clamp(seconds, 0, current.duration) }))
                       }}
                     />
                   ) : (
@@ -717,10 +716,10 @@ export function TimelineEditor({
                       <div>
                         <Video className="mx-auto h-10 w-10 text-zinc-600" />
                         <div className="mt-3 text-sm text-zinc-300">
-                          Pick a clip to preview it here.
+                          Add clips to the timeline to preview them here.
                         </div>
                         <div className="mt-1 text-xs text-zinc-500">
-                          Generated clips with a saved source URL can be reviewed directly in the monitor.
+                          Generated clips will automatically appear in the monitor.
                         </div>
                       </div>
                     </div>
