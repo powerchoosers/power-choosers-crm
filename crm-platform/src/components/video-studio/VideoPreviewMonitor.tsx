@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Player, type PlayerRef } from '@remotion/player'
 import { TimelineComposition } from './TimelineComposition'
 import type { TimelineState } from './timelineTypes'
@@ -22,7 +22,11 @@ export function VideoPreviewMonitor({
   const fps = timeline.fps || 24
   const durationInFrames = Math.max(1, Math.round(timeline.duration * fps))
 
-  // Sync isPlaying state to Player
+  // Keep a ref so the rAF callback always reads the latest value
+  const onTimeUpdateRef = useRef(onTimeUpdate)
+  onTimeUpdateRef.current = onTimeUpdate
+
+  // Sync isPlaying state → Player
   useEffect(() => {
     if (!playerRef.current || isPlaying === undefined) return
     if (isPlaying && !playerRef.current.isPlaying()) {
@@ -32,40 +36,39 @@ export function VideoPreviewMonitor({
     }
   }, [isPlaying])
 
-  // Sync timeline playhead to Player when NOT playing
+  // Sync timeline playhead → Player when NOT playing (scrubbing)
   useEffect(() => {
     if (!playerRef.current || isPlaying) return
     const targetFrame = Math.round(timeline.playhead * fps)
-    if (Math.abs(playerRef.current.getCurrentFrame() - targetFrame) > 1) {
-      playerRef.current.seekTo(targetFrame)
-    }
+    playerRef.current.seekTo(targetFrame)
   }, [timeline.playhead, fps, isPlaying])
 
-  // Monitor frame updates to sync back to timeline
+  // While playing, push current frame back to the timeline playhead
   useEffect(() => {
     const player = playerRef.current
     if (!player || !isPlaying) return
 
-    let frameId: number
-    const update = () => {
-      onTimeUpdate?.(player.getCurrentFrame() / fps)
-      frameId = requestAnimationFrame(update)
+    let raf: number
+    const tick = () => {
+      const currentSeconds = player.getCurrentFrame() / fps
+      onTimeUpdateRef.current?.(currentSeconds)
+      raf = requestAnimationFrame(tick)
     }
-    frameId = requestAnimationFrame(update)
-    return () => cancelAnimationFrame(frameId)
-  }, [isPlaying, fps, onTimeUpdate])
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isPlaying, fps])
 
-  // Listen to native play/pause to sync state (if user interacts somehow, though controls are off)
+  // Native play/pause events → sync state back
   useEffect(() => {
     const player = playerRef.current
     if (!player) return
-    
+
     const onPlay = () => onPlayStateChange?.(true)
     const onPause = () => onPlayStateChange?.(false)
-    
+
     player.addEventListener('play', onPlay)
     player.addEventListener('pause', onPause)
-    
+
     return () => {
       player.removeEventListener('play', onPlay)
       player.removeEventListener('pause', onPause)
@@ -82,7 +85,7 @@ export function VideoPreviewMonitor({
         fps={fps}
         compositionWidth={1920}
         compositionHeight={1080}
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        style={{ width: '100%', height: '100%' }}
         controls={false}
         spaceKeyToPlayOrPause={false}
         clickToPlay={false}
