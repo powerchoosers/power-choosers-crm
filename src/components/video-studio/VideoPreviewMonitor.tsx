@@ -29,6 +29,7 @@ export function VideoPreviewMonitor({
   // Sync isPlaying state → Player
   useEffect(() => {
     if (!playerRef.current || isPlaying === undefined) return
+    console.log('[VideoPreviewMonitor] isPlaying sync:', isPlaying)
     if (isPlaying && !playerRef.current.isPlaying()) {
       playerRef.current.play()
     } else if (!isPlaying && playerRef.current.isPlaying()) {
@@ -48,14 +49,19 @@ export function VideoPreviewMonitor({
     const player = playerRef.current
     if (!player || !isPlaying) return
 
+    console.log('[VideoPreviewMonitor] Starting frame tick loop')
     let raf: number
     const tick = () => {
       const currentSeconds = player.getCurrentFrame() / fps
+      // console.log('[VideoPreviewMonitor] tick:', currentSeconds.toFixed(3))
       onTimeUpdateRef.current?.(currentSeconds)
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      console.log('[VideoPreviewMonitor] Stopping frame tick loop')
+      cancelAnimationFrame(raf)
+    }
   }, [isPlaying, fps])
 
   // Native play/pause events → sync state back
