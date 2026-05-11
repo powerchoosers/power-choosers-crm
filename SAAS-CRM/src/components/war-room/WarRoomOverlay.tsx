@@ -1,0 +1,331 @@
+'use client'
+
+import { useEffect, useCallback, useState, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useWarRoomStore } from '@/store/warRoomStore'
+import { useCallStore } from '@/store/callStore'
+import { GridStrip } from '@/components/war-room/GridStrip'
+import { PriorityStack } from '@/components/war-room/PriorityStack'
+import { SignalFeed, SignalEntry } from '@/components/war-room/SignalFeed'
+import { Shield, Zap } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
+import { ForensicClose } from '@/components/ui/ForensicClose'
+import { useFourCPForecast } from '@/hooks/useFourCPForecast'
+import { useLiveTranscription } from '@/hooks/useLiveTranscription'
+
+function generateId() {
+    return Math.random().toString(36).substring(2, 11)
+}
+
+interface GridSnapshot {
+    hubPrice: number | null
+    reserves: number | null
+    frequency: number | null
+    scarcityProb: string | null
+}
+
+export function WarRoomOverlay() {
+    const { isOpen, close, addSignal, isTranscribing, liveTranscript } = useWarRoomStore()
+    const { isActive: isCallActive, status: callStatus, metadata: callMeta } = useCallStore()
+    const { data: fourCP } = useFourCPForecast()
+    const router = useRouter()
+    const [gridSnapshot, setGridSnapshot] = useState<GridSnapshot | null>(null)
+    const [prevReserves, setPrevReserves] = useState<number | null>(null)
+    const [currentTime, setCurrentTime] = useState(new Date())
+    const [prevCallActive, setPrevCallActive] = useState(false)
+    const lastPriceAlertRef = useRef<number>(0)
+    const lastBattleStationsRef = useRef(false)
+
+    // Initialize Live Transcription ONLY when a call is active AND the War Room is open
+    useLiveTranscription(isCallActive && isOpen, callMeta?.accountId)
+
+    const isBattleStations = (fourCP?.riskLevel === 'BATTLE_STATIONS' || fourCP?.riskLevel === 'CRITICAL') && fourCP?.isPeakSeason
+
+    // Keyboard: Esc closes
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        if (e.key === 'Escape' && isOpen) close()
+    }, [isOpen, close])
+
+    useEffect(() => {
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [handleKeyDown])
+
+    // Clock only ticks when the overlay is open
+    useEffect(() => {
+        if (!isOpen) return
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [isOpen])
+
+    useEffect(() => {
+        if (isCallActive && !prevCallActive) {
+            addSignal({
+                id: generateId(),
+                time: new Date(),
+                type: 'CALL',
+                message: `Live Call initiated: ${callMeta?.name || 'Unknown'} — ${callStatus}`,
+            })
+        }
+        setPrevCallActive(isCallActive)
+    }, [isCallActive, prevCallActive, callMeta?.name, callStatus, addSignal])
+
+    // Lock body scroll when open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden'
+        } else {
+            document.body.style.overflow = ''
+        }
+        return () => { document.body.style.overflow = '' }
+    }, [isOpen])
+
+    // Receive grid updates from GridStrip and generate market signal events
+    const handleGridUpdate = useCallback((data: GridSnapshot & { timestamp?: string | null }) => {
+        setGridSnapshot(data)
+
+        // Fire a signal when reserves cross threshold
+        if (data.reserves !== null && prevReserves !== null) {
+            if (prevReserves >= 3000 && data.reserves < 3000) {
+                addSignal({
+                    id: generateId(),
+                    time: new Date(),
+                    type: 'MARKET',
+                    message: `ERCOT reserves breached 3,000 MW floor — ${data.reserves.toLocaleString()} MW`,
+                })
+            } else if (prevReserves >= 4000 && data.reserves < 4000) {
+                addSignal({
+                    id: generateId(),
+                    time: new Date(),
+                    type: 'MARKET',
+                    message: `ERCOT reserves tightening — ${data.reserves.toLocaleString()} MW`,
+                })
+            }
+        }
+
+        // Fire when price spikes significantly — 60s cooldown to prevent flooding
+        if (data.hubPrice !== null && data.hubPrice > 200) {
+            const now = Date.now()
+            if (now - lastPriceAlertRef.current > 60_000) {
+                addSignal({
+                    id: generateId(),
+                    time: new Date(),
+                    type: 'MARKET',
+                    message: `RT Hub price elevated: $${data.hubPrice.toFixed(2)}/MWh — scarcity adder active`,
+                })
+                lastPriceAlertRef.current = now
+            }
+        }
+
+        setPrevReserves(data.reserves)
+    }, [prevReserves, addSignal])
+
+    const handleAccountOpen = useCallback((accountId: string) => {
+        router.push(`/network/accounts/${accountId}`)
+        close()
+    }, [router, close])
+
+    const handleQuickCall = useCallback((accountId: string) => {
+        router.push(`/network/accounts/${accountId}`)
+        close()
+    }, [router, close])
+
+    const reservesTight = (gridSnapshot?.reserves ?? Infinity) < 4000
+
+    // Auto-inject signal when Battle Stations mode activates
+    useEffect(() => {
+        if (isBattleStations && !lastBattleStationsRef.current) {
+            addSignal({
+                id: generateId(),
+                time: new Date(),
+                type: 'MARKET',
+                message: `⚡ BATTLE STATIONS — 4CP probability at ${fourCP?.probability ?? ''}%. Call 4CP-exposed accounts now.`,
+            })
+        }
+        lastBattleStationsRef.current = !!isBattleStations
+    }, [isBattleStations, fourCP?.probability, addSignal])
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    {/* Backdrop */}
+                    <motion.div
+                        key="war-room-backdrop"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-[99] bg-black/70 backdrop-blur-sm"
+                        onClick={close}
+                    />
+
+                    {/* War Room panel */}
+                    <motion.div
+                        key="war-room-panel"
+                        initial={{ opacity: 0, scale: 0.98, y: 12 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.98, y: 8 }}
+                        transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                        className={cn(
+                            'fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]',
+                            isBattleStations
+                                ? 'border border-zinc-100/50 shadow-[0_30px_80px_rgba(0,0,0,0.8),0_0_40px_rgba(255,255,255,0.06)]'
+                                : 'border border-white/10'
+                        )}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 shrink-0">
+                            <div className="flex items-center gap-3">
+                                <Shield className={cn(
+                                    'w-4 h-4 transition-colors',
+                                    isBattleStations ? 'text-amber-400' : reservesTight ? 'text-zinc-100' : 'text-zinc-600'
+                                )} />
+                                <span className="text-xs font-mono text-zinc-300 uppercase tracking-[0.3em]">
+                                    Forensic War Room
+                                </span>
+                                {isBattleStations && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: -4 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10"
+                                    >
+                                        <Zap size={10} className="text-amber-400" />
+                                        <span className="text-[9px] font-mono uppercase tracking-widest text-amber-400">
+                                            BATTLE_STATIONS · {fourCP?.probability}%
+                                        </span>
+                                    </motion.div>
+                                )}
+                                <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+                                    Ctrl+Shift+W
+                                </span>
+                            </div>
+
+                            {/* Alert badge */}
+                            <AnimatePresence>
+                                {reservesTight && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 0.8 }}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/20 bg-white/5"
+                                    >
+                                        <motion.div
+                                            animate={{ opacity: [1, 0.4, 1] }}
+                                            transition={{ repeat: Infinity, duration: 1.5 }}
+                                            className="w-1.5 h-1.5 rounded-full bg-white"
+                                        />
+                                        <span className="text-[10px] font-mono text-zinc-100 uppercase tracking-widest font-bold">
+                                            Grid Alert Active
+                                        </span>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Live Call Badge */}
+                            <AnimatePresence>
+                                {isCallActive && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10 }}
+                                        className="flex items-center gap-2 px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 shadow-[0_0_15px_rgba(244,63,94,0.2)] ml-4"
+                                    >
+                                        <div className="relative">
+                                            <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute inset-0" />
+                                            <div className="w-2 h-2 rounded-full bg-rose-500 relative" />
+                                        </div>
+                                        <span className="text-[10px] font-mono text-rose-500 tabular-nums uppercase tracking-widest font-bold">
+                                            Live Call: {callStatus}
+                                        </span>
+                                        {callMeta?.name && (
+                                            <>
+                                                <span className="text-zinc-700 text-[10px]">/</span>
+                                                <span className="text-[10px] font-mono text-zinc-300 truncate max-w-[120px]">
+                                                    {callMeta.name}
+                                                </span>
+                                            </>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            <ForensicClose onClick={close} size={20} title="Close (Esc)" />
+                        </div>
+
+                        {/* Station I: Grid Strip */}
+                        <GridStrip onGridUpdate={handleGridUpdate} />
+
+                        {/* Stations II + III */}
+                        <div className="flex flex-1 overflow-hidden">
+                            {/* Station II: Priority Stack — 65% width */}
+                            <div className="flex-[65] overflow-hidden border-r border-white/5">
+                                <PriorityStack
+                                    gridSnapshot={gridSnapshot}
+                                    activeAccountId={callMeta?.accountId}
+                                    onAccountOpen={handleAccountOpen}
+                                    onQuickCall={handleQuickCall}
+                                />
+                            </div>
+
+                            {/* Station III: Signal Feed — 35% width */}
+                            <div className="flex-[35] flex flex-col overflow-hidden">
+                                <SignalFeed />
+
+                                {/* Live Monitor Section */}
+                                <AnimatePresence>
+                                    {isTranscribing && (
+                                        <motion.div
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            exit={{ y: 20, opacity: 0 }}
+                                            className="px-5 py-4 border-t border-white/5 bg-zinc-950/60 backdrop-blur-md"
+                                        >
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex gap-0.5">
+                                                    {[1, 2, 3].map((i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            animate={{ height: [4, 12, 4] }}
+                                                            transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
+                                                            className="w-0.5 bg-zinc-100"
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                                                    Live Monitor
+                                                </span>
+                                            </div>
+                                            <div className="min-h-[3rem]">
+                                                <p className="text-xs font-mono text-zinc-100 leading-relaxed">
+                                                    {liveTranscript || <span className="text-zinc-700 italic">Listening for live cues...</span>}
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between px-5 py-2 border-t border-white/5 shrink-0 bg-black/40">
+                            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                Nodal Point · Forensic Terminal v1.0
+                            </span>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                    {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                </span>
+                                <span className="text-[10px] font-mono text-zinc-100 tabular-nums font-bold">
+                                    {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'America/Chicago' })} CST
+                                </span>
+                            </div>
+                        </div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
+    )
+}

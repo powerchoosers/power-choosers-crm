@@ -1,0 +1,1193 @@
+'use client'
+
+import { AnimatedCount } from '@/components/ui/AnimatedCount'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  ColumnDef,
+  SortingState,
+  PaginationState,
+  RowSelectionState,
+} from '@tanstack/react-table'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowUpDown, Clock, Plus, MoreHorizontal, Check, Radar, Users, Building2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { motion, AnimatePresence } from 'framer-motion'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
+import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
+import { useAccounts, useAccountsCount, useDeleteAccounts, Account } from '@/hooks/useAccounts'
+import { useTarget } from '@/hooks/useTargets'
+import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
+import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { usePersistentColumnFilters } from '@/hooks/usePersistentColumnFilters'
+import { useDebounce } from '@/hooks/useDebounce'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { OwnerBadge } from '@/components/ui/OwnerBadge'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
+import { useContactLastTouch, useAccountLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
+import FilterCommandDeck from '@/components/network/FilterCommandDeck'
+import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
+import Link from 'next/link'
+import { DraggableTableHeader } from '@/components/network/DraggableTableHeader'
+import { useTableColumnOrder } from '@/hooks/useTableColumnOrder'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
+import { useComposeStore } from '@/store/composeStore'
+import { useUIStore } from '@/store/uiStore'
+import { buildPowerDialTargets } from '@/lib/powerDialer'
+import { usePowerDialerStore } from '@/store/powerDialerStore'
+import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStatusToken } from '@/lib/status-filters'
+import { ForensicPagination } from '@/components/ui/ForensicPagination'
+
+const PAGE_SIZE = 50
+const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
+const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as const
+
+function getFrozenNameCellClass(isSelected: boolean) {
+  return cn(
+    "sticky left-12 z-20 relative backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40 shadow-[22px_0_34px_-26px_rgba(0,0,0,0.95)] border-r border-white/5 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-5 after:w-5 after:bg-gradient-to-r after:from-black/75 after:to-transparent",
+    isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/50 group-hover:bg-white/[0.04]"
+  )
+}
+
+function getFrozenSelectCellClass() {
+  return cn(
+    "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40"
+  )
+}
+
+export default function TargetDetailPage() {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { id } = useParams() as { id: string }
+  const [isMounted, setIsMounted] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [columnFilters, setColumnFilters, columnFilterSignature] = usePersistentColumnFilters(pathname ?? `/network/targets/${id}`)
+  const [globalFilter, setGlobalFilter] = useState('')
+
+  // Use state-preserving table state (must be before useTableScrollRestore so pageIndex is defined)
+  const {
+    pageIndex,
+    pageSize,
+    searchQuery,
+    setPage,
+    setSearch,
+  } = useTableState({
+    pageSize: PAGE_SIZE
+  })
+
+  const baseScrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  const scrollKey = columnFilterSignature ? `${baseScrollKey}#filters=${columnFilterSignature}` : baseScrollKey
+
+  // Sync the local globalFilter state with the URL search query if needed
+  useEffect(() => {
+    if (searchQuery !== globalFilter) {
+      setGlobalFilter(searchQuery)
+    }
+  }, [searchQuery])
+
+  // Sync the search back to the URL search query
+  const debouncedSearch = useDebounce(globalFilter, 300)
+  useEffect(() => {
+    setSearch(debouncedSearch)
+  }, [debouncedSearch, setSearch])
+
+  const { data: target, isLoading: targetLoading } = useTarget(id)
+  const { getOwner, isLoading: ownerDirectoryLoading } = useOwnerDirectory()
+
+  const isPeopleList = target?.kind === 'people' || target?.kind === 'person' || target?.kind === 'contact' || target?.kind === 'contacts'
+  const isAccountList = target?.kind === 'account' || target?.kind === 'accounts' || target?.kind === 'company' || target?.kind === 'companies'
+
+  const filters = useMemo(() => {
+    return {
+      industry: (columnFilters.find(f => f.id === 'industry')?.value as string[]) || [],
+      status: (columnFilters.find(f => f.id === 'status')?.value as string[]) || [],
+      location: (columnFilters.find(f => f.id === 'location')?.value as string[]) || [],
+      title: (columnFilters.find(f => f.id === 'title')?.value as string[]) || [],
+    };
+  }, [columnFilters]);
+
+  const contactQuery = useContacts(
+    searchQuery,
+    filters,
+    isPeopleList ? id : undefined,
+    isPeopleList && !!target
+  )
+  const contactCount = useContactsCount(searchQuery, filters, isPeopleList ? id : undefined, isPeopleList && !!target)
+
+  const accountQuery = useAccounts(
+    searchQuery,
+    filters,
+    isAccountList ? id : undefined,
+    isAccountList && !!target
+  )
+  const accountCount = useAccountsCount(searchQuery, filters, isAccountList ? id : undefined, isAccountList && !!target)
+
+  const { mutateAsync: deleteContacts } = useDeleteContacts()
+  const { mutateAsync: deleteAccounts } = useDeleteAccounts()
+
+  const query = isPeopleList ? contactQuery : accountQuery
+  const data = useMemo(() => {
+    if (isPeopleList) return contactQuery.data?.pages.flatMap(page => page.contacts) || []
+    if (isAccountList) return accountQuery.data?.pages.flatMap(page => page.accounts) || []
+    return []
+  }, [isPeopleList, isAccountList, contactQuery.data, accountQuery.data])
+
+  const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
+  const pageCount = Math.ceil(totalRecords / pageSize)
+  const openPowerDialer = usePowerDialerStore((state) => state.openPowerDialer)
+
+  // Entity IDs for the last-touch hooks
+  const contactIds = useMemo(() =>
+    isPeopleList ? (data as Contact[]).map(c => c.id) : [], [isPeopleList, data]
+  )
+  const entityAccountIds = useMemo(() =>
+    isAccountList ? (data as Account[]).map(a => a.id) : [], [isAccountList, data]
+  )
+  const { data: contactLastTouchMap, isLoading: contactTouchLoading } = useContactLastTouch(contactIds)
+  const { data: accountLastTouchMap, isLoading: accountTouchLoading } = useAccountLastTouch(entityAccountIds)
+
+  // Fetch next page when table state changes
+  useEffect(() => {
+    if (pageIndex > 0 && query.hasNextPage && data.length < (pageIndex + 1) * pageSize) {
+      query.fetchNextPage()
+    }
+  }, [pageIndex, query.hasNextPage, query.fetchNextPage, data.length, pageSize])
+
+  const isLoading = targetLoading || (isPeopleList ? contactQuery.isLoading : isAccountList ? accountQuery.isLoading : false) || !isMounted
+  const isError = isPeopleList ? contactQuery.isError : isAccountList ? accountQuery.isError : false
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
+
+  const initialPeopleOrder = useMemo(() => [
+    'select', 'name', 'title', 'company', 'owner', 'industry', 'location', 'phone', 'status', 'actions'
+  ], [])
+
+  const initialAccountOrder = useMemo(() => [
+    'select', 'name', 'industry', 'location', 'owner', 'companyPhone', 'employees', 'contractEnd', 'updated', 'status', 'actions'
+  ], [])
+
+  const [peopleColumnOrder, setPeopleColumnOrder] = useTableColumnOrder('targets_people', initialPeopleOrder)
+  const [accountColumnOrder, setAccountColumnOrder] = useTableColumnOrder('targets_accounts', initialAccountOrder)
+
+  const columnOrder = isPeopleList ? peopleColumnOrder : accountColumnOrder
+  const setColumnOrder = isPeopleList ? setPeopleColumnOrder : setAccountColumnOrder
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string)
+        const newIndex = items.indexOf(over.id as string)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
+
+  const handleFilterChange = (columnId: string, value: any) => {
+    setColumnFilters(prev => {
+      const existing = prev.find(f => f.id === columnId)
+      if (existing) {
+        if (value === undefined) return prev.filter(f => f.id !== columnId)
+        return prev.map(f => f.id === columnId ? { ...f, value } : f)
+      }
+      if (value === undefined) return prev
+      return [...prev, { id: columnId, value }]
+    })
+    setPage(0)
+  }
+
+  const selectedCount = Object.keys(rowSelection).length
+  const pendingSelectCountRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const targetCount = pendingSelectCountRef.current
+    if (targetCount == null) return
+    if (data.length < targetCount) return
+
+    pendingSelectCountRef.current = null
+    const newSelection: RowSelectionState = {}
+    data.slice(0, targetCount).forEach((row: any) => {
+      newSelection[row.id] = true
+    })
+    setRowSelection(newSelection)
+  }, [data])
+
+  const handleSelectCount = async (count: number) => {
+    const normalizedCount = Math.max(0, Math.min(count, totalRecords || count))
+
+    if (normalizedCount > data.length && query.hasNextPage && !query.isFetchingNextPage) {
+      pendingSelectCountRef.current = normalizedCount
+      const pagesToFetch = Math.ceil((normalizedCount - data.length) / pageSize)
+      for (let i = 0; i < pagesToFetch; i++) {
+        await query.fetchNextPage()
+      }
+      return
+    }
+
+    const newSelection: RowSelectionState = {}
+    data.slice(0, normalizedCount).forEach((row: any) => {
+      newSelection[row.id] = true
+    })
+    setRowSelection(newSelection)
+  }
+
+  const selectedEntities = useMemo(() => {
+    const selectedIds = new Set(Object.keys(rowSelection))
+    return data.filter((row: any) => selectedIds.has(row.id))
+  }, [data, rowSelection])
+
+  const queryClient = useQueryClient()
+  const openCompose = useComposeStore((state) => state.openCompose)
+  const { setRightPanelMode, setTaskContext, setIngestionContext } = useUIStore()
+  const handlePowerDial = () => {
+    if (!isPeopleList) return
+
+    const selectedContacts = selectedEntities as Contact[]
+    const dialTargets = buildPowerDialTargets(selectedContacts)
+    const skipped = Math.max(0, selectedContacts.length - dialTargets.length)
+
+    if (dialTargets.length === 0) {
+      toast.error('No dialable contacts found', {
+        description: 'The selected contacts do not have usable phone numbers.',
+      })
+      return
+    }
+
+    if (skipped > 0) {
+      toast.info(`${skipped} contact${skipped === 1 ? '' : 's'} skipped`, {
+        description: 'Those records do not have a dialable phone number.',
+      })
+    }
+
+    openPowerDialer({
+      contacts: selectedContacts,
+      selectedCount: selectedContacts.length,
+      sourceLabel: target?.name || id,
+    })
+  }
+
+  const handleBulkAction = async (action: string) => {
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+    } else {
+      console.log(`Executing ${action} for ${selectedCount} ${isPeopleList ? 'contacts' : 'accounts'}`)
+      // Implement other actions as needed
+    }
+  }
+
+  const handleConfirmPurge = async () => {
+    // With getRowId: (row) => row.id, rowSelection keys are entity IDs, not indices
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
+
+    if (selectedIds.length > 0) {
+      if (isPeopleList) {
+        await deleteContacts(selectedIds)
+      } else {
+        await deleteAccounts(selectedIds)
+      }
+      setRowSelection({})
+      setIsDestructModalOpen(false)
+    }
+  }
+
+  // Column definitions for People
+  const peopleColumns = useMemo<ColumnDef<Contact>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <button
+            onClick={table.getToggleAllPageRowsSelectedHandler()}
+            className={cn(
+              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+            )}
+          >
+            {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
+          </button>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const index = row.index + 1 + pageIndex * pageSize
+        const isSelected = row.getIsSelected()
+        return (
+          <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
+            <span className={cn(
+              "font-mono text-[10px] text-zinc-700 transition-opacity",
+              isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+            )}>
+              {index.toString().padStart(2, '0')}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                row.toggleSelected()
+              }}
+              className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+            >
+              <div className={cn(
+                "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                isSelected
+                  ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+              )}>
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
+            </button>
+          </div>
+        )
+      }
+    },
+    {
+      accessorKey: 'name',
+      header: () => (
+        <span className="flex items-center gap-2 text-sm font-medium">
+          Name
+          <span
+            className="flex items-center gap-0.5"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+          </span>
+        </span>
+      ),
+      cell: ({ row, table }) => {
+        const contact = row.original
+        const meta = table.options.meta as any
+        const contactLastTouchMap = meta?.contactLastTouchMap
+        const contactTouchLoading = meta?.contactTouchLoading
+
+        // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
+        // (enabled:false gives isLoading=false but data=undefined — this guard catches both)
+        const healthScore = (contactTouchLoading || contactLastTouchMap === undefined)
+          ? undefined
+          : computeHealthScore(contactLastTouchMap.get(contact.id))
+
+        return (
+          <Link
+            href={`/network/contacts/${contact.id}`}
+            className="flex items-center gap-3 group/person whitespace-nowrap"
+            onClick={(e) => {
+              e.stopPropagation()
+              saveScroll()
+            }}
+          >
+            <ContactAvatar
+              name={contact.name}
+              photoUrl={contact.avatarUrl}
+              size={36}
+              className="w-9 h-9 transition-all"
+              textClassName="text-[10px]"
+              healthScore={healthScore}
+              healthLoading={contactTouchLoading || contactLastTouchMap === undefined}
+            />
+            <div>
+              <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
+                {contact.name}
+              </div>
+              <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
+            </div>
+          </Link>
+        )
+      }
+    },
+    {
+      accessorKey: 'title',
+      header: 'Title',
+      filterFn: () => true, // Server-side filtered
+      cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('title')}</div>,
+    },
+      {
+        accessorKey: 'company',
+        header: 'Company',
+        cell: ({ row }) => {
+        const contact = row.original
+        return (
+          <Link
+            href={`/network/accounts/${contact.accountId}`}
+            className="flex items-start gap-2 group/acc"
+            onClick={(e) => { e.stopPropagation(); saveScroll(); }}
+          >
+            <CompanyIcon
+              logoUrl={contact.logoUrl}
+              domain={contact.companyDomain}
+              name={contact.company}
+              size={36}
+              className="w-8 h-8"
+            />
+            <div className="flex min-w-0 flex-col">
+              <div className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+                {contact.company || 'Unknown Company'}
+              </div>
+              <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
+                {contact.accountLocation || 'Unknown location'}
+              </div>
+            </div>
+          </Link>
+        )
+      }
+    },
+      {
+      id: 'owner',
+      header: 'Owner',
+      cell: ({ row }) => {
+        const owner = getOwner(row.original.ownerId)
+        return (
+          <div className="flex items-center min-w-0">
+            <OwnerBadge owner={owner} loading={ownerDirectoryLoading} />
+          </div>
+        )
+      }
+    },
+    {
+      accessorKey: 'industry',
+      header: 'Industry',
+      filterFn: () => true, // Server-side filtered
+      cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('industry')}</div>,
+    },
+    {
+      accessorKey: 'location',
+      header: 'Location',
+      filterFn: () => true, // Server-side filtered
+      cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('location')}</div>,
+    },
+    {
+      accessorKey: 'phone',
+      header: 'Phone',
+      cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('phone')}</div>,
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      filterFn: () => true, // Server-side filtered
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string
+        const normalizedStatus = normalizeStatusToken(status)
+        const isCustomer = normalizedStatus === 'CUSTOMER'
+        const isLead = normalizedStatus === 'LEAD'
+        return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isCustomer ? "bg-emerald-500 animate-pulse" : isLead ? "bg-[#002FA7]" : "bg-zinc-600"
+            )} />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{status}</span>
+          </div>
+        )
+      }
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const contact = row.original
+        const hasDialablePhone = buildPowerDialTargets([contact]).length > 0
+        return (
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            <ClickToCallButton
+              phoneNumber={contact.phone}
+              name={contact.name}
+              photoUrl={contact.avatarUrl}
+              account={contact.company}
+              logoUrl={contact.logoUrl}
+              className="h-8 w-8"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+                  aria-label="More actions"
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!contact.email}
+                  onClick={() => {
+                    if (!contact.email) return
+                    openCompose({
+                      to: contact.email,
+                      subject: '',
+                      context: {
+                        contactId: contact.id,
+                        contactName: contact.name,
+                        contactTitle: contact.title || undefined,
+                        companyName: contact.company || undefined,
+                        accountId: contact.accountId || undefined,
+                        accountName: contact.company || undefined,
+                        industry: contact.industry || undefined,
+                        contextForAi: (contact.metadata as { notes?: string } | null | undefined)?.notes?.trim() || undefined,
+                      }
+                    })
+                  }}
+                >
+                  Send Email
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setTaskContext({
+                      entityId: contact.id,
+                      entityName: contact.name,
+                      entityType: 'contact',
+                      entityPhotoUrl: contact.avatarUrl || undefined,
+                      entityLogoUrl: contact.logoUrl || undefined,
+                      entityDomain: contact.companyDomain || undefined,
+                      contactId: contact.id,
+                      accountId: contact.accountId || undefined,
+                    })
+                    setRightPanelMode('CREATE_TASK')
+                  }}
+                >
+                  Add Task
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!hasDialablePhone}
+                  onClick={() => {
+                    if (!hasDialablePhone) return
+                    openPowerDialer({
+                      contacts: [contact],
+                      selectedCount: 1,
+                      sourceLabel: id,
+                    })
+                  }}
+                >
+                  Add to Power Dialer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('list_members')
+                      .delete()
+                      .eq('listId', id)
+                      .eq('targetId', contact.id)
+                      .in('targetType', [...CONTACT_TARGET_TYPES])
+
+                    if (error) {
+                      console.error('Error removing contact from target:', error)
+                      toast.error('Failed to remove contact from target')
+                      return
+                    }
+
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+                      queryClient.invalidateQueries({ queryKey: ['contacts-count'] }),
+                      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['targets'] }),
+                      queryClient.invalidateQueries({ queryKey: ['target', id] }),
+                    ])
+
+                    toast.success('Contact removed from target')
+                  }}
+                >
+                  Remove from Target
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      }
+    }
+  ], [pageIndex, pageSize, isPeopleList, getOwner, id, openCompose, openPowerDialer, queryClient, setRightPanelMode, setTaskContext])
+
+  // Column definitions for Accounts
+  const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center px-2">
+          <button
+            onClick={table.getToggleAllPageRowsSelectedHandler()}
+            className={cn(
+              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+            )}
+          >
+            {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
+          </button>
+        </div>
+      ),
+      cell: ({ row }) => {
+        const index = row.index + 1 + pageIndex * pageSize
+        const isSelected = row.getIsSelected()
+        return (
+          <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
+            <span className={cn(
+              "font-mono text-[10px] text-zinc-700 transition-opacity",
+              isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+            )}>
+              {index.toString().padStart(2, '0')}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                row.toggleSelected()
+              }}
+              className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+            >
+              <div className={cn(
+                "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                isSelected
+                  ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                  : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+              )}>
+                {isSelected && <Check className="w-3 h-3 text-white" />}
+              </div>
+            </button>
+          </div>
+        )
+      }
+    },
+    {
+      accessorKey: 'name',
+      header: () => (
+        <span className="flex items-center gap-2 text-sm font-medium">
+          Account Name
+          <span
+            className="flex items-center gap-0.5"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last call or email"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+          </span>
+        </span>
+      ),
+      cell: ({ row, table }) => {
+        const account = row.original
+        const meta = table.options.meta as any
+        const accountLastTouchMap = meta?.accountLastTouchMap
+        const accountTouchLoading = meta?.accountTouchLoading
+
+        // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
+        const healthScore = (accountTouchLoading || accountLastTouchMap === undefined)
+          ? undefined
+          : computeHealthScore(accountLastTouchMap.get(account.id))
+
+        return (
+          <Link
+            href={`/network/accounts/${account.id}`}
+            className="flex items-center gap-3 group/acc whitespace-nowrap"
+            onClick={(e) => { e.stopPropagation(); saveScroll(); }}
+          >
+            <CompanyIcon
+              logoUrl={account.logoUrl}
+              domain={account.domain}
+              name={account.name}
+              size={36}
+              className="w-9 h-9"
+              healthScore={healthScore}
+              healthLoading={accountTouchLoading || accountLastTouchMap === undefined}
+            />
+            <div>
+              <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+                {account.name}
+              </div>
+              {account.domain && <div className="text-[10px] font-mono text-zinc-500 uppercase">{account.domain}</div>}
+            </div>
+          </Link>
+        )
+      }
+    },
+    {
+      accessorKey: 'industry',
+      header: 'Industry',
+      filterFn: () => true, // Server-side filtered
+      cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('industry')}</div>,
+    },
+      {
+        accessorKey: 'location',
+        header: 'Location',
+        filterFn: () => true, // Server-side filtered
+        cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('location')}</div>,
+      },
+      {
+        id: 'owner',
+        header: 'Owner',
+        cell: ({ row }) => {
+          const owner = getOwner(row.original.ownerId)
+          return (
+            <div className="flex items-center min-w-0">
+              <OwnerBadge owner={owner} loading={ownerDirectoryLoading} />
+            </div>
+          )
+        }
+      },
+      {
+        accessorKey: 'companyPhone',
+        header: 'Phone',
+        cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('companyPhone')}</div>,
+    },
+      {
+        accessorKey: 'employees',
+        header: 'Headcount',
+        cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('employees')}</div>,
+      },
+      {
+        accessorKey: 'contractEnd',
+        header: 'Contract End',
+        cell: ({ row }) => {
+          const dateStr = row.getValue('contractEnd') as string
+          if (!dateStr) return <span className="text-zinc-600 font-mono text-xs">--</span>
+
+          try {
+            const date = new Date(dateStr)
+            const threeMonthsAgo = subMonths(new Date(), 3)
+            const isRecent = isAfter(date, threeMonthsAgo)
+
+            return (
+              <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums whitespace-nowrap">
+                <Clock size={12} className="text-zinc-600" />
+                <span>
+                  {isRecent
+                    ? formatDistanceToNow(date, { addSuffix: true })
+                    : format(date, 'MMM d, yyyy')}
+                </span>
+              </div>
+            )
+          } catch (e) {
+            return <span className="text-zinc-600 font-mono text-xs">{dateStr}</span>
+          }
+        },
+      },
+      {
+        accessorKey: 'updated',
+        header: 'Last Update',
+        cell: ({ row }) => {
+          const val = row.original.updated
+          if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
+
+          try {
+            const date = new Date(val)
+            const threeMonthsAgo = subMonths(new Date(), 3)
+            const isRecent = isAfter(date, threeMonthsAgo)
+
+            return (
+              <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums whitespace-nowrap">
+                <div className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  isRecent ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : "bg-zinc-600"
+                )} />
+                <span>
+                  {isRecent
+                    ? formatDistanceToNow(date, { addSuffix: true })
+                    : format(date, 'MMM d, yyyy')}
+                </span>
+              </div>
+            )
+          } catch (e) {
+            return <span className="text-zinc-600 font-mono text-xs">{val}</span>
+          }
+        },
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        filterFn: () => true, // Server-side filtered
+        cell: ({ row }) => {
+          const account = row.original
+          const isExpired = isContractExpired(account.contractEnd)
+          const isCustomer = isCustomerStatus(account.status)
+          const isActiveLoad = isActiveLoadAccount(account)
+          const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'
+          const isActive = isCustomer || isActiveLoad
+          return (
+          <div className="flex items-center gap-2">
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isActive ? "bg-emerald-500 animate-pulse" : isExpired ? "bg-red-500" : "bg-zinc-600"
+            )} />
+            <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{displayStatus}</span>
+          </div>
+        )
+      }
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const account = row.original
+        const hasMainNumber = Boolean(account.companyPhone?.trim())
+        return (
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            <ClickToCallButton
+              phoneNumber={account.companyPhone}
+              account={account.name}
+              logoUrl={account.logoUrl}
+              isCompany={true}
+              className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+                  aria-label="More actions"
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setIngestionContext({
+                      accountId: account.id,
+                      accountName: account.name,
+                      accountLogoUrl: account.logoUrl,
+                      accountDomain: account.domain,
+                    })
+                    setRightPanelMode('INGEST_CONTACT')
+                  }}
+                >
+                  Add Contact
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setTaskContext({
+                      entityId: account.id,
+                      entityName: account.name,
+                      entityType: 'account',
+                      entityLogoUrl: account.logoUrl || undefined,
+                      entityDomain: account.domain || undefined,
+                      accountId: account.id,
+                    })
+                    setRightPanelMode('CREATE_TASK')
+                  }}
+                >
+                  Add Task
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!hasMainNumber}
+                  onClick={async () => {
+                    if (!hasMainNumber) return
+                    try {
+                      await navigator.clipboard.writeText(account.companyPhone.trim())
+                      toast.success('Main number copied')
+                    } catch (error) {
+                      console.error('Failed to copy main number:', error)
+                      toast.error('Failed to copy main number')
+                    }
+                  }}
+                >
+                  Copy Main Number
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('list_members')
+                      .delete()
+                      .eq('listId', id)
+                      .eq('targetId', account.id)
+                      .in('targetType', [...ACCOUNT_TARGET_TYPES])
+
+                    if (error) {
+                      console.error('Error removing account from target:', error)
+                      toast.error('Failed to remove account from target')
+                      return
+                    }
+
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+                      queryClient.invalidateQueries({ queryKey: ['accounts-count'] }),
+                      queryClient.invalidateQueries({ queryKey: ['account-list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['targets'] }),
+                      queryClient.invalidateQueries({ queryKey: ['target', id] }),
+                    ])
+
+                    toast.success('Account removed from target')
+                  }}
+                >
+                  Remove from Target
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      }
+    }
+  ], [pageIndex, pageSize, router, getOwner, id, queryClient, setIngestionContext, setRightPanelMode, setTaskContext])
+
+  const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
+
+  const table = useReactTable({
+    data,
+    columns: tableColumns as ColumnDef<any>[],
+    meta: {
+      contactLastTouchMap,
+      contactTouchLoading,
+      accountLastTouchMap,
+      accountTouchLoading
+    },
+    onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
+    manualPagination: false,
+    pageCount,
+    getRowId: (row: any) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    state: {
+      pagination: {
+        pageIndex,
+        pageSize
+      },
+      rowSelection,
+      columnOrder,
+    }
+  })
+
+  const filteredRowCount = totalRecords || data.length
+  // Show loading when we're on a page that needs more data and we have no rows yet (avoids "No results" flash)
+  const needsMoreDataForPage = data.length < (pageIndex + 1) * pageSize
+  const currentPageRowCount = Math.max(0, Math.min(data.length - pageIndex * pageSize, pageSize))
+  const showTableLoading =
+    isLoading || (currentPageRowCount === 0 && needsMoreDataForPage && query.hasNextPage)
+
+  const showingStart = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, pageIndex * pageSize + 1)
+  const showingEnd = filteredRowCount === 0
+    ? 0
+    : Math.min(filteredRowCount, (pageIndex + 1) * pageSize)
+
+  if (isError) {
+    return (
+      <div className="h-full flex items-center justify-center text-red-500 font-mono text-xs uppercase tracking-widest">
+        Error loading target array data.
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
+
+      <CollapsiblePageHeader
+        backHref="/network/targets"
+        title={
+          <div className="flex items-center gap-3">
+            <h1 className="text-4xl font-semibold tracking-tighter text-white uppercase">
+              {targetLoading ? 'Loading...' : target?.name}
+            </h1>
+            <Badge className="bg-white/5 text-zinc-500 border-white/10 uppercase font-mono text-[10px] tracking-widest">
+              {isPeopleList ? 'Human_Intel' : 'Asset_Intel'}
+            </Badge>
+          </div>
+        }
+        description={
+          <p className="text-zinc-500 mt-1">
+            Target Array Cluster: {target?.id?.slice(0, 8)}
+          </p>
+        }
+        globalFilter={globalFilter}
+        onSearchChange={(value) => {
+          setGlobalFilter(value)
+          setPage(0)
+        }}
+        onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
+        isFilterActive={isFilterOpen || columnFilters.length > 0}
+        primaryAction={{
+          label: "Initialize Node",
+          onClick: () => {
+            setRightPanelMode('TARGET_SEARCH')
+            setIngestionContext({
+              listId: id,
+              listName: target?.name || 'Target',
+              listKind: target?.kind || (isPeopleList ? 'people' : 'account')
+            })
+          },
+          icon: <Plus size={18} />
+        }}
+      />
+
+      <FilterCommandDeck
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        type={isPeopleList ? 'people' : 'account'}
+        columnFilters={columnFilters}
+        onFilterChange={handleFilterChange}
+      />
+
+      {/* DATA CONTAINER */}
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
+
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+          <Table>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    <SortableContext
+                      items={columnOrder}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <DraggableTableHeader key={header.id} header={header} />
+                      ))}
+                    </SortableContext>
+                  </TableRow>
+                ))}
+              </TableHeader>
+            </DndContext>
+            <TableBody>
+              {showTableLoading ? (
+                <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} variant="target" />
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() ? 'selected' : undefined}
+                    onClick={(e) => {
+                      // Don't trigger row click if clicking a link or button
+                      if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
+                        return;
+                      }
+                      saveScroll()
+                      router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
+                    }}
+                  className={cn(
+                    "cursor-pointer border-b border-white/5 border-l-2 transition-colors",
+                    row.getIsSelected()
+                      ? "border-l-[#002FA7] bg-[#002FA7]/8 hover:bg-[#002FA7]/10"
+                      : "border-l-transparent hover:bg-white/[0.03]"
+                  )}
+                >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell
+                        key={cell.id}
+                        className={cn(
+                          "py-3",
+                          cell.column.id === 'select' && getFrozenSelectCellClass(),
+                          cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
+                        )}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={tableColumns.length} className="h-32 text-center align-middle">
+                    <div className="flex flex-col items-center justify-center gap-2 text-zinc-500">
+                      <div className="text-sm font-medium">No results found</div>
+                      <div className="text-xs font-mono uppercase tracking-widest opacity-50">Sync_Block_Empty</div>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* SYNC_BLOCK FOOTER */}
+        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+              <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
+              <div className="h-1 w-1 rounded-full bg-black/40" />
+              <span className="text-zinc-500">Total_Nodes: <AnimatedCount value={totalRecords || data.length} className="text-zinc-400 tabular-nums" /></span>
+            </div>
+          </div>
+          <ForensicPagination
+            currentPage={pageIndex + 1}
+            totalPages={pageCount}
+            onPageChange={(page) => setPage(page - 1)}
+            hasNextPage={query.hasNextPage}
+            isFetchingNextPage={query.isFetchingNextPage}
+          />
+        </div>
+      </div>
+
+      <BulkActionDeck
+        selectedCount={selectedCount}
+        totalAvailable={totalRecords}
+        selectionLabel={isPeopleList ? 'CONTACT' : 'ACCOUNT'}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={handleSelectCount}
+        onPowerDial={isPeopleList ? handlePowerDial : undefined}
+      />
+
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmPurge}
+        count={selectedCount}
+      />
+    </div>
+  )
+}

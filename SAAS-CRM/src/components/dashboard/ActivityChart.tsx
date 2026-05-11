@@ -1,0 +1,227 @@
+'use client';
+
+import { useCallStore } from '@/store/callStore';
+import { supabase } from '@/lib/supabase';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { isHumanConnectCall } from '@/lib/voice-outcomes';
+
+// ─── Animated integer hook ────────────────────────────────────────────────────
+function useAnimatedCount(target: number, duration = 800): number {
+  const [displayed, setDisplayed] = useState(0);
+  const prevRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const from = prevRef.current;
+    const to = target;
+    if (from === to) return;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    startRef.current = null;
+    const easeOut = (t: number) => 1 - Math.pow(1 - t, 4);
+    const tick = (ts: number) => {
+      if (startRef.current === null) startRef.current = ts;
+      const progress = Math.min((ts - startRef.current) / duration, 1);
+      setDisplayed(Math.round(from + (to - from) * easeOut(progress)));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        prevRef.current = to;
+        rafRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+
+  return displayed;
+}
+
+type VelocityCallRow = {
+  id: string
+  status?: string | null
+  duration?: number | null
+  metadata?: {
+    answeredBy?: unknown
+    [key: string]: unknown
+  } | null
+}
+
+export function VelocityTrackerV3() {
+  const { status } = useCallStore();
+  const [mounted, setMounted] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: dashboardMetrics } = useDashboardMetrics();
+
+  useEffect(() => {
+    setMounted(true);
+
+    const channel = supabase.channel('velocity-metrics-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['velocity-metrics'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  const { data: metrics } = useQuery({
+    queryKey: ['velocity-metrics'],
+    queryFn: async () => {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const startIso = startOfDay.toISOString();
+      const selectFields = 'id, status, duration, metadata, timestamp, createdAt';
+
+      const [timestampRes, createdAtRes] = await Promise.all([
+        supabase
+          .from('calls')
+          .select(selectFields)
+          .gte('timestamp', startIso),
+        supabase
+          .from('calls')
+          .select(selectFields)
+          .gte('createdAt', startIso),
+      ]);
+
+      if (timestampRes.error && createdAtRes.error) {
+        console.error('Error fetching velocity metrics:', timestampRes.error || createdAtRes.error);
+        return {
+          totalCalls: 0,
+          connectRate: 0,
+          signalEfficiency: 0,
+        };
+      }
+
+      const merged = new Map<string, VelocityCallRow>();
+      for (const row of [...(timestampRes.data ?? []), ...(createdAtRes.data ?? [])]) {
+        if (row?.id && !merged.has(row.id)) {
+          merged.set(row.id, row as VelocityCallRow);
+        }
+      }
+
+      const allCalls = Array.from(merged.values());
+      const totalCalls = allCalls.length;
+      const humanConnects = allCalls.filter(isHumanConnectCall).length;
+      const connectRate = totalCalls ? Math.round((humanConnects / totalCalls) * 100) : 0;
+
+      return {
+        totalCalls,
+        connectRate,
+        signalEfficiency: Math.floor(connectRate * 0.4),
+      };
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const currentCalls = Math.min(metrics?.totalCalls || 0, 100);
+  const animatedCalls = useAnimatedCount(currentCalls);
+
+  if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;
+
+  const isCold = currentCalls <= 33;
+  const isTracing = currentCalls > 33 && currentCalls <= 66;
+  const isLocked = currentCalls > 66;
+
+  const barColor = isLocked ? 'bg-emerald-500' : isTracing ? 'bg-[#002FA7]' : 'bg-zinc-500';
+  const barShadow = isLocked ? 'shadow-[0_0_20px_rgba(16,185,129,0.8)]' : isTracing ? 'shadow-[0_0_20px_rgba(0,47,167,0.8)]' : 'shadow-[0_0_10px_rgba(113,113,122,0.5)]';
+
+  return (
+    <div className="nodal-void-card p-6 h-full min-h-[380px] relative overflow-hidden flex flex-col justify-between group/velocity">
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+      <div className="flex items-center justify-between mb-8 z-10 relative">
+        <div>
+          <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
+            <Zap size={14} className={cn("transition-colors", isLocked ? "text-emerald-500" : isTracing ? "text-[#002FA7]" : "text-zinc-500")} />
+            Velocity_Tracker_v3
+          </h3>
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-1">
+            Total calls today across all dial flows
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 text-[9px] font-mono uppercase tracking-widest text-zinc-500 bg-black/20 px-3 py-1.5 rounded-md border border-white/5">
+          <span className={cn("w-2 h-2 rounded-full", status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-700')} />
+          {status === 'connected' ? 'Neural Link Active' : 'Standby'}
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col justify-center items-center relative z-10 mb-8 mt-4">
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="text-[100px] xl:text-[120px] leading-none font-mono tabular-nums tracking-tighter text-white font-light flex items-baseline gap-2 group"
+        >
+          <span className={cn(
+            "transition-colors duration-1000",
+            isLocked ? "text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" :
+              isTracing ? "text-[#002FA7] drop-shadow-[0_0_15px_rgba(0,47,167,0.5)]" : "text-white"
+          )}>
+          {animatedCalls.toString().padStart(2, '0')}
+          </span>
+          <span className="text-[32px] xl:text-[40px] text-zinc-700 tracking-widest transition-colors group-hover/velocity:text-zinc-600">/100</span>
+        </motion.div>
+
+        <div className="mt-8 w-full max-w-lg mx-auto relative px-4 xl:px-0">
+          <div className="h-4 w-full bg-zinc-900/80 rounded-full overflow-hidden border border-white/10 nodal-glass relative">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: `${currentCalls}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className={cn("h-full rounded-full transition-colors duration-1000 ease-in-out", barColor, barShadow)}
+            />
+
+            <div className="absolute top-0 bottom-0 left-[33%] w-px bg-white/20 z-10" />
+            <div className="absolute top-0 bottom-0 left-[66%] w-px bg-white/20 z-10" />
+          </div>
+
+          <div className="flex justify-between w-full mt-3 text-[9px] font-mono text-zinc-500 tracking-widest uppercase px-1">
+            <span className={cn("transition-colors", isCold ? 'text-white' : '')}>Cold</span>
+            <span className={cn("transition-colors", isTracing ? 'text-[#002FA7]' : '')}>Tracing</span>
+            <span className={cn("transition-colors", isLocked ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]' : '')}>Locked</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-auto relative z-10">
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
+          <div className="p-2 rounded-md bg-[#002FA7]/10 text-[#002FA7] border border-[#002FA7]/20">
+            <Plug size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Human Connect Rate</div>
+            <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{metrics?.connectRate || 0}%</div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
+          <div className="p-2 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
+            <Target size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Signal Efficiency</div>
+            <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{metrics?.signalEfficiency || 0}%</div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
+          <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+            <ShieldCheck size={16} />
+          </div>
+          <div>
+            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Asset Capture</div>
+            <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{(dashboardMetrics?.dailyBillsIngested ?? 0)} BILLS</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

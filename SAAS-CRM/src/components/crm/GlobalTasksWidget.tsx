@@ -1,0 +1,209 @@
+'use client'
+
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { CheckSquare, Circle, CheckCircle2, CalendarCheck, CalendarX, CalendarClock } from 'lucide-react'
+import { format } from 'date-fns'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useTasks, type Task } from '@/hooks/useTasks'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { cn } from '@/lib/utils'
+import { compareTasksByDueDate, isPendingTask, isTodayOrOverdue } from '@/lib/task-date'
+
+const DISPLAY_LIMIT = 3
+const EXIT_DELAY_MS = 180
+const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
+const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
+
+function TaskRow({
+  task,
+  isCompleted,
+  onComplete,
+}: {
+  task: Task
+  isCompleted: boolean
+  onComplete: () => void
+}) {
+  const router = useRouter()
+
+  const handleNavigate = () => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}`)
+    } else if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}`)
+    }
+  }
+
+  return (
+    <div
+      onClick={handleNavigate}
+      className={cn(
+        "group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors",
+        (task.contactId || task.accountId) && "cursor-pointer"
+      )}
+    >
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onComplete()
+        }}
+        className={cn(
+          'flex-shrink-0 mt-0.5 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20',
+          isCompleted ? 'text-emerald-500 cursor-default' : 'text-zinc-600 hover:text-zinc-400 cursor-pointer'
+        )}
+        aria-label={isCompleted ? 'Completed' : 'Mark complete'}
+      >
+        {isCompleted ? (
+          <CheckCircle2 size={14} className="text-emerald-500" />
+        ) : (
+          <Circle size={14} />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <p
+          className={cn(
+            'text-[11px] font-medium truncate transition-colors duration-300',
+            isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'
+          )}
+        >
+          {task.title.replace(/ at (Sun|Mon|Tue|Wed|Thu|Fri|Sat).*$/i, '').trim()}
+        </p>
+        {task.dueDate && (
+          <p className="text-[10px] font-mono tabular-nums text-zinc-500 mt-0.5">
+            {format(new Date(task.dueDate), 'h:mm a')}
+            <span className="text-zinc-700 mx-1">·</span>
+            {format(new Date(task.dueDate), 'EEE, MMM d')}
+          </p>
+        )}
+        <div className="flex items-center gap-2 mt-1.5">
+          <PriorityBadge priority={task.priority} labelStyle="suffix" completed={isCompleted} />
+          {task.priority === 'BRIEFING' && !!task.metadata?.syncCalendar && (
+            task.metadata?.rsvpStatus === 'ACCEPTED' ? (
+              <CalendarCheck size={10} className="text-emerald-400 shrink-0" />
+            ) : task.metadata?.rsvpStatus === 'DECLINED' ? (
+              <CalendarX size={10} className="text-rose-400 shrink-0" />
+            ) : (
+              <CalendarClock size={10} className="text-amber-400/50 shrink-0" />
+            )
+          )}
+          {task.relatedTo && (
+            <span className="text-[8px] font-mono text-zinc-700 truncate">{task.relatedTo}</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function GlobalTasksWidget() {
+  const { data: tasksData, updateTask } = useTasks()
+  const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
+  const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const tasks = useMemo(() => {
+    const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
+    return allTasks
+      .filter((task) => isTodayOrOverdue(task.dueDate))
+      .sort(compareTasksByDueDate)
+  }, [tasksData])
+  const pendingTasks = useMemo(
+    () => tasks.filter(isPendingTask).slice(0, DISPLAY_LIMIT + 1),
+    [tasks]
+  )
+  const completedCount = tasks.filter(t => (t.status ?? '').toLowerCase() === 'completed').length
+  const totalCount = tasks.length
+  const velocity = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
+
+  const listWithoutExiting = useMemo(() => {
+    if (!exitingTask) return pendingTasks.slice(0, DISPLAY_LIMIT)
+    return pendingTasks.filter(t => t.id !== exitingTask.task.id).slice(0, DISPLAY_LIMIT)
+  }, [pendingTasks, exitingTask])
+
+  const listToRender = useMemo(() => {
+    if (!exitingTask) return listWithoutExiting
+    const { task, index } = exitingTask
+    const completedTask = { ...task, status: 'Completed' as const }
+    return [
+      ...listWithoutExiting.slice(0, index),
+      completedTask,
+      ...listWithoutExiting.slice(index),
+    ]
+  }, [listWithoutExiting, exitingTask])
+
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current)
+    }
+  }, [])
+
+  const handleComplete = (task: Task, index: number) => {
+    if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current)
+    setExitingTask({ task, index })
+    updateTask({ id: task.id, status: 'Completed' })
+    exitTimeoutRef.current = setTimeout(() => {
+      exitTimeoutRef.current = null
+      setExitingTask(null)
+    }, EXIT_DELAY_MS)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-center text-[9px] font-mono uppercase tracking-tighter text-zinc-500">
+          <span>Velocity</span>
+          <span className="text-zinc-400">{velocity.toFixed(0)}%</span>
+        </div>
+        <div className="h-1 w-full bg-black/40 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-white transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+            style={{ width: `${velocity}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2 overflow-hidden">
+        <AnimatePresence initial={false} mode="popLayout">
+          {listToRender.length > 0 ? (
+            listToRender.map((task, i) => {
+              const isExiting = exitingTask?.task.id === task.id
+              const isCompleted = isExiting || (task.status ?? '').toLowerCase() === 'completed'
+              return (
+                <motion.div
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{
+                    x: '100%',
+                    opacity: 0,
+                    transition: exitTransition,
+                  }}
+                  transition={layoutTransition}
+                  className="rounded-xl"
+                >
+                  <TaskRow
+                    task={task}
+                    isCompleted={isCompleted}
+                    onComplete={() => !isCompleted && handleComplete(task, i)}
+                  />
+                </motion.div>
+              )
+            })
+          ) : (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={layoutTransition}
+              className="text-center py-6 border border-dashed border-white/5 rounded-2xl"
+            >
+              <CheckSquare size={20} className="mx-auto text-zinc-800 mb-2" />
+              <p className="text-[10px] font-mono text-zinc-700 uppercase">Today And Overdue Clear</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
+  )
+}

@@ -1,0 +1,1136 @@
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import type { SortingState } from '@tanstack/react-table'
+import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/context/AuthContext'
+import { millDecimal } from '@/lib/mills'
+import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
+import { getTexasEnergyContext } from '@/lib/texas-territory'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
+import { queryPredicateById } from '@/lib/queryKeys'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
+import { buildAccountStatusClauses } from '@/lib/status-filters'
+import { formatHeadcountLabel, headcountMetadata, parseHeadcount } from '@/lib/headcount'
+import { pruneContactCaches, restoreContactCaches } from '@/lib/contact-cache'
+import { pruneAccountCaches, restoreAccountCaches } from '@/lib/account-cache'
+
+export interface Account {
+  id: string
+  name: string
+  industry: string
+  domain: string
+  website?: string
+  description: string
+  logoUrl?: string
+  companyPhone: string
+  contractEnd: string
+  sqft: string
+  occupancy: string
+  employees: string
+  revenue?: string
+  location: string
+  city?: string
+  state?: string
+  country?: string
+  zip?: string
+  /** Account HQ coords for map/weather; may be null if not set */
+  latitude?: number | null
+  longitude?: number | null
+  serviceAddresses?: any[]
+  address?: string
+  tdu?: string
+  utilityTerritory?: string
+  updated: string
+  ownerId?: string
+  linkedinUrl?: string
+  // Forensic/Asset Fields
+  loadFactor?: number // 0-1
+  loadZone?: string
+  annualUsage?: string
+  electricitySupplier?: string
+  currentRate?: string
+  mills?: string // the commission/margin mills
+  status?: 'ACTIVE' | 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
+  intelligenceBriefHeadline?: string | null
+  intelligenceBriefDetail?: string | null
+  intelligenceBriefTalkTrack?: string | null
+  intelligenceBriefSignalDate?: string | null
+  intelligenceBriefReportedAt?: string | null
+  intelligenceBriefSourceUrl?: string | null
+  intelligenceBriefConfidenceLevel?: string | null
+  intelligenceBriefLastRefreshedAt?: string | null
+  intelligenceBriefStatus?: 'idle' | 'ready' | 'empty' | 'error' | string | null
+  meters?: Array<{
+    id: string
+    esiId: string
+    address: string
+    rate: string
+    endDate: string
+  }>
+  metadata?: any
+  primaryContactId?: string | null
+}
+
+const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
+const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as const
+
+async function deleteMembershipsForAccountIds(accountIds: string[]) {
+  if (accountIds.length === 0) return [] as string[]
+
+  const { data: contactRows, error: contactRowsError } = await supabase
+    .from('contacts')
+    .select('id')
+    .in('accountId', accountIds)
+
+  if (contactRowsError) throw contactRowsError
+
+  const contactIds = (contactRows ?? [])
+    .map((row: { id?: string | null }) => String(row.id || '').trim())
+    .filter(Boolean)
+
+  if (contactIds.length > 0) {
+    const { error: contactMembershipError } = await supabase
+      .from('list_members')
+      .delete()
+      .in('targetId', contactIds)
+      .in('targetType', [...CONTACT_TARGET_TYPES])
+
+    if (contactMembershipError) throw contactMembershipError
+  }
+
+  const { error: accountMembershipError } = await supabase
+    .from('list_members')
+    .delete()
+    .in('targetId', accountIds)
+    .in('targetType', [...ACCOUNT_TARGET_TYPES])
+
+  if (accountMembershipError) throw accountMembershipError
+
+  return contactIds
+}
+
+export function useDeleteAccounts() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      await ensureFreshSupabaseSession()
+      await deleteMembershipsForAccountIds(ids)
+
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .in('id', ids)
+
+      if (error) throw error
+    },
+    onMutate: async (ids) => {
+      const previousAccountQueries = await pruneAccountCaches(queryClient, ids)
+      const previousContactQueries = await pruneContactCaches(queryClient, { accountIds: ids })
+
+      return { previousAccountQueries, previousContactQueries }
+    },
+    onError: (err, ids, context: any) => {
+      if (context?.previousAccountQueries) {
+        restoreAccountCaches(queryClient, context.previousAccountQueries)
+      }
+      if (context?.previousContactQueries) {
+        restoreContactCaches(queryClient, context.previousContactQueries)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-search'] })
+      queryClient.invalidateQueries({ queryKey: ['account'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-search'] })
+      queryClient.invalidateQueries({ queryKey: ['contact'] })
+      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-membership'] })
+      queryClient.invalidateQueries({ queryKey: ['page-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
+    }
+  })
+}
+
+export interface AccountFilters {
+  industry?: string[]
+  status?: string[]
+  location?: string[]
+}
+
+const PAGE_SIZE = 50
+const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url, phone'
+const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
+const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+
+function normalizeLocationTerms(values?: string[]) {
+  return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
+}
+
+function normalizeStatusTerms(values?: string[]) {
+  return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
+}
+
+function normalizeAccountSort(sorting?: SortingState, defaultColumn = 'name') {
+  const sort = sorting?.[0]
+
+  if (!sort?.id) {
+    return { column: defaultColumn, ascending: true, secondary: null as string | null }
+  }
+
+  switch (sort.id) {
+    case 'contractEnd':
+      return { column: 'contract_end_date', ascending: !sort.desc, secondary: null as string | null }
+    case 'updated':
+      return { column: 'updatedAt', ascending: !sort.desc, secondary: null as string | null }
+    case 'employees':
+      return { column: 'employees', ascending: !sort.desc, secondary: null as string | null }
+    case 'name':
+      return { column: 'name', ascending: !sort.desc, secondary: null as string | null }
+    case 'industry':
+      return { column: 'industry', ascending: !sort.desc, secondary: null as string | null }
+    case 'location':
+      return {
+        column: 'city',
+        ascending: !sort.desc,
+        secondary: 'state',
+      }
+    case 'owner':
+      return { column: 'ownerId', ascending: !sort.desc, secondary: null as string | null }
+    case 'companyPhone':
+      return { column: 'phone', ascending: !sort.desc, secondary: null as string | null }
+    default:
+      return { column: defaultColumn, ascending: true, secondary: null as string | null }
+  }
+}
+
+function normalizeSearchPhoneDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
+function accountMatchesPhoneDigits(account: { phone?: string | null }, searchDigits: string) {
+  if (searchDigits.length < 7) return false
+  const digits = normalizeSearchPhoneDigits(account.phone)
+  if (!digits) return false
+  const last10 = digits.slice(-10)
+  const queryLast10 = searchDigits.slice(-10)
+  return digits.includes(searchDigits) || searchDigits.includes(digits) || last10 === queryLast10
+}
+
+function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
+  const city = data.city || ''
+  const state = data.state || ''
+  const location = city ? `${city}, ${state}` : (data.address || '')
+
+  return {
+    id: data.id,
+    name: data.name || 'Unknown Account',
+    industry: data.industry || '',
+    domain: data.domain || data.website || data.metadata?.domain || data.metadata?.general?.domain || '',
+    website: data.website || data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
+    description: data.description || '',
+    logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || '',
+    companyPhone: data.phone || '',
+    contractEnd: data.contract_end_date || '',
+    employees: formatHeadcountLabel(data.employees, data.metadata) || data.employees?.toString() || '',
+    revenue: data.revenue || '',
+    location,
+    city,
+    state,
+    country: data.country || data.metadata?.country || '',
+    zip: data.zip || data.metadata?.postal_code || data.metadata?.zip || '',
+    latitude: data.latitude != null ? Number(data.latitude) : null,
+    longitude: data.longitude != null ? Number(data.longitude) : null,
+    serviceAddresses: data.service_addresses || [],
+    address: data.address || '',
+    // tdu/utilityTerritory/loadZone are computed on-demand in the dossier detail view
+    tdu: '',
+    utilityTerritory: '',
+    updated: data.updatedAt || new Date().toISOString(),
+    sqft: data.metadata?.sqft || '',
+    occupancy: data.metadata?.occupancy || '',
+    ownerId: data.ownerId,
+    linkedinUrl: data.linkedin_url || data.linkedinUrl || '',
+    loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
+    loadZone: resolveAccountLoadZone(data),
+    annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
+    electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
+    currentRate: data.current_rate || data.metadata?.current_rate || '',
+    status: data.status || 'PROSPECT',
+    intelligenceBriefHeadline: data.intelligence_brief_headline || null,
+    intelligenceBriefDetail: data.intelligence_brief_detail || null,
+    intelligenceBriefTalkTrack: data.intelligence_brief_talk_track || null,
+    intelligenceBriefSignalDate: data.intelligence_brief_signal_date || null,
+    intelligenceBriefReportedAt: data.intelligence_brief_reported_at || null,
+    intelligenceBriefSourceUrl: data.intelligence_brief_source_url || null,
+    intelligenceBriefConfidenceLevel: data.intelligence_brief_confidence_level || null,
+    intelligenceBriefLastRefreshedAt: data.intelligence_brief_last_refreshed_at || null,
+    intelligenceBriefStatus: data.intelligence_brief_status || 'idle',
+    meters: metersOverride ?? data.metadata?.meters ?? [],
+    mills: data.metadata?.mills || '',
+    metadata: data.metadata || {},
+    primaryContactId: data.primaryContactId || null,
+  }
+}
+
+function shouldInvalidateDealCaches(updates: Partial<Account>) {
+  return Boolean(
+    updates.name !== undefined ||
+    updates.annualUsage !== undefined ||
+    updates.currentRate !== undefined ||
+    updates.contractEnd !== undefined ||
+    updates.mills !== undefined ||
+    updates.status !== undefined
+  )
+}
+
+function resolveAccountLoadZone(data: any): ErcotZone {
+  const metadataZone =
+    data?.metadata?.loadZone ||
+    data?.metadata?.load_zone ||
+    data?.metadata?.ercotZone ||
+    data?.metadata?.ercot_zone
+
+  if (typeof metadataZone === 'string' && metadataZone.startsWith('LZ_')) {
+    return metadataZone as ErcotZone
+  }
+
+  return mapLocationToZone(data?.city, data?.state, data?.address)
+}
+
+export function useSearchAccounts(queryTerm: string) {
+  const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
+
+  return useQuery({
+    queryKey: ['accounts-search', queryTerm, user?.id ?? user?.email ?? 'guest', role ?? 'unknown'],
+    queryFn: async () => {
+      if (!queryTerm || queryTerm.length < 2) return []
+      if (loading || !user) return []
+
+      try {
+        const searchDigits = normalizeSearchPhoneDigits(queryTerm)
+        const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
+        let query = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT);
+
+        // Admin and dev see all accounts; others filtered by ownerId
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
+        }
+
+        query = query.or(`name.ilike.%${queryTerm}%,domain.ilike.%${queryTerm}%,industry.ilike.%${queryTerm}%`);
+
+        const { data, error } = await query.limit(10);
+
+        if (error) {
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return [];
+          }
+          console.error("Search error:", error);
+          return [];
+        }
+
+        const byId = new Map<string, any>()
+        for (const item of data || []) {
+          byId.set(item.id, item)
+        }
+
+        if (phoneTail) {
+          let phoneQuery = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT)
+
+          if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+            phoneQuery = phoneQuery.in('ownerId', ownerScopeValues);
+          }
+
+          const { data: phoneData, error: phoneError } = await phoneQuery
+            .ilike('phone', `%${phoneTail}%`)
+            .limit(25)
+
+          if (!phoneError) {
+            for (const item of phoneData || []) {
+              if (accountMatchesPhoneDigits(item, searchDigits)) {
+                byId.set(item.id, item)
+              }
+            }
+          } else if (!phoneError.message?.includes('Abort') && phoneError.message !== 'FetchUserError: Request was aborted') {
+            console.error("Account phone search error:", phoneError)
+          }
+        }
+
+        return Array.from(byId.values()).slice(0, 10).map(item => ({
+          id: item.id,
+          name: item.name || 'Unknown Account',
+          industry: item.industry || '',
+          domain: item.domain || '',
+          logoUrl: item.logo_url || '',
+          companyPhone: item.phone || '',
+        }));
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          return [];
+        }
+        console.error("Search hook error:", error);
+        return [];
+      }
+    },
+    enabled: queryTerm.length >= 2 && !loading && !!user,
+    staleTime: 1000 * 60 * 1,
+  });
+}
+
+export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true, sorting?: SortingState) {
+  const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
+  const locationTerms = normalizeLocationTerms(filters?.location)
+  const statusTerms = normalizeStatusTerms(filters?.status)
+  const industryTerms = (filters?.industry ?? []).map((value) => String(value).trim()).filter(Boolean)
+  const activeSort = normalizeAccountSort(sorting, listId ? 'name' : 'contract_end_date')
+
+  return useInfiniteQuery({
+    queryKey: ['accounts', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId, activeSort.column, activeSort.ascending],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam = 0 }) => {
+      try {
+        if (!enabled || loading) return { accounts: [], nextCursor: null };
+        if (!user && !loading) return { accounts: [], nextCursor: null };
+
+        const from = pageParam * PAGE_SIZE;
+
+        if (listId) {
+          const { data, error } = await supabase.rpc('get_accounts_by_list', {
+            p_list_id: listId,
+            p_limit: PAGE_SIZE,
+            p_offset: from,
+            p_search: searchQuery ?? null,
+            p_industries: industryTerms.length > 0 ? industryTerms : null,
+            p_statuses: statusTerms.length > 0 ? statusTerms : null,
+            p_locations: locationTerms.length > 0 ? locationTerms : null,
+            p_owner_ids: role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null,
+          });
+
+          if (error) {
+            if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+              throw error;
+            }
+            console.error("Supabase error fetching accounts:", error);
+            throw error;
+          }
+
+          const accounts = (data ?? []).map((row: any) => mapAccountRow(row)) as Account[];
+          return {
+            accounts,
+            nextCursor: accounts.length === PAGE_SIZE ? pageParam + 1 : null,
+          };
+        }
+
+        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT);
+
+        // Apply ownership filter for non-admin users
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
+        }
+
+        if (searchQuery) {
+          query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+        }
+
+        // Apply column filters
+        if (industryTerms.length > 0) {
+          query = query.in('industry', industryTerms);
+        }
+        if (statusTerms.length > 0) {
+          const statusConditions = buildAccountStatusClauses(statusTerms)
+          if (statusConditions.length > 0) {
+            query = query.or(statusConditions.join(','))
+          }
+        }
+        if (locationTerms.length > 0) {
+          const locConditions = locationTerms.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+          query = query.or(locConditions);
+        }
+
+        const to = from + PAGE_SIZE - 1;
+
+        const orderedQuery = query
+          .range(from, to)
+          .order(activeSort.column, { ascending: activeSort.ascending, nullsFirst: false })
+
+        const { data, error } = activeSort.secondary
+          ? await orderedQuery.order(activeSort.secondary, { ascending: activeSort.ascending, nullsFirst: false })
+          : await orderedQuery;
+
+        if (error) {
+          // Suppress logging for aborted requests
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            throw error;
+          }
+          console.error("Supabase error fetching accounts:", error);
+          throw error;
+        }
+
+        if (!data) {
+          return { accounts: [], nextCursor: null };
+        }
+
+        const accounts = data.map((row) => mapAccountRow(row)) as Account[];
+
+        const hasNextPage = data.length === PAGE_SIZE;
+
+        return {
+          accounts,
+          nextCursor: hasNextPage ? pageParam + 1 : null
+        };
+      } catch (error: any) {
+        if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
+        console.error("Error fetching accounts from Supabase:", error);
+        throw error;
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage?.nextCursor ?? undefined,
+    enabled: enabled && !loading && !!user, // Only run query when user is loaded
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 60 * 24,   // 24 hours
+  })
+}
+
+export function useAccount(id: string) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account', id, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!id || loading || !user) return null
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .select(ACCOUNT_DETAIL_SELECT)
+        .eq('id', id)
+        .single()
+
+      if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          throw error;
+        }
+        console.error("Error fetching account from Supabase:", error)
+        throw error
+      }
+
+      if (!data) return null
+
+      // Fetch meters from dedicated table (bill-extracted ESIDs) and merge with metadata
+      let meters: Account['meters'] = []
+      const { data: meterRows } = await supabase
+        .from('meters')
+        .select('id, esid, service_address, rate, end_date')
+        .eq('account_id', data.id)
+        .order('created_at', { ascending: true })
+
+      if (meterRows?.length) {
+        meters = meterRows.map((m) => ({
+          id: m.id,
+          esiId: m.esid ?? '',
+          address: m.service_address ?? '',
+          rate: m.rate ?? '',
+          endDate: m.end_date ?? ''
+        }))
+      } else {
+        meters = data.metadata?.meters || []
+      }
+
+      const base = mapAccountRow(data, meters) as Account
+      // Enrich with TDU/utility territory for the dossier view (single record, not the list)
+      const texasEnergy = getTexasEnergyContext(base.city, base.state, base.address || base.location)
+      return {
+        ...base,
+        tdu: texasEnergy.tduDisplay || '',
+        utilityTerritory: texasEnergy.utilityTerritory || '',
+      } as Account
+    },
+    enabled: !!id && !loading && !!user,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Bill intelligence for contracts detail page
+// Fetches forensic account data + meters populated by /api/analyze-document
+// ---------------------------------------------------------------------------
+export function useAccountBillIntelligence(accountId: string | undefined) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account-bill-intel', accountId, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!accountId) return null
+
+      const { data: acc } = await supabase
+        .from('accounts')
+        .select('electricity_supplier, current_rate, annual_usage, load_factor, metadata')
+        .eq('id', accountId)
+        .single()
+
+      const { data: meters } = await supabase
+        .from('meters')
+        .select('id, esid, service_address, rate, end_date, status')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('id, name, metadata, created_at')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      const latestIntelDoc = docs?.find(
+        d => ['BILL', 'USAGE_DATA'].includes(d.metadata?.ai_extraction?.type)
+      )
+      const latestIntelData = latestIntelDoc?.metadata?.ai_extraction?.data ?? null
+      const latestIntelCurrentRate = latestIntelData?.strike_price != null ? String(latestIntelData.strike_price) : null
+      const latestIntelAnnualUsage = latestIntelData?.annual_usage != null ? String(latestIntelData.annual_usage) : null
+      const electricitySupplier = acc?.electricity_supplier ?? acc?.metadata?.electricity_supplier ?? latestIntelData?.supplier ?? null
+      const currentRate = acc?.current_rate ?? acc?.metadata?.current_rate ?? latestIntelCurrentRate ?? null
+      const annualUsage = acc?.annual_usage ?? acc?.metadata?.annual_usage ?? latestIntelAnnualUsage ?? null
+      const loadFactor = acc?.load_factor ?? acc?.metadata?.loadFactor ?? null
+      const resolvedMeters = meters?.length ? meters : (acc?.metadata?.meters ?? [])
+
+      return {
+        electricitySupplier: electricitySupplier as string | null,
+        currentRate: currentRate as string | null,
+        annualUsage: annualUsage as string | null,
+        loadFactor: loadFactor as number | null,
+        usageHistory: (acc?.metadata?.usageHistory ?? latestIntelData?.usage_history ?? []) as Array<{
+          month: string; kwh: number; billed_kw: number | null;
+          actual_kw: number | null; billed_demand_unit?: 'kW' | 'kVA' | null; actual_demand_unit?: 'kW' | 'kVA' | null; tdsp_charges: number | null
+        }>,
+        meters: (resolvedMeters as Array<{
+          id: string; esid: string; service_address: string;
+          rate: string; end_date: string; status: string
+        }>),
+        latestBillName: (latestIntelDoc?.name ?? null) as string | null,
+        latestBillDate: (latestIntelDoc?.created_at ?? null) as string | null,
+        latestBillData: latestIntelData,
+      }
+    },
+    enabled: !!accountId && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useAccountsCount(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
+  const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
+  const locationTerms = normalizeLocationTerms(filters?.location)
+  const statusTerms = normalizeStatusTerms(filters?.status)
+  const industryTerms = (filters?.industry ?? []).map((value) => String(value).trim()).filter(Boolean)
+
+  return useQuery({
+    queryKey: ['accounts-count', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryFn: async () => {
+      if (!enabled || loading) return 0
+      if (!user) return 0
+
+      let query = supabase.from('accounts').select('id', { count: 'exact', head: true })
+
+      if (listId) {
+        const { data: countData, error: countError } = await supabase
+          .rpc('get_accounts_count_by_list', {
+            p_list_id: listId,
+            p_search: searchQuery ?? null,
+            p_industries: industryTerms.length > 0 ? industryTerms : null,
+            p_statuses: statusTerms.length > 0 ? statusTerms : null,
+            p_locations: locationTerms.length > 0 ? locationTerms : null,
+            p_owner_ids: role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null,
+          });
+
+        if (countError) {
+          console.error("Error fetching list members count via RPC:", countError);
+          return 0;
+        }
+
+        return Number(countData || 0);
+      }
+
+      // Admin and dev see all accounts; others filtered by ownerId
+      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+        query = query.in('ownerId', ownerScopeValues)
+      }
+
+      if (searchQuery) {
+        query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+      }
+
+      // Apply column filters
+      if (filters?.industry && filters.industry.length > 0) {
+        query = query.in('industry', filters.industry);
+      }
+      if (filters?.status && filters.status.length > 0) {
+        const statusConditions = buildAccountStatusClauses(filters.status)
+        if (statusConditions.length > 0) {
+          query = query.or(statusConditions.join(','))
+        }
+      }
+      if (filters?.location && filters.location.length > 0) {
+        const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+        query = query.or(locConditions);
+      }
+
+      const { count, error } = await query
+
+      if (error) {
+        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+          return 0;
+        }
+        console.error("Supabase error fetching accounts count:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        return 0
+      }
+
+      return count || 0
+    },
+    enabled: enabled && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+export function useCreateAccount() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  return useMutation({
+    mutationFn: async (newAccount: Omit<Account, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
+      const parsedHeadcount = parseHeadcount(newAccount.employees)
+      // Map frontend fields to DB columns
+      const dbAccount = {
+        id: newAccount.id || crypto.randomUUID(),
+        name: newAccount.name,
+        industry: newAccount.industry,
+        domain: newAccount.domain,
+        website: newAccount.website || newAccount.domain || null,
+        logo_url: newAccount.logoUrl,
+        phone: newAccount.companyPhone,
+        linkedin_url: newAccount.linkedinUrl,
+        service_addresses: newAccount.serviceAddresses,
+        contract_end_date: newAccount.contractEnd || null,
+        employees: parsedHeadcount.value,
+        revenue: newAccount.revenue || null,
+        city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
+        state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
+        country: newAccount.country || null,
+        zip: newAccount.zip || null,
+        address: newAccount.address || null,
+        annual_usage: newAccount.annualUsage || null,
+        electricity_supplier: newAccount.electricitySupplier || null,
+        current_rate: newAccount.currentRate || null,
+        status: newAccount.status || 'PROSPECT',
+        description: newAccount.description || '',
+        ownerId: user?.email || null,
+        metadata: {
+          sqft: newAccount.sqft,
+          occupancy: newAccount.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_create'),
+          ...newAccount.metadata
+        }
+      }
+
+      const { data, error } = await supabase
+        .from('accounts')
+        .insert(dbAccount)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Supabase insert error:', error)
+        throw error
+      }
+
+      return { id: data.id, ...newAccount }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    }
+  })
+}
+
+export function useUpsertAccount() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  return useMutation({
+    mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
+      // 1. Try to find existing account by domain or name if ID is missing
+      let existingId = account.id;
+
+      if (!existingId) {
+        if (account.domain) {
+          const { data: existing } = await supabase
+            .from('accounts')
+            .select('id, metadata')
+            .eq('domain', account.domain)
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            existingId = existing.id;
+          }
+        }
+
+        // Fallback: Try to find by name if no domain match found
+        if (!existingId && account.name) {
+          const { data: existing } = await supabase
+            .from('accounts')
+            .select('id, metadata')
+            .ilike('name', account.name)
+            .limit(1)
+            .maybeSingle();
+
+          if (existing) {
+            existingId = existing.id;
+          }
+        }
+      }
+
+      const hasText = (value: unknown) => typeof value === 'string' ? value.trim().length > 0 : value != null
+      const parsedHeadcount = parseHeadcount(account.employees)
+      const employeesValue = hasText(account.employees) ? parsedHeadcount.value : null
+
+      const dbAccount: any = existingId
+        ? {
+          updatedAt: new Date().toISOString()
+        }
+        : {
+          name: account.name,
+          industry: account.industry,
+          domain: account.domain,
+          website: account.website || account.domain || null,
+          logo_url: account.logoUrl,
+          phone: account.companyPhone,
+          linkedin_url: account.linkedinUrl,
+          service_addresses: account.serviceAddresses,
+          contract_end_date: account.contractEnd || null,
+          employees: employeesValue,
+          description: account.description || '',
+          updatedAt: new Date().toISOString()
+        };
+
+      if (existingId) {
+        if (hasText(account.name)) dbAccount.name = account.name;
+        if (hasText(account.industry)) dbAccount.industry = account.industry;
+        if (hasText(account.domain)) dbAccount.domain = account.domain;
+        if (hasText(account.website || account.domain)) dbAccount.website = account.website || account.domain;
+        if (hasText(account.logoUrl)) dbAccount.logo_url = account.logoUrl;
+        if (hasText(account.companyPhone)) dbAccount.phone = account.companyPhone;
+        if (hasText(account.linkedinUrl)) dbAccount.linkedin_url = account.linkedinUrl;
+        if (Array.isArray(account.serviceAddresses) && account.serviceAddresses.length > 0) dbAccount.service_addresses = account.serviceAddresses;
+        if (hasText(account.contractEnd)) dbAccount.contract_end_date = account.contractEnd;
+        if (employeesValue !== null) dbAccount.employees = employeesValue;
+        if (hasText(account.description)) dbAccount.description = account.description;
+      }
+
+      if (!existingId) {
+        if (account.address !== undefined) dbAccount.address = account.address || null;
+        if (account.city !== undefined) dbAccount.city = account.city || null;
+        if (account.state !== undefined) dbAccount.state = account.state || null;
+        if (account.country !== undefined) dbAccount.country = account.country || null;
+        if (account.zip !== undefined) dbAccount.zip = account.zip || null;
+      } else {
+        if (hasText(account.address)) dbAccount.address = account.address;
+        if (hasText(account.city)) dbAccount.city = account.city;
+        if (hasText(account.state)) dbAccount.state = account.state;
+        if (hasText(account.country)) dbAccount.country = account.country;
+        if (hasText(account.zip)) dbAccount.zip = account.zip;
+      }
+      if (account.revenue) dbAccount.revenue = account.revenue;
+      if (account.annualUsage) dbAccount.annual_usage = account.annualUsage;
+      if (account.electricitySupplier) dbAccount.electricity_supplier = account.electricitySupplier;
+      if (account.currentRate) dbAccount.current_rate = account.currentRate;
+      if (account.status !== undefined) dbAccount.status = account.status || 'PROSPECT';
+
+      if (!existingId) {
+        dbAccount.id = crypto.randomUUID();
+        dbAccount.ownerId = user?.email || null;
+        dbAccount.metadata = {
+          sqft: account.sqft,
+          occupancy: account.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_upsert'),
+          ...account.metadata
+        };
+
+        const { data, error } = await supabase
+          .from('accounts')
+          .insert(dbAccount)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return { id: data.id, ...account, _isNew: true };
+      } else {
+        // Merge metadata for enrichment
+        const { data: current } = await supabase
+          .from('accounts')
+          .select('metadata')
+          .eq('id', existingId)
+          .single();
+
+        dbAccount.metadata = {
+          ...(current?.metadata || {}),
+          sqft: account.sqft || current?.metadata?.sqft,
+          occupancy: account.occupancy || current?.metadata?.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_upsert'),
+          ...account.metadata
+        };
+
+        const { data, error } = await supabase
+          .from('accounts')
+          .update(dbAccount)
+          .eq('id', existingId)
+          .select()
+          .single();
+        if (error) throw error;
+        return { id: data.id, ...account, _isNew: false };
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    }
+  })
+}
+
+export function useUpdateAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    onMutate: async (updates) => {
+      const accountPredicate = queryPredicateById('account', updates.id)
+      await queryClient.cancelQueries({ predicate: accountPredicate })
+      const previousAccountQueries = queryClient.getQueriesData({ predicate: accountPredicate })
+
+      queryClient.setQueriesData({ predicate: accountPredicate }, (cached: any) =>
+        cached?.id === updates.id ? { ...cached, ...updates } : cached
+      )
+
+      return { previousAccountQueries }
+    },
+    onError: (err, updates, context) => {
+      if (context?.previousAccountQueries) {
+        for (const [queryKey, value] of context.previousAccountQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
+      }
+    },
+    mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
+      await ensureFreshSupabaseSession()
+      // 1. Try to get metadata from cache to save a roundtrip
+      const cachedAccount = queryClient.getQueriesData({ predicate: queryPredicateById('account', id) })[0]?.[1] as Account | undefined
+      let currentMetadata = cachedAccount?.metadata || {}
+
+      if (!cachedAccount?.metadata) {
+        // Fetch current data if not in cache (fallback)
+        const { data: current, error: fetchError } = await supabase
+          .from('accounts')
+          .select('metadata')
+          .eq('id', id)
+          .single()
+
+        if (fetchError) {
+          console.warn('Could not fetch current metadata, proceeding with empty metadata', fetchError)
+        } else {
+          currentMetadata = current?.metadata || {}
+        }
+      }
+
+      // 2. Map updates to DB columns
+      const dbUpdates: Record<string, string | number | null | object> = {}
+      let parsedHeadcountForMetadata: ReturnType<typeof parseHeadcount> | null = null
+      if (updates.name !== undefined) dbUpdates.name = updates.name
+      if (updates.industry !== undefined) dbUpdates.industry = updates.industry
+      if (updates.domain !== undefined) {
+        dbUpdates.domain = updates.domain
+        dbUpdates.website = updates.domain || null
+      }
+      if (updates.website !== undefined) dbUpdates.website = updates.website || null
+      if (updates.description !== undefined) dbUpdates.description = updates.description
+      if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
+      if (updates.companyPhone !== undefined) dbUpdates.phone = updates.companyPhone
+      if (updates.contractEnd !== undefined) dbUpdates.contract_end_date = updates.contractEnd || null
+      if (updates.employees !== undefined) {
+        parsedHeadcountForMetadata = parseHeadcount(updates.employees)
+        dbUpdates.employees = updates.employees ? parsedHeadcountForMetadata.value : null
+      }
+      if (updates.location !== undefined) {
+        const parts = updates.location?.split(',') || []
+        dbUpdates.city = parts[0]?.trim() || null
+        dbUpdates.state = parts[1]?.trim() || null
+      }
+      if (updates.city !== undefined) dbUpdates.city = updates.city || null
+      if (updates.state !== undefined) dbUpdates.state = updates.state || null
+      if (updates.address !== undefined) dbUpdates.address = updates.address || null
+
+      // Forensic fields mapping
+      if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage || null
+      if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
+      if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
+      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' 
+      if (updates.intelligenceBriefHeadline !== undefined) dbUpdates.intelligence_brief_headline = updates.intelligenceBriefHeadline || null
+      if (updates.intelligenceBriefDetail !== undefined) dbUpdates.intelligence_brief_detail = updates.intelligenceBriefDetail || null
+      if (updates.intelligenceBriefTalkTrack !== undefined) dbUpdates.intelligence_brief_talk_track = updates.intelligenceBriefTalkTrack || null
+      if (updates.intelligenceBriefSignalDate !== undefined) dbUpdates.intelligence_brief_signal_date = updates.intelligenceBriefSignalDate || null
+      if (updates.intelligenceBriefReportedAt !== undefined) dbUpdates.intelligence_brief_reported_at = updates.intelligenceBriefReportedAt || null
+      if (updates.intelligenceBriefSourceUrl !== undefined) dbUpdates.intelligence_brief_source_url = updates.intelligenceBriefSourceUrl || null
+      if (updates.intelligenceBriefConfidenceLevel !== undefined) dbUpdates.intelligence_brief_confidence_level = updates.intelligenceBriefConfidenceLevel || null
+      if (updates.intelligenceBriefLastRefreshedAt !== undefined) dbUpdates.intelligence_brief_last_refreshed_at = updates.intelligenceBriefLastRefreshedAt || null
+      if (updates.intelligenceBriefStatus !== undefined) dbUpdates.intelligence_brief_status = updates.intelligenceBriefStatus || 'idle'
+
+      // Metadata updates
+      const newMetadata = { ...currentMetadata }
+      let hasMetadataUpdate = false
+
+      if (updates.sqft !== undefined) { newMetadata.sqft = updates.sqft; hasMetadataUpdate = true; }
+      if (updates.occupancy !== undefined) { newMetadata.occupancy = updates.occupancy; hasMetadataUpdate = true; }
+      if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
+      if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
+      if (updates.mills !== undefined) { newMetadata.mills = updates.mills; hasMetadataUpdate = true; }
+      if (parsedHeadcountForMetadata && parsedHeadcountForMetadata.value !== null) {
+        Object.assign(newMetadata, headcountMetadata(parsedHeadcountForMetadata, 'account_update'))
+        hasMetadataUpdate = true
+      }
+      if (updates.primaryContactId !== undefined) dbUpdates['primaryContactId'] = updates.primaryContactId ?? null
+      if (updates.meters !== undefined) {
+        newMetadata.meters = updates.meters;
+        hasMetadataUpdate = true;
+        // Also sync meters back to serviceAddresses for consistency
+        const addresses = (updates.meters as any[])?.map((m: any) => m.address).filter(Boolean) || []
+        if (addresses.length > 0) {
+          dbUpdates.service_addresses = addresses
+        }
+      }
+
+      if (hasMetadataUpdate) {
+        dbUpdates.metadata = newMetadata
+      }
+
+      dbUpdates.updatedAt = new Date().toISOString()
+
+      const { error } = await supabase
+        .from('accounts')
+        .update(dbUpdates)
+        .eq('id', id)
+
+      if (error) throw error
+
+      // Synchronize with the latest active deal
+      if (dbUpdates.annual_usage || dbUpdates.contract_end_date || (dbUpdates.metadata && (dbUpdates.metadata as any).mills)) {
+        const { data: accountDeals } = await supabase
+          .from('deals')
+          .select('id, annualUsage, mills')
+          .eq('accountId', id)
+          .neq('stage', 'TERMINATED')
+          .order('createdAt', { ascending: false })
+
+        if (accountDeals?.length) {
+          await Promise.all(
+            accountDeals.map(async (deal: any) => {
+              const dealUpdates: any = {}
+              if (dbUpdates.annual_usage) dealUpdates.annualUsage = Number(dbUpdates.annual_usage)
+              if (dbUpdates.contract_end_date) dealUpdates.closeDate = dbUpdates.contract_end_date
+              if (dbUpdates.metadata && (dbUpdates.metadata as any).mills) {
+                dealUpdates.mills = Number((dbUpdates.metadata as any).mills)
+              }
+
+              // Recalculate amount for each active deal using shared account usage + mills inputs.
+              const usage = dealUpdates.annualUsage ?? deal.annualUsage
+              const mills = dealUpdates.mills ?? deal.mills
+              const millsValue = millDecimal(mills)
+              if (usage && millsValue) {
+                dealUpdates.amount = Number((usage * millsValue).toFixed(2))
+              }
+
+              if (Object.keys(dealUpdates).length > 0) {
+                await supabase.from('deals').update(dealUpdates).eq('id', deal.id)
+              }
+            })
+          )
+        }
+      }
+
+      return { id, ...updates }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueriesData({ predicate: queryPredicateById('account', data.id) }, (cached: any) =>
+        cached?.id === data.id ? { ...cached, ...data } : cached
+      )
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts', data.id] })
+      // Avoid traversing all individual contact caches - only target contacts we know about if possible
+      // queryClient.setQueriesData({ queryKey: ['contact'] }, ...)
+
+      if (shouldInvalidateDealCaches(data)) {
+        queryClient.invalidateQueries({ queryKey: ['deals'] })
+        queryClient.invalidateQueries({
+          predicate: (query) => Array.isArray(query.queryKey) &&
+            query.queryKey[0] === 'deals-by-account' &&
+            query.queryKey[2] === data.id
+        })
+        queryClient.invalidateQueries({
+          predicate: (query) => Array.isArray(query.queryKey) &&
+            query.queryKey[0] === 'account-bill-intel' &&
+            query.queryKey[1] === data.id
+        })
+      }
+    }
+  })
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await ensureFreshSupabaseSession()
+      await deleteMembershipsForAccountIds([id])
+      const { error } = await supabase.from('accounts').delete().eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onMutate: async (id) => {
+      const previousAccountQueries = await pruneAccountCaches(queryClient, [id])
+      const previousContactQueries = await pruneContactCaches(queryClient, { accountIds: [id] })
+      return { previousAccountQueries, previousContactQueries }
+    },
+    onError: (err, id, context: any) => {
+      if (context?.previousAccountQueries) {
+        restoreAccountCaches(queryClient, context.previousAccountQueries)
+      }
+      if (context?.previousContactQueries) {
+        restoreContactCaches(queryClient, context.previousContactQueries)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts-search'] })
+      queryClient.invalidateQueries({ queryKey: ['account'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-search'] })
+      queryClient.invalidateQueries({ queryKey: ['contact'] })
+      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-membership'] })
+      queryClient.invalidateQueries({ queryKey: ['page-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
+    }
+  })
+}
