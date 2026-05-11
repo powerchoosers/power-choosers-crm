@@ -1,0 +1,119 @@
+import { createClient } from '@supabase/supabase-js'
+import { resolveUserRole, isBootstrapAdminEmail } from '@/lib/auth/roles'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  const msg = '⚠️ NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set in .env.local'
+  if (typeof window === 'undefined') {
+    // Server-side: hard fail so misconfiguration is caught at startup
+    throw new Error(msg)
+  } else if (process.env.NODE_ENV === 'development') {
+    console.error(msg)
+  }
+}
+
+export const supabase = createClient(
+  supabaseUrl!,
+  supabaseAnonKey!
+)
+
+// Admin client for backend operations (bypasses RLS)
+// This will only work on the server side
+if (typeof window === 'undefined' && !supabaseServiceKey) {
+  console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY is not set — supabaseAdmin will use the anon key and RLS will NOT be bypassed')
+}
+export const supabaseAdmin = createClient(
+  supabaseUrl!,
+  supabaseServiceKey || supabaseAnonKey!
+)
+
+/**
+ * Helper to require a valid Supabase user in API routes
+ * Used for server-side auth validation
+ */
+export async function requireUser(req: any) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return { email: null, user: null, isAdmin: false };
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Sanity check: prevent 'undefined' or 'null' strings from being treated as tokens
+    if (!token || token === 'undefined' || token === 'null') {
+      return { email: null, user: null, isAdmin: false };
+    }
+
+    // Dev Bypass Check
+    if (process.env.NODE_ENV === 'development' && token === 'dev-bypass-token') {
+      return {
+        email: 'dev@nodalpoint.io',
+        user: { id: 'dev-bypass-uid', email: 'dev@nodalpoint.io' } as any,
+        id: 'dev-bypass-uid',
+        role: 'admin',
+        isAdmin: true
+      };
+    }
+
+    let { data: { user }, error } = await supabase.auth.getUser(token);
+
+    // Fallback: Try with Admin Client if Anon Client fails (sometimes needed in server environments)
+    if (!user || error) {
+      const { data: adminData, error: adminError } = await supabaseAdmin.auth.getUser(token);
+      if (adminData?.user) {
+        user = adminData.user;
+        error = null;
+      } else {
+        console.warn('[requireUser] Token verification failure:', {
+          anonError: error?.message,
+          adminError: adminError?.message,
+          tokenPrefix: token?.substring(0, 15)
+        });
+      }
+    }
+
+    if (error || !user) {
+      return { email: null, user: null, isAdmin: false };
+    }
+
+    const emailLower = user.email?.toLowerCase().trim() || null;
+    let role = resolveUserRole(null, emailLower);
+
+    if (emailLower) {
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from('users')
+          .select('settings')
+          .eq('email', emailLower)
+          .maybeSingle();
+
+        if (profile) {
+          role = resolveUserRole(profile.settings as Record<string, unknown> | null | undefined, emailLower);
+        }
+      } catch (profileError) {
+        console.warn('[requireUser] Failed to resolve stored role:', profileError);
+      }
+    }
+
+    const isAdmin = role === 'admin';
+
+    return {
+      email: user.email,
+      user: user,
+      id: user.id,
+      role,
+      isAdmin
+    };
+  } catch (err) {
+    return { email: null, user: null, isAdmin: false };
+  }
+}
+
+/**
+ * Check if a user ID is an admin
+ */
+export function isUserAdmin(email: string) {
+  return isBootstrapAdminEmail(email);
+}

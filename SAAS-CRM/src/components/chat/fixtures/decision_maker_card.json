@@ -1,0 +1,14 @@
+{
+  "type": "decision_maker_card",
+  "data": {
+    "type": "contact",
+    "id": "contact_decision_maker_001",
+    "name": "Maria Sanchez",
+    "title": "VP of Operations",
+    "company": "High Plains Packaging",
+    "status": "active",
+    "initials": "MS",
+    "subtitle": "Decision Maker",
+    "contactCount": 0
+  }
+}
