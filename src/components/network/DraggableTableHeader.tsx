@@ -36,7 +36,7 @@ export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
         transition,
         opacity: isDragging ? 0.5 : 1,
         zIndex: isDragging ? 1000 : undefined,
-        position: 'relative',
+        position: isFrozenSelectColumn || isFrozenNameColumn ? undefined : 'relative',
     }
 
     const containerVariants = {
