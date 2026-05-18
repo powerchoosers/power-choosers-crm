@@ -353,7 +353,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/contacts/${contact.id}`}
-              className="flex w-full min-w-0 items-center gap-3 group/person whitespace-nowrap pl-1 pr-4"
+              className="flex w-full min-w-0 items-center gap-2 group/person whitespace-nowrap pl-0.5 pr-3"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <ContactAvatar
@@ -367,7 +367,7 @@ export default function PeoplePage() {
               <div className="min-w-0 flex-1">
                 <FrozenHoverText
                   text={contact.name}
-                  className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left"
+                  className="font-medium text-zinc-200 group-hover/person:text-white transition-colors origin-left"
                 />
                 <div className="truncate text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
               </div>
@@ -384,7 +384,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/accounts/${contact.accountId}`}
-              className="flex w-full min-w-0 items-start gap-2 group/acc whitespace-nowrap pl-1 pr-4"
+              className="flex w-full min-w-0 items-start gap-1.5 group/acc whitespace-nowrap pl-0.5 pr-3"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <CompanyIcon
@@ -394,11 +394,11 @@ export default function PeoplePage() {
                 size={36}
                 className="w-9 h-9 transition-all"
               />
-              <div className="min-w-0 flex-1 flex-col">
-                <FrozenHoverText
-                  text={companyName || 'Unknown Company'}
-                  className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
-                />
+              <div className="flex min-w-0 flex-1 flex-col">
+              <FrozenHoverText
+                text={companyName || 'Unknown Company'}
+                className="truncate text-zinc-400 group-hover/acc:text-white transition-colors origin-left"
+              />
                 <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
                   {contact.accountLocation || 'Unknown location'}
                 </div>
