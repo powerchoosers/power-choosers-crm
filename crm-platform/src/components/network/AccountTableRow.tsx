@@ -46,7 +46,7 @@ export const AccountTableRow = memo(function AccountTableRow({
             }}
             data-state={isSelected && "selected"}
             className={cn(
-                "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                "transition-colors group cursor-pointer relative z-10",
                 isSelected
                     ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
                     : "hover:bg-white/[0.02]"
@@ -60,7 +60,7 @@ export const AccountTableRow = memo(function AccountTableRow({
                 <TableCell
                     key={cell.id}
                     className={cn(
-                        "py-3",
+                        "py-3 border-b border-white/5",
                         cell.column.id === 'select' && getFrozenSelectCellClass(isSelected),
                         cell.column.id === 'name' && getFrozenNameCellClass(isSelected)
                     )}
