@@ -81,23 +81,15 @@ import { buildPowerDialTargets } from '@/lib/powerDialer'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStatusToken } from '@/lib/status-filters'
 import { ForensicPagination } from '@/components/ui/ForensicPagination'
+import {
+  FrozenHoverText,
+  getFrozenNameCellClass,
+  getFrozenSelectCellClass,
+} from '@/components/network/frozenTable'
 
 const PAGE_SIZE = 50
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as const
-
-function getFrozenNameCellClass(isSelected: boolean) {
-  return cn(
-    "sticky left-12 z-20 relative backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40 shadow-[22px_0_34px_-26px_rgba(0,0,0,0.95)] border-r border-white/5 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-5 after:w-5 after:bg-gradient-to-r after:from-black/75 after:to-transparent",
-    isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/50 group-hover:bg-white/[0.04]"
-  )
-}
-
-function getFrozenSelectCellClass() {
-  return cn(
-    "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40"
-  )
-}
 
 export default function TargetDetailPage() {
   const router = useRouter()
@@ -423,7 +415,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/contacts/${contact.id}`}
-            className="flex items-center gap-3 group/person whitespace-nowrap"
+            className="flex w-full min-w-0 items-center gap-3 group/person whitespace-nowrap pl-1 pr-4"
             onClick={(e) => {
               e.stopPropagation()
               saveScroll()
@@ -438,11 +430,12 @@ export default function TargetDetailPage() {
               healthScore={healthScore}
               healthLoading={contactTouchLoading || contactLastTouchMap === undefined}
             />
-            <div>
-              <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
-                {contact.name}
-              </div>
-              <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
+            <div className="min-w-0 flex-1">
+              <FrozenHoverText
+                text={contact.name}
+                className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left"
+              />
+              <div className="truncate text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
             </div>
           </Link>
         )
@@ -462,7 +455,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/accounts/${contact.accountId}`}
-            className="flex items-start gap-2 group/acc"
+            className="flex w-full min-w-0 items-start gap-2 group/acc whitespace-nowrap pl-1 pr-4"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
@@ -472,10 +465,11 @@ export default function TargetDetailPage() {
               size={36}
               className="w-8 h-8"
             />
-            <div className="flex min-w-0 flex-col">
-              <div className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
-                {contact.company || 'Unknown Company'}
-              </div>
+            <div className="min-w-0 flex-1 flex-col">
+              <FrozenHoverText
+                text={contact.company || 'Unknown Company'}
+                className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
+              />
               <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
                 {contact.accountLocation || 'Unknown location'}
               </div>
@@ -732,7 +726,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/accounts/${account.id}`}
-            className="flex items-center gap-3 group/acc whitespace-nowrap"
+            className="flex w-full min-w-0 items-center gap-3 group/acc whitespace-nowrap pl-1 pr-4"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
@@ -744,11 +738,12 @@ export default function TargetDetailPage() {
               healthScore={healthScore}
               healthLoading={accountTouchLoading || accountLastTouchMap === undefined}
             />
-            <div>
-              <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
-                {account.name}
-              </div>
-              {account.domain && <div className="text-[10px] font-mono text-zinc-500 uppercase">{account.domain}</div>}
+            <div className="min-w-0 flex-1">
+              <FrozenHoverText
+                text={account.name}
+                className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
+              />
+              {account.domain && <div className="truncate text-[10px] font-mono text-zinc-500 uppercase">{account.domain}</div>}
             </div>
           </Link>
         )
@@ -1130,7 +1125,7 @@ export default function TargetDetailPage() {
                         key={cell.id}
                         className={cn(
                           "py-3",
-                          cell.column.id === 'select' && getFrozenSelectCellClass(),
+                          cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
                           cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
                         )}
                       >

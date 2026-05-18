@@ -7,6 +7,10 @@ import { TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { Contact } from '@/hooks/useContacts'
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
+import {
+    getFrozenNameCellClass,
+    getFrozenSelectCellClass,
+} from '@/components/network/frozenTable'
 
 interface ContactTableRowProps {
     row: Row<Contact>
@@ -30,13 +34,6 @@ export const ContactTableRow = memo(function ContactTableRow({
     isSelected
 }: ContactTableRowProps) {
     const isAnimated = index < 12
-    const frozenSelectCellClass = cn(
-        "sticky left-0 z-30 w-12 min-w-12 max-w-12 bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40"
-    )
-    const frozenNameCellClass = cn(
-        "sticky left-12 z-20 relative backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40 shadow-[22px_0_34px_-26px_rgba(0,0,0,0.95)] border-r border-white/5 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-5 after:w-5 after:bg-gradient-to-r after:from-black/75 after:to-transparent",
-        isSelected ? "bg-[#002FA7]/8" : "bg-zinc-950/50 group-hover:bg-white/[0.04]"
-    )
     return (
         <motion.tr
             initial={isAnimated ? { opacity: 0 } : false}
@@ -68,8 +65,8 @@ export const ContactTableRow = memo(function ContactTableRow({
                     key={cell.id}
                     className={cn(
                         "py-3",
-                        cell.column.id === 'select' && frozenSelectCellClass,
-                        cell.column.id === 'name' && frozenNameCellClass
+                        cell.column.id === 'select' && getFrozenSelectCellClass(isSelected),
+                        cell.column.id === 'name' && getFrozenNameCellClass(isSelected)
                     )}
                 >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

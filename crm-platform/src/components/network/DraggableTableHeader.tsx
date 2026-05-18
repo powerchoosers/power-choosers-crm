@@ -8,6 +8,10 @@ import { TableHead } from '@/components/ui/table'
 import { GripVertical } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import {
+    getFrozenNameHeaderClass,
+    getFrozenSelectHeaderClass,
+} from '@/components/network/frozenTable'
 
 interface DraggableTableHeaderProps {
     header: Header<any, unknown>
@@ -69,8 +73,8 @@ export function DraggableTableHeader({ header }: DraggableTableHeaderProps) {
             className={cn(
                 "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 relative select-none overflow-hidden cursor-grab active:cursor-grabbing",
                 (isFrozenSelectColumn || isFrozenNameColumn) && "overflow-visible",
-                isFrozenSelectColumn && "sticky left-0 z-50 w-12 min-w-12 max-w-12 bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40",
-                isFrozenNameColumn && "sticky left-12 z-40 relative bg-zinc-950/50 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/40 shadow-[22px_0_34px_-26px_rgba(0,0,0,0.95)] border-r border-white/5 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-5 after:w-5 after:bg-gradient-to-r after:from-black/75 after:to-transparent",
+                isFrozenSelectColumn && getFrozenSelectHeaderClass(),
+                isFrozenNameColumn && getFrozenNameHeaderClass(),
                 isDragging && "bg-zinc-900 border-x border-[#002FA7]/30"
             )}
         >
