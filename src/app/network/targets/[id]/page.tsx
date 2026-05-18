@@ -415,7 +415,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/contacts/${contact.id}`}
-            className="flex w-full min-w-0 items-center gap-3 group/person whitespace-nowrap pl-1 pr-4"
+            className="flex w-full min-w-0 items-center gap-2 group/person whitespace-nowrap pl-0.5 pr-3"
             onClick={(e) => {
               e.stopPropagation()
               saveScroll()
@@ -433,7 +433,7 @@ export default function TargetDetailPage() {
             <div className="min-w-0 flex-1">
               <FrozenHoverText
                 text={contact.name}
-                className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left"
+                className="font-medium text-zinc-200 group-hover/person:text-white transition-colors origin-left"
               />
               <div className="truncate text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
             </div>
@@ -455,7 +455,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/accounts/${contact.accountId}`}
-            className="flex w-full min-w-0 items-start gap-2 group/acc whitespace-nowrap pl-1 pr-4"
+            className="flex w-full min-w-0 items-start gap-1.5 group/acc whitespace-nowrap pl-0.5 pr-3"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
@@ -465,10 +465,10 @@ export default function TargetDetailPage() {
               size={36}
               className="w-8 h-8"
             />
-            <div className="min-w-0 flex-1 flex-col">
+            <div className="flex min-w-0 flex-1 flex-col">
               <FrozenHoverText
                 text={contact.company || 'Unknown Company'}
-                className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
+                className="truncate text-zinc-400 group-hover/acc:text-white transition-colors origin-left"
               />
               <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
                 {contact.accountLocation || 'Unknown location'}
@@ -726,7 +726,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/accounts/${account.id}`}
-            className="flex w-full min-w-0 items-center gap-3 group/acc whitespace-nowrap pl-1 pr-4"
+            className="flex w-full min-w-0 items-center gap-2 group/acc whitespace-nowrap pl-0.5 pr-3"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
@@ -741,7 +741,7 @@ export default function TargetDetailPage() {
             <div className="min-w-0 flex-1">
               <FrozenHoverText
                 text={account.name}
-                className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
+                className="font-medium text-zinc-200 group-hover/acc:text-white transition-colors origin-left"
               />
               {account.domain && <div className="truncate text-[10px] font-mono text-zinc-500 uppercase">{account.domain}</div>}
             </div>
@@ -1114,7 +1114,7 @@ export default function TargetDetailPage() {
                       router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
                     }}
                   className={cn(
-                    "cursor-pointer border-b border-white/5 border-l-2 transition-colors",
+                    "cursor-pointer border-b-0 border-l-2 transition-colors",
                     row.getIsSelected()
                       ? "border-l-[#002FA7] bg-[#002FA7]/8 hover:bg-[#002FA7]/10"
                       : "border-l-transparent hover:bg-white/[0.03]"
@@ -1124,7 +1124,7 @@ export default function TargetDetailPage() {
                       <TableCell
                         key={cell.id}
                         className={cn(
-                          "py-3",
+                          "py-3 border-b border-white/5",
                           cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
                           cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
                         )}

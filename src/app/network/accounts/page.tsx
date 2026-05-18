@@ -430,7 +430,7 @@ export default function AccountsPage() {
           return (
             <Link
               href={`/network/accounts/${account.id}`}
-              className="flex w-full min-w-0 items-center gap-3 group/acc cursor-pointer whitespace-nowrap pl-1 pr-4"
+              className="flex w-full min-w-0 items-center gap-2 group/acc cursor-pointer whitespace-nowrap pl-0.5 pr-3"
             >
               <CompanyIcon
                 logoUrl={account.logoUrl}
@@ -445,7 +445,7 @@ export default function AccountsPage() {
               <div className="min-w-0 flex-1">
                 <FrozenHoverText
                   text={account.name}
-                  className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all flex items-center gap-1.5 origin-left"
+                  className="font-medium text-zinc-200 group-hover/acc:text-white transition-colors flex items-center gap-1.5 origin-left"
                 />
                 {account.domain && (
                   <div className="truncate text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
