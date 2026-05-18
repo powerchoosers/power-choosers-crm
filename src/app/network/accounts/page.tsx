@@ -72,6 +72,7 @@ import { usePersistentColumnFilters } from '@/hooks/usePersistentColumnFilters'
 import { toast } from 'sonner'
 import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
+import { FrozenHoverText } from '@/components/network/frozenTable'
 
 const PAGE_SIZE = 50
 
@@ -429,7 +430,7 @@ export default function AccountsPage() {
           return (
             <Link
               href={`/network/accounts/${account.id}`}
-              className="flex items-center gap-3 group/acc cursor-pointer"
+              className="flex w-full min-w-0 items-center gap-3 group/acc cursor-pointer whitespace-nowrap pl-1 pr-4"
             >
               <CompanyIcon
                 logoUrl={account.logoUrl}
@@ -441,12 +442,13 @@ export default function AccountsPage() {
                 healthScore={healthScore}
                 healthLoading={lastTouchLoading || lastTouchMap === undefined}
               />
-              <div>
-                <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all flex items-center gap-1.5 origin-left">
-                  {account.name}
-                </div>
+              <div className="min-w-0 flex-1">
+                <FrozenHoverText
+                  text={account.name}
+                  className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all flex items-center gap-1.5 origin-left"
+                />
                 {account.domain && (
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                  <div className="truncate text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                     {account.domain}
                   </div>
                 )}

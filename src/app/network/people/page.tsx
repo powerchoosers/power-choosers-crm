@@ -77,6 +77,7 @@ import { toast } from 'sonner'
 import { useComposeStore } from '@/store/composeStore'
 import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import { normalizeStatusToken, statusMatchesFilter } from '@/lib/status-filters'
+import { FrozenHoverText } from '@/components/network/frozenTable'
 
 const PAGE_SIZE = 50
 
@@ -352,7 +353,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/contacts/${contact.id}`}
-              className="flex items-center gap-3 group/person"
+              className="flex w-full min-w-0 items-center gap-3 group/person whitespace-nowrap pl-1 pr-4"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <ContactAvatar
@@ -363,11 +364,12 @@ export default function PeoplePage() {
                 healthScore={healthScore}
                 healthLoading={lastTouchLoading || lastTouchMap === undefined}
               />
-              <div>
-                <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
-                  {contact.name}
-                </div>
-                <div className="text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
+              <div className="min-w-0 flex-1">
+                <FrozenHoverText
+                  text={contact.name}
+                  className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left"
+                />
+                <div className="truncate text-xs text-zinc-500 font-mono tracking-tight">{contact.email}</div>
               </div>
             </Link>
           )
@@ -382,7 +384,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/accounts/${contact.accountId}`}
-              className="flex items-start gap-2 group/acc"
+              className="flex w-full min-w-0 items-start gap-2 group/acc whitespace-nowrap pl-1 pr-4"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <CompanyIcon
@@ -392,10 +394,11 @@ export default function PeoplePage() {
                 size={36}
                 className="w-9 h-9 transition-all"
               />
-              <div className="flex min-w-0 flex-col">
-                <div className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
-                  {companyName || 'Unknown Company'}
-                </div>
+              <div className="min-w-0 flex-1 flex-col">
+                <FrozenHoverText
+                  text={companyName || 'Unknown Company'}
+                  className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left"
+                />
                 <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
                   {contact.accountLocation || 'Unknown location'}
                 </div>
