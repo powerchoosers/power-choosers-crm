@@ -431,7 +431,7 @@ export default function AccountsPage() {
           return (
             <Link
               href={`/network/accounts/${account.id}`}
-              className="flex w-full min-w-0 items-center gap-2 group/acc cursor-pointer whitespace-nowrap pl-0.5 pr-3"
+              className="flex w-full min-w-0 items-center gap-2 group/acc cursor-pointer whitespace-nowrap pl-0 pr-3"
             >
               <CompanyIcon
                 logoUrl={account.logoUrl}

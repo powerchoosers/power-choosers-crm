@@ -354,7 +354,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/contacts/${contact.id}`}
-              className="flex w-full min-w-0 items-center gap-2 group/person whitespace-nowrap pl-0.5 pr-3"
+              className="flex w-full min-w-0 items-center gap-2 group/person whitespace-nowrap pl-0 pr-3"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <ContactAvatar
@@ -385,7 +385,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/accounts/${contact.accountId}`}
-              className="flex w-full min-w-0 items-start gap-1.5 group/acc whitespace-nowrap pl-0.5 pr-3"
+              className="flex w-full min-w-0 items-start gap-1.5 group/acc whitespace-nowrap pl-0 pr-3"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <CompanyIcon
