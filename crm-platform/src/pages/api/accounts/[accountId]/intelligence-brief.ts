@@ -3787,15 +3787,14 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
     : ''
 
-  const prompt = `You are a plainspoken energy analyst and strategist. You are crafting a talk track opener for a peer-to-peer conversation with a C-level executive or operations lead.
+  const prompt = `You are a plainspoken energy analyst and strategist. You are writing the TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
 VOICE:
 - Conversational, peer-to-peer, and undeniably expert. 
 - Avoid "broker-speak" or sounding like you're selling a service. 
 - Sound like someone who is looking at a diagnostic report and has identified a specific anomaly or liability.
 - Do not use first-person curiosity language like "I was curious about" or "I was looking at."
-- Open with a concrete company fact, event, footprint, or facility detail first.
-- Do not open with a generic role-based template line like "What most [title] leaders care about is..." or "The useful question is..."
+- Do not write the opener. The opener is handled separately.
 - Keep the first sentence about the company or the site, not about the speaker.
 
 COMPANY CONTEXT:
@@ -3816,15 +3815,15 @@ ${identityContext}
 ${audienceProfileBlock ? `AUDIENCE PROFILE:\n${audienceProfileBlock}\n` : ''}
 
 REQUIREMENTS:
-1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR a concrete operating fact from the company, site, or footprint. Do not use a generic role-based opener. Use third-person or company-centered phrasing, for example: "UHS runs a 400+ facility healthcare network across 39 states, so the site-by-site differences matter here" or "The new Haslet campus expansion is the part that matters here."
-2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
-3. BUSINESS PAIN POINT: Connect the technical detail directly to a bill issue:
+1. THE PROBLEM: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR a concrete operating fact from the company, site, or footprint, then explain why it matters on the power side. Do not use a generic role-based opener. Use third-person or company-centered phrasing, for example: "UHS runs a 400+ facility healthcare network across 39 states, so the site-by-site differences matter here" or "The new Haslet campus expansion is the part that matters here."
+2. THE DEPTH: Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
+3. THE QUESTION: End with ONE specific, easy-to-answer question about their operations and make the second sentence a question.
+4. BUSINESS PAIN POINT: Connect the technical detail directly to a bill issue:
    - Electrification shift: The risk of adding electric equipment and changing usage faster than the bill structure catches up.
    - One-time peak charges that stick: A single spike can leave a higher peak charge on the bill for months.
    - Transmission exposure: Hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
    - Usage mismatch: When the operating schedule changes but the bill structure still reflects the old pattern.
-4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
-5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule created a peak charge that is still sitting on the bill?" or "Are you guys tracking the transmission exposure on that technical load yet?").
+5. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
 ${audienceRule}${sequencePriorityRule}
 ${dentalContext}${behavioralHealthContext}
@@ -3835,14 +3834,14 @@ ${dentalContext}${behavioralHealthContext}
    - For multi-site care organizations, keep the comparison portfolio-wide but the liability meter-specific. Say each site can carry its own locked-in peak charge rather than implying one site changes every other site.
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
-8. LENGTH: 2-3 sentences max. 50-80 words.
+8. LENGTH: Exactly 2 sentences. Aim for 14-50 words total.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
 13. IDENTITY PROFILE: If an identity profile is provided, treat it as the source of truth for what kind of company this is unless the signal text directly contradicts it. Do not use language blocked by the guardrails.
 
-Generate a plain-English, peer-to-peer opener for ${companyName}:`
+Generate a plain-English, peer-to-peer talk track for ${companyName}:`
 
   try {
     const openrouterKey = process.env.OPENROUTER_API_KEY
@@ -3887,7 +3886,8 @@ Generate a plain-English, peer-to-peer opener for ${companyName}:`
 
     // Validate the AI-generated talk track
     const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
-    if (wordCount < 30 || wordCount > 120) {
+    const sentenceCount = splitTalkTrackSentences(talkTrack).length
+    if (sentenceCount !== 2 || wordCount < 14 || wordCount > 60) {
       console.warn('[Intelligence Brief] AI talk track word count out of range:', wordCount)
       return null
     }
@@ -3935,7 +3935,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
   const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
-  const sentenceCount = text.split(/[.!?]+/).map(cleanText).filter(Boolean).length
+  const sentenceCount = splitTalkTrackSentences(text).length
   const mentionsSignal = TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsIndustry = TALK_TRACK_INDUSTRY_KEYWORDS[context.industryCluster].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsMarket = context.marketFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
@@ -3998,14 +3998,14 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
-  const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
+  const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 2
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
     if (cluster === context.industryCluster) return false
     return labels.some((label) => lower.includes(label.toLowerCase()))
   })
-  const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
+  const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string) {
@@ -4057,19 +4057,34 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
 }
 
+function splitTalkTrackSentences(value: string) {
+  return cleanText(value)
+    .split(/(?<=[.!?])\s+/)
+    .map(cleanText)
+    .filter(Boolean)
+}
+
+function ensureSentence(value: string) {
+  const text = cleanText(value)
+  if (!text) return ''
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
+
+function buildTwoSentenceTalkTrack(problemSentence: string, questionSentence: string) {
+  return simplifyTalkTrackLanguage(
+    [ensureSentence(problemSentence), ensureSentence(questionSentence)]
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim(),
+  )
+}
+
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
-  const companyName = cleanText(account.name) || 'the company'
-  const sourceLead = buildSourceLead(account, candidate)
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
-  const openingIndustryLine = buildOpeningIndustryLine(
-    context.industryCluster,
-    alreadyOpen,
-    cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase(),
-  )
-  const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
   const signalLineBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
@@ -4077,7 +4092,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
     ],
     new_location: [
-      openingIndustryLine,
+      fallbackIndustryLine,
       alreadyOpen
         ? `If the site is already live, the power piece should already match how it is being used now.`
         : `For a new site, the electricity setup should already be in place before it goes live.`,
@@ -4111,10 +4126,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
   }
 
-  const industryLine = pickVariant(context.industryOpeners, variantSeed) || context.industryOpeners[0]
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
-  
+
   const lowIntensityCluster = [
     'office_services',
     'banking',
@@ -4129,43 +4143,14 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     'unknown',
   ].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
-  
-  const forensicObservation = context.signalFamily === 'industry_context'
-    ? (shouldUseMarketLine ? marketLine : industryLine)
+  const problemSentence = context.signalFamily === 'industry_context'
+    ? (shouldUseMarketLine ? marketLine : signalLine)
     : signalLine
-    
-  const question = context.signalFamily === 'industry_context' ? fallbackQuestion : context.question
+  const questionSentence = context.signalFamily === 'industry_context'
+    ? fallbackQuestion
+    : context.question
 
-  // Create a more cohesive flow
-  let fullTrack = ''
-  const permissionOpener = buildPermissionOpener(account, context, variantSeed)
-  const bodyLead = context.signalFamily === 'industry_context'
-    ? (() => {
-        const companyLeadOptions = context.industryCluster === 'school_district'
-          ? [
-              sourceLead,
-              multiSiteInfo.isMultiSite
-                ? `${companyName} runs a multi-campus school network, so each campus can carry its own summer cooling and classroom-technology load.`
-                : `${companyName} is a school district, so the campus calendar and summer HVAC are the parts to watch.`,
-              fallbackIndustryLine,
-              openingIndustryLine,
-            ]
-          : [
-              sourceLead,
-              multiSiteInfo.isMultiSite
-                ? `${companyName} has a multi-site footprint, so the location-by-location differences matter more than a broad summary.`
-                : `${companyName} is the kind of operation where the location-level detail matters more than a broad summary.`,
-              fallbackIndustryLine,
-              openingIndustryLine,
-            ]
-
-        return pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
-      })()
-    : sourceLead
-
-  fullTrack = `${permissionOpener} ${bodyLead} ${forensicObservation} ${question}`
-
-  return simplifyTalkTrackLanguage(fullTrack.replace(/\s+/g, ' ').trim())
+  return buildTwoSentenceTalkTrack(problemSentence, questionSentence)
 }
 
 function extractHtmlAttribute(tag: string, attribute: string) {
@@ -4729,9 +4714,10 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
     return null
   }
 
-  // Validate talk track length (20-200 words)
+  // Validate talk track length (two short sentences)
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
-  if (talkTrackWordCount < 20 || talkTrackWordCount > 200) {
+  const talkTrackSentenceCount = splitTalkTrackSentences(talkTrack).length
+  if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 60) {
     return null
   }
 
@@ -4993,7 +4979,7 @@ Decision rules:
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
-- Talk Track must be 2-4 short sentences maximum. Use conversational language.
+- Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5006,17 +4992,18 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
-- Use a permission-based cold-call opener first. State your name/company and ask for permission to give the reason for the call. Keep it to one sentence. If an audience profile is present, you may use the first name once if it sounds natural.
-- The next sentence should name the actual event, company fact, or facility detail. Do not write "I saw a report about [company]" and then move on. If you can name the event, keep it in that second sentence. Example: "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
-- If you cannot name the actual event, do not force a news-style second sentence. Use a plain website or company update detail instead.
+- The opener is handled separately. Do not write it into talk_track.
+- Start with the concrete event, company fact, or facility detail, then end with one direct question.
+- If you can name the event, keep it specific instead of saying "I saw a report about [company]." Example: "Lambda is moving into Aligned's DFW-04 data center in Plano."
+- If you cannot name the event clearly, use a plain website or company update detail instead.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
-- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, the opening style, and the question to ask.
-- Start with a permission-based opener, then move into the direct observation about the event and why it matters for operations. Do not open like a support ticket or ask if the person is "responsible" for electricity.
-- Rotate the opener and second sentence shape. Do not always open the same way.
+- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, and the question to ask.
+- Write only the talk_track. The opener is handled separately.
+- Rotate the problem sentence and question wording. Do not always sound the same.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
@@ -5095,7 +5082,7 @@ Decision rules:
 - Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
-- Talk Track should be 2-4 short sentences maximum. Use conversational language.
+- Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5110,9 +5097,9 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- Use a permission-based cold-call opener first. State your name/company and ask for permission to give the reason for the call. Keep it to one sentence. If an audience profile is present, you may use the first name once if it sounds natural.
-- The next sentence should name the actual business fact, event, or footprint detail. Do not write "I saw a report about [company]" and then move on. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
-- If the sentence cannot name the event clearly, do not use a report-style second sentence.
+- The opener is handled separately. Do not write it into talk_track.
+- Start with the concrete business fact or footprint detail, then end with one direct question. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
+- If the sentence cannot name the event clearly, keep it plain and specific anyway.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
@@ -5123,8 +5110,8 @@ Decision rules:
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
 - If an audience_profile block is present, use it as the human lens. Keep the first name or title tied to the business question instead of generic company language.
-- Start with a permission-based opener, then move into the direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
-- Rotate the opener and second sentence shape. Do not always open with the same setup.
+- Write only the talk_track. The opener is handled separately.
+- Rotate the problem sentence and question wording. Do not always sound the same.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
