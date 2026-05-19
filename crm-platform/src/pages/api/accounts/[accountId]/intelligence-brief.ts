@@ -3688,10 +3688,10 @@ function buildTalkTrackContext(
   const simplifyList = (items: string[]) => items.map(simplifyTalkTrackLanguage).filter(Boolean)
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
-    observation: 'Open with a concrete company fact or operating detail first.',
-    question: 'Open with the company fact first, then move into one direct question.',
-    contrast: 'Name the company fact first, then contrast it with the bill issue.',
-    curiosity: 'Use a specific company detail as the hook, not a generic curiosity line.',
+    observation: 'Open with a short permission-based cold-call opener, then move into a concrete company fact or operating detail.',
+    question: 'Open with a short permission-based cold-call opener, then the company fact, then one direct question.',
+    contrast: 'Open with a short permission-based cold-call opener, then name the company fact and contrast it with the bill issue.',
+    curiosity: 'Open with a short permission-based cold-call opener, then use a specific company detail as the hook, not a generic curiosity line.',
   }
 
   return {
@@ -4008,6 +4008,55 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
+function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string) {
+  const companyName = cleanText(account.name) || 'the company'
+  const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
+  const greeting = firstName
+    ? `Hi ${firstName}, this is Lewis with Nodal Point`
+    : 'Hi, this is Lewis with Nodal Point'
+
+  const openerBySignal: Record<SignalFamily, string[]> = {
+    acquisition: [
+      `${greeting} - can I give you the short reason I’m calling about the acquisition?`,
+      `${greeting} - I’m calling because the acquisition usually changes what is worth checking on the power side, can I give you the reason?`,
+    ],
+    new_location: [
+      `${greeting} - can I give you the short reason I’m calling about the new site?`,
+      `${greeting} - I’m calling because a new site usually means a quick power-side check, can I give you the reason?`,
+    ],
+    leadership_change: [
+      `${greeting} - can I give you the short reason I’m calling about the leadership change?`,
+      `${greeting} - I’m calling because new leadership usually means a fresh look at the electricity setup, can I give you the reason?`,
+    ],
+    growth: [
+      `${greeting} - can I give you the short reason I’m calling about the growth?`,
+      `${greeting} - I’m calling because growth usually changes the power side before the bill catches up, can I give you the reason?`,
+    ],
+    restructuring: [
+      `${greeting} - can I give you the short reason I’m calling about the footprint change?`,
+      `${greeting} - I’m calling because a footprint change usually leaves something to clean up on the power side, can I give you the reason?`,
+    ],
+    contract_win: [
+      `${greeting} - can I give you the short reason I’m calling about the new contract or project?`,
+      `${greeting} - I’m calling because a new contract usually changes the load mix fast, can I give you the reason?`,
+    ],
+    funding: [
+      `${greeting} - can I give you the short reason I’m calling about the new funding?`,
+      `${greeting} - I’m calling because fresh capital usually means a new facility plan or equipment plan, can I give you the reason?`,
+    ],
+    technical_load: [
+      `${greeting} - can I give you the short reason I’m calling about the equipment side?`,
+      `${greeting} - I’m calling because new equipment usually changes the usage pattern before the bill catches up, can I give you the reason?`,
+    ],
+    industry_context: [
+      `${greeting} - can I give you the short reason I’m calling about ${companyName}?`,
+      `${greeting} - I found a detail on ${companyName} that looked worth a quick call, can I give you the reason?`,
+    ],
+  }
+
+  return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
+}
+
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const sourceLead = buildSourceLead(account, candidate)
@@ -4022,21 +4071,6 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   )
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
-  const openerBySignal: Record<SignalFamily, string[]> = {
-    acquisition: [sourceLead],
-    new_location: [sourceLead],
-    leadership_change: [sourceLead],
-    growth: [sourceLead],
-    restructuring: [sourceLead],
-    contract_win: [sourceLead],
-    funding: [sourceLead],
-    technical_load: [sourceLead],
-    industry_context: [
-      sourceLead,
-    ],
-  }
-
-  const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const signalLineBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       `After an acquisition, somebody usually has to sort out what got inherited on the power side.`,
@@ -4104,35 +4138,32 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
 
   // Create a more cohesive flow
   let fullTrack = ''
-  
-  if (context.signalFamily === 'industry_context') {
-    // Lead with a company fact or operating detail, then the observation, then the question.
-    // Do not fall back to generic "what most operators" phrasing here.
-    const companyLeadOptions = context.industryCluster === 'school_district'
-      ? [
-          sourceLead,
-          multiSiteInfo.isMultiSite
-            ? `${companyName} runs a multi-campus school network, so each campus can carry its own summer cooling and classroom-technology load.`
-            : `${companyName} is a school district, so the campus calendar and summer HVAC are the parts to watch.`,
-          fallbackIndustryLine,
-          openingIndustryLine,
-        ]
-      : [
-          sourceLead,
-          multiSiteInfo.isMultiSite
-            ? `${companyName} has a multi-site footprint, so the location-by-location differences matter more than a broad summary.`
-            : `${companyName} is the kind of operation where the location-level detail matters more than a broad summary.`,
-          fallbackIndustryLine,
-          openingIndustryLine,
-        ]
-    
-    const companyLead = pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
+  const permissionOpener = buildPermissionOpener(account, context, variantSeed)
+  const bodyLead = context.signalFamily === 'industry_context'
+    ? (() => {
+        const companyLeadOptions = context.industryCluster === 'school_district'
+          ? [
+              sourceLead,
+              multiSiteInfo.isMultiSite
+                ? `${companyName} runs a multi-campus school network, so each campus can carry its own summer cooling and classroom-technology load.`
+                : `${companyName} is a school district, so the campus calendar and summer HVAC are the parts to watch.`,
+              fallbackIndustryLine,
+              openingIndustryLine,
+            ]
+          : [
+              sourceLead,
+              multiSiteInfo.isMultiSite
+                ? `${companyName} has a multi-site footprint, so the location-by-location differences matter more than a broad summary.`
+                : `${companyName} is the kind of operation where the location-level detail matters more than a broad summary.`,
+              fallbackIndustryLine,
+              openingIndustryLine,
+            ]
 
-    fullTrack = `${companyLead} ${forensicObservation} ${question}`
-  } else {
-    // Signal-led flow
-    fullTrack = `${opener} ${forensicObservation} ${question}`
-  }
+        return pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
+      })()
+    : sourceLead
+
+  fullTrack = `${permissionOpener} ${bodyLead} ${forensicObservation} ${question}`
 
   return simplifyTalkTrackLanguage(fullTrack.replace(/\s+/g, ' ').trim())
 }
@@ -4975,16 +5006,17 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
-- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
-- If you cannot name the actual event, do not force a news-style opener. Use a plain website or company update opener instead.
+- Use a permission-based cold-call opener first. State your name/company and ask for permission to give the reason for the call. Keep it to one sentence. If an audience profile is present, you may use the first name once if it sounds natural.
+- The next sentence should name the actual event, company fact, or facility detail. Do not write "I saw a report about [company]" and then move on. If you can name the event, keep it in that second sentence. Example: "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
+- If you cannot name the actual event, do not force a news-style second sentence. Use a plain website or company update detail instead.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, the opening style, and the question to ask.
-- Start with a direct observation about the event and why it matters for operations. Do not open like a support ticket or ask if the person is "responsible" for electricity.
-- Rotate the first sentence shape. Do not always open the same way.
+- Start with a permission-based opener, then move into the direct observation about the event and why it matters for operations. Do not open like a support ticket or ask if the person is "responsible" for electricity.
+- Rotate the opener and second sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
@@ -5078,8 +5110,9 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
-- If the sentence cannot name the event clearly, do not use a report-style opener.
+- Use a permission-based cold-call opener first. State your name/company and ask for permission to give the reason for the call. Keep it to one sentence. If an audience profile is present, you may use the first name once if it sounds natural.
+- The next sentence should name the actual business fact, event, or footprint detail. Do not write "I saw a report about [company]" and then move on. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
+- If the sentence cannot name the event clearly, do not use a report-style second sentence.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
@@ -5090,8 +5123,8 @@ Decision rules:
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
 - If an audience_profile block is present, use it as the human lens. Keep the first name or title tied to the business question instead of generic company language.
-- Start with a direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
-- Rotate the first sentence shape. Do not always open with the same setup.
+- Start with a permission-based opener, then move into the direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
+- Rotate the opener and second sentence shape. Do not always open with the same setup.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
