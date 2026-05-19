@@ -145,6 +145,7 @@ type ResearchHit = {
 type RankedResearchHit = ResearchHit & {
   __index: number
   __sourceTrust: number
+  __ageAdjustedPriority: number
 }
 
 type BriefResult = {
@@ -423,6 +424,18 @@ function hasStrongAutomotiveSignals(text: string) {
   return /(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
 }
 
+function hasStrongRetailStoreSignals(text: string) {
+  return /(lifestyle (?:and )?design store|department store|luxury retail|retail store|showroom space|showrooms?|home goods|tabletop|bedding|bath|furniture|garden|fashion|apothecary|shopping|customer-facing retail)/i.test(text)
+}
+
+function hasStrongManufacturersRepSignals(text: string) {
+  return /(manufacturers?'?\s+rep(?:resentative)?|manufacturers?'?\s+representative agency|rep firm|lighting rep|electrical rep|sales rep agency|independent sales representative|represents? manufacturers?|working with distributors|electrical contractors|engineers|architects|lighting designers)/i.test(text)
+}
+
+function hasStrongBakeryCafeSignals(text: string) {
+  return /(bakery caf[eé]|bakery cafe|neighborhood bakery|bakery chain|fresh baked goods|pastries|warm breads|cakes|brewed drinks|bakery-caf[eé]|baked goods and beverages)/i.test(text)
+}
+
 function hasStrongAutoPartsDistributionSignals(text: string) {
   return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket parts|aftermarket collision parts|parts house|parts stores?|parts supplier|parts distribution|distribution centers?|same[-\s]?day parts|automotive service centers|repair centers|fleet and municipal)/i.test(text)
 }
@@ -432,7 +445,7 @@ function hasStrongDmeSignals(text: string) {
 }
 
 function hasStrongRestaurantSignals(text: string) {
-  return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging)/i.test(text)
+  return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging)/i.test(text)
 }
 
 function hasStrongManufacturingSignals(text: string) {
@@ -472,6 +485,9 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const dentalSignals = hasStrongDentalSignals(accountText)
   const dmeSignals = hasStrongDmeSignals(accountText)
   const restaurantSignals = hasStrongRestaurantSignals(accountText)
+  const retailStoreSignals = hasStrongRetailStoreSignals(accountText)
+  const manufacturersRepSignals = hasStrongManufacturersRepSignals(accountText)
+  const bakeryCafeSignals = hasStrongBakeryCafeSignals(accountText)
   const logisticsSignals = hasStrongLogisticsSignals(accountText)
   const autoPartsDistributionSignals = hasStrongAutoPartsDistributionSignals(accountText)
   const officeSignals = hasStrongOfficeServicesSignals(accountText)
@@ -496,6 +512,18 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (restaurantSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
+    return true
+  }
+
+  if (retailStoreSignals && /(school|school district|manufacturing|industrial|plant|production|warehouse|logistics|distribution|cold storage|clinic|hospital)/i.test(profileText)) {
+    return true
+  }
+
+  if (manufacturersRepSignals && /(warehouse|logistics|distribution network|manufacturing|industrial|plant|production|dock activity|material handling|cold storage)/i.test(profileText)) {
+    return true
+  }
+
+  if (bakeryCafeSignals && /(cold storage|warehouse|food production plant|manufacturing|industrial|plant|production lines?|distribution network)/i.test(profileText)) {
     return true
   }
 
@@ -1075,6 +1103,16 @@ function getAgeAdjustedPriority(item: ResearchHit): number {
   const age = Date.now() - new Date(item.publishedAt).getTime()
   if (age > MAX_SIGNAL_AGE_MS) return item.priority + 4 // too old → deprioritise heavily
   return item.priority
+}
+
+function isStaleNewsSignal(item: ResearchHit | null) {
+  if (!item?.publishedAt) return false
+  if (item.sourceKind !== 'news' && item.sourceKind !== 'linkedin') return false
+
+  const publishedTime = new Date(item.publishedAt).getTime()
+  if (!Number.isFinite(publishedTime)) return false
+
+  return Date.now() - publishedTime > MAX_SIGNAL_AGE_MS
 }
 
 function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
@@ -1824,6 +1862,9 @@ function buildStructuredIdentityProfile(
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
+  const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
+  const isManufacturersRepAgency = hasStrongManufacturersRepSignals(text)
+  const isBakeryCafe = hasStrongBakeryCafeSignals(text)
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
   const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
@@ -1937,6 +1978,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'logistics':
+      if (isManufacturersRepAgency) {
+        companyType = 'manufacturers representative agency'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-state sales and specification network' : 'office and showroom sales agency'
+        facilityType = 'office / showroom / training space'
+        identityKeywords = selectIdentityKeywords(text, ['manufacturers representative', 'lighting', 'electrical products', 'controls', 'architects', 'engineers', 'contractors', 'distributors'], ['manufacturers representative', 'lighting and electrical products', 'sales agency'])
+        powerKeywords = selectIdentityKeywords(text, ['office HVAC', 'showroom lighting', 'training space', 'controls displays', 'IT equipment'], ['showroom lighting', 'office HVAC', 'training space'])
+        talkTrackGuardrails = ['No logistics language', 'No warehouse language', 'No manufacturing language', 'No dock activity language']
+        break
+      }
+
       if (isAutoPartsDistributor) {
         companyType = multiSiteInfo.isMultiSite ? 'wholesale auto-parts distribution network' : 'wholesale auto-parts supplier'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-location parts distribution network' : 'parts supply and distribution site'
@@ -1985,6 +2036,16 @@ function buildStructuredIdentityProfile(
         break
       }
 
+      if (isLifestyleRetailStore) {
+        companyType = 'lifestyle and design retail store'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-building retail campus' : 'large showroom-based retail store'
+        facilityType = 'showroom / retail campus'
+        identityKeywords = selectIdentityKeywords(text, ['lifestyle and design store', 'showroom space', 'furniture', 'tabletop', 'bedding', 'bath', 'fashion', 'garden'], ['lifestyle retail', 'showroom space', 'design store'])
+        powerKeywords = selectIdentityKeywords(text, ['showroom lighting', 'HVAC', 'large open floor plans', 'retail hours', 'multi-building campus'], ['showroom lighting', 'HVAC', 'retail hours'])
+        talkTrackGuardrails = ['No school language', 'No manufacturing language', 'No logistics language']
+        break
+      }
+
       companyType = multiSiteInfo.isMultiSite ? 'retail store network' : 'retail business'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-store footprint' : 'customer-facing retail site'
       facilityType = 'store / showroom'
@@ -1994,6 +2055,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'restaurant':
+      if (isBakeryCafe) {
+        companyType = multiSiteInfo.isMultiSite ? 'bakery cafe network' : 'bakery cafe'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location bakery cafe footprint' : 'single bakery cafe'
+        facilityType = 'bakery cafe / customer-facing food service'
+        identityKeywords = selectIdentityKeywords(text, ['bakery cafe', 'pastries', 'warm breads', 'cakes', 'coffee', 'fresh baked goods'], ['bakery cafe', 'pastries', 'fresh baked goods'])
+        powerKeywords = selectIdentityKeywords(text, ['ovens', 'proofers', 'refrigeration', 'display cases', 'HVAC', 'morning production'], ['ovens', 'refrigeration', 'display cases'])
+        talkTrackGuardrails = ['No factory language', 'No food production plant language', 'No cold-storage warehouse language']
+        break
+      }
+
       companyType = multiSiteInfo.isMultiSite ? 'restaurant group' : 'restaurant'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-location dining footprint' : 'single restaurant site'
       facilityType = 'restaurant / dining facility'
@@ -2093,6 +2164,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'office_services':
+      if (isManufacturersRepAgency) {
+        companyType = 'manufacturers representative agency'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-state sales and specification network' : 'office and showroom sales agency'
+        facilityType = 'office / showroom / training space'
+        identityKeywords = selectIdentityKeywords(text, ['manufacturers representative', 'lighting', 'electrical products', 'controls', 'architects', 'engineers', 'contractors', 'distributors'], ['manufacturers representative', 'lighting and electrical products', 'sales agency'])
+        powerKeywords = selectIdentityKeywords(text, ['office HVAC', 'showroom lighting', 'training space', 'controls displays', 'IT equipment'], ['showroom lighting', 'office HVAC', 'training space'])
+        talkTrackGuardrails = ['No logistics language', 'No warehouse language', 'No manufacturing language', 'No dock activity language']
+        break
+      }
+
       companyType = 'professional services business'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-office footprint' : 'office-based business'
       facilityType = 'office'
@@ -2515,6 +2596,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
+  if (hasStrongBakeryCafeSignals(text)) return 'restaurant'
+  if (hasStrongRetailStoreSignals(text)) return 'retail'
+  if (hasStrongManufacturersRepSignals(text)) return 'office_services'
   if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
   if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
@@ -2522,14 +2606,12 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
-  // Lighting/electrical rep firms — NOT logistics, NOT manufacturing
-  if (/(manufacturers?\s*rep|rep\s*firm|lighting rep|electrical rep|sales rep agency|agent for|represents manufacturers?)/.test(text)) return 'office_services'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
   if (hotelProperty && (verifiedLocationCount === null || verifiedLocationCount <= 1)) return 'hotel_owner'
   if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy|psychiatric|partial hospitalization|intensive outpatient|substance use|chemical dependency)/.test(text)) return 'healthcare'
-  if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
+  if (/(restaurant|dining|cafe|café|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
@@ -3467,6 +3549,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const retailMultiSite = detectMultiSiteScale(account, candidate)
       const isAutoGroup = hasStrongAutomotiveSignals(text)
 
+      if (hasStrongRetailStoreSignals(text) && !isAutoGroup) {
+        return {
+          label: 'Lifestyle retail showroom',
+          angle: 'Showroom lighting, large retail floors, customer hours, and summer HVAC shaping the bill at a design-store campus.',
+          question: 'Are you able to see whether showroom lighting or summer HVAC is creating the biggest spikes, or does it just show up as one retail bill?',
+          openers: [
+            `Lifestyle retailers like ${companyName} usually care about the customer experience first, but large showroom floors, lighting, and summer HVAC can make the bill move fast.`,
+            `A design-store campus is different from a small shop because lighting, open floor plans, and customer comfort can all hit the meter at once.`,
+            `The question is whether showroom lighting or HVAC is creating the biggest usage spikes on the meter.`,
+          ],
+          focus: ['showroom lighting', 'retail floors', 'customer hours', 'summer HVAC', 'design-store campus'],
+        }
+      }
+
       if (isAutoGroup) {
         if (retailMultiSite.isMultiSite) {
           const locationDesc = retailMultiSite.locationCount
@@ -3484,8 +3580,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             question: `With ${locationDesc}${regionDesc}, are you comparing each dealership on its own meter, or is the group view making it hard to see which locations are carrying the bigger charges?`,
             openers: [
               `Auto groups with ${locationDesc} usually need a dealership-by-dealership view, because showroom traffic, service bays, parts, and lot lighting all behave differently.`,
-              `With that kind of footprint${regionDesc}, one dealership can carry a very different peak history even when the group total looks fine.`,
-              `The useful question is which dealerships are carrying the biggest charges on their own meters.`,
+              `Across ${locationDesc}${regionDesc}, one dealership can carry a very different peak history even when the group total looks fine.`,
+              `The question is which dealerships are carrying the biggest charges on their own meters.`,
             ],
             focus: ['dealership-by-dealership review', 'showroom lighting', 'service bays', 'parts', 'lot lighting', 'meter-level exposure'],
           }
@@ -3497,7 +3593,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: `Have you looked at whether the showroom, service bays, parts, or lot lighting are what create the biggest spikes on ${companyName}?`,
           openers: [
             `${companyName} is different because showroom traffic, service bays, parts, and lot lighting all show up differently on the meter.`,
-            `The useful question is whether the showroom, service department, or lot lighting is creating the biggest usage moments.`,
+            `The question is whether the showroom, service department, or lot lighting is creating the biggest usage moments.`,
             `For a dealership, the power side usually comes down to which part of the site is really driving the charge.`,
           ],
           focus: ['showroom traffic', 'service bays', 'parts department', 'lot lighting', 'meter-level exposure'],
@@ -3538,6 +3634,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'restaurant':
       const restaurantMultiSite = detectMultiSiteScale(account, candidate)
+
+      if (hasStrongBakeryCafeSignals(text)) {
+        const locationDesc = restaurantMultiSite.locationCount
+          ? `${restaurantMultiSite.locationCount}+ bakery cafes`
+          : 'a bakery cafe'
+        const regionDesc = restaurantMultiSite.regions.length > 1
+          ? ` across ${restaurantMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'Bakery cafe',
+          angle: `Ovens, proofers, refrigeration, display cases, customer hours, and HVAC shaping the bill across ${locationDesc}${regionDesc}.`,
+          question: 'Are you able to see whether ovens, refrigeration, or display cases are creating the biggest spikes, or does it just show up as one cafe bill?',
+          openers: [
+            `Bakery cafe operators usually care about keeping the guest experience consistent, but ovens, refrigeration, display cases, and HVAC can all hit the meter during the same windows.`,
+            `A bakery cafe is not a production plant; the power pattern is tied to morning baking, display refrigeration, customer hours, and HVAC.`,
+            `The question is whether the baking side or the customer-facing side is creating the biggest usage spikes.`,
+          ],
+          focus: ['ovens', 'proofers', 'refrigeration', 'display cases', 'customer hours', 'HVAC'],
+        }
+      }
       
       if (restaurantMultiSite.isMultiSite && restaurantMultiSite.locationCount && restaurantMultiSite.locationCount >= 5) {
         const locationDesc = restaurantMultiSite.locationCount >= 20 
@@ -3549,14 +3666,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         
         return {
           label: 'Restaurant chain',
-          angle: 'Coincident kitchen peaks showing up on specific site meters while the roll-up view makes the problem harder to isolate.',
-          question: `With ${locationDesc}${regionDesc}, are you tracking the coincident peaks site-by-site, or is it one big bucket?`,
+          angle: 'Kitchen equipment, refrigeration, and HVAC creating high-usage moments that can sit on specific location bills.',
+          question: `With ${locationDesc}${regionDesc}, are you comparing which locations create the biggest usage spikes during rush periods, or is it still one blended view?`,
           openers: [
-            `Restaurant groups with ${locationDesc} usually have a significant blind spot in how kitchen service rushes are setting local demand ratchets.`,
-            `With that kind of footprint${regionDesc}, one unit's kitchen spike can leave a higher charge on that meter even if the rest of the group looks normal.`,
-            `The useful check is whether any of those ${locationDesc} are carrying a stealth demand ratchet from service peaks.`,
+            `Restaurant groups with ${locationDesc} usually care about keeping service consistent, but kitchen rushes, refrigeration, and HVAC can make one location cost a lot more than the rest.`,
+            `Across ${locationDesc}${regionDesc}, one unit's kitchen spike can leave a higher charge on that meter even if the rest of the group looks normal.`,
+            `The question is whether any of those ${locationDesc} are carrying peak charges from service rushes.`,
           ],
-          focus: ['coincident peaks', 'service rushes', 'kitchen load', 'demand ratchets', 'portfolio visibility', 'billing floors'],
+          focus: ['service rushes', 'kitchen equipment', 'refrigeration', 'HVAC', 'location-level bill spikes'],
         }
       }
       
@@ -3565,27 +3682,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       if (isHospitality) {
         return {
           label: 'Hospitality / Event Venues',
-          angle: '24/7 base load and lodging HVAC driving demand ratchets.',
-          question: 'Are you tracking the peak exposure on that 24/7 base load, or is the lodging HVAC masking the ratchets?',
+          angle: 'Guest rooms, event timing, kitchen service, laundry, and HVAC creating the highest usage moments.',
+          question: 'Are you able to see whether guest rooms, event timing, kitchen service, laundry, or HVAC is creating the biggest spike on the bill?',
           openers: [
-            `Hospitality and event venues are unique because the load never really gets to sleep, especially with on-site lodging.`,
-          `With 24/7 operations, the useful question is how the base load hides the peaks that set the billing floor.`,
-            `The power side matters here because the constant load from HVAC and lodging can quietly set a demand ratchet that lasts for months.`,
+            `Hospitality and event venues are unique because guest rooms, event timing, kitchen service, laundry, and HVAC can all hit the meter differently.`,
+            `For a lodging or event property, the question is which part of the building is creating the biggest bill days.`,
+            `The power side matters here because one busy, hot operating window can leave a higher charge on that property's meter.`,
           ],
-          focus: ['24/7 base load', 'lodging HVAC', 'event peaks', 'demand ratchets', 'billing floors', 'capacity mismatch'],
+          focus: ['guest rooms', 'event timing', 'kitchen service', 'laundry', 'HVAC', 'property meter'],
         }
       }
 
       return {
         label: 'Restaurant / Dining',
-        angle: 'Kitchen coincident peaks from service rushes setting high billing floors.',
-        question: 'Have you looked at whether your game-day or service rushes are setting a demand ratchet that lasts all year?',
+        angle: 'Kitchen equipment, refrigeration, and HVAC creating the highest usage moments during rush periods.',
+        question: 'Have you looked at whether fryers, grills, refrigeration, and AC are all hitting the meter during the same rush periods?',
         openers: [
-          `In a high-intensity brand like this, your forensic driver is the Coincident Kitchen Peak during service rushes.`,
-          `If your fryers, grills, and HVAC all peak during a rush, you're setting a demand ratchet that follows you into the slow months.`,
-          `The real cost driver for restaurant groups is the peak floor set by the kitchen equipment, not the energy rate itself.`,
+          `Restaurant operators usually care about service speed and guest experience first, but fryers, grills, refrigeration, and AC can all hit the bill at once during a rush.`,
+          `If kitchen equipment and AC peak together during a hot service window, that one spike can stay expensive for months.`,
+          `The question is whether the kitchen rush or the cooling load is creating the biggest charge on the meter.`,
         ],
-        focus: ['coincident peaks', 'service rushes', 'kitchen equipment', 'demand ratchets', 'billing floors', 'HVAC load'],
+        focus: ['service rushes', 'kitchen equipment', 'refrigeration', 'HVAC load', 'peak charges'],
       }
     case 'hotel_owner':
       return {
@@ -3740,16 +3857,30 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['process timing', 'transmission exposure', 'peak start-ups', 'demand ratchets', 'billing floors', 'load factor'],
       }
     case 'office_services':
+      if (hasStrongManufacturersRepSignals(text)) {
+        return {
+          label: 'Lighting and electrical rep agency',
+          angle: 'Showroom lighting, office HVAC, controls displays, and training space creating a different power pattern than a warehouse or plant.',
+          question: 'Are you able to see whether the showroom and training spaces are the bigger bill drivers, or is it all getting lumped into office overhead?',
+          openers: [
+            `Lighting and electrical rep firms usually care about keeping showrooms, training spaces, and product displays ready for contractors and designers without letting facility costs drift.`,
+            `A manufacturers' rep agency is not a warehouse; the power pattern usually comes from showroom lighting, controls displays, office HVAC, and training space.`,
+            `The question is whether the showroom and training areas are creating the biggest usage spikes, not dock activity or warehouse throughput.`,
+          ],
+          focus: ['showroom lighting', 'controls displays', 'training space', 'office HVAC', 'contractor education'],
+        }
+      }
+
       return {
         label: 'Office / Professional Services',
-        angle: 'Occupancy-driven HVAC and lighting peaks setting the annual billing floor.',
-        question: 'Are you guys tracking whether the summer HVAC peaks are setting a demand ratchet that sticks for the rest of the year?',
+        angle: 'Occupancy, HVAC, lighting, and IT equipment creating higher-use windows during business hours.',
+        question: 'Are you able to see whether summer cooling or office occupancy is creating the biggest spike on the bill?',
         openers: [
-          `Professional office spaces have a specific liability because the cooling load during peak business hours usually sets a billing floor that hides in the budget for 11 months.`,
-          `The useful check is whether your occupancy peaks are triggering a demand ratchet that is dragging down the budget.`,
-          `With office footprints, the power side matters because the load factor is usually much lower than the occupancy suggests.`,
+          `Professional office spaces usually care about predictable overhead, but summer cooling and occupancy can make the bill jump during normal business hours.`,
+          `The question is whether the office is paying for one or two high-usage windows instead of normal day-to-day usage.`,
+          `For office-heavy businesses, HVAC, lighting, and IT equipment are usually the first places to check when the bill moves.`,
         ],
-        focus: ['HVAC peaks', 'occupancy drivers', 'demand ratchets', 'billing floors', 'load factor'],
+        focus: ['HVAC peaks', 'occupancy drivers', 'lighting', 'IT equipment', 'business-hour spikes'],
       }
     case 'multi_site':
       return {
@@ -5115,6 +5246,10 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
     return null
   }
 
+  if (isStaleNewsSignal(candidate)) {
+    return null
+  }
+
   if (isLikelyNonEnglishText(headline, detail, talkTrack, sourceUrl, result?.source_title || '', result?.source_domain || '')) {
     return null
   }
@@ -5826,6 +5961,56 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           account: serializeAccount(account),
         })
       }
+    }
+
+    if (isCompetitorEnergyBroker(account as AccountRow)) {
+      const now = new Date().toISOString()
+      const competitorBrief: StoredBriefResult = {
+        usable_signal: true,
+        signal_headline: 'Competitor Energy Broker / Energy Management Firm',
+        signal_detail: `${cleanText(account.name) || 'This account'} appears to be an energy broker, energy consultant, or energy management firm. Do not use a standard prospecting brief for this account unless the goal is a referral, partnership, or competitive-intelligence conversation.`,
+        opener: null,
+        talk_track: 'This is not a normal prospect call because they already work in energy procurement or energy management. If you call them, the angle should be referral or partnership fit, not reviewing their electricity bill.',
+        signal_date: now.slice(0, 10),
+        source_date: now.slice(0, 10),
+        source_url: account.domain ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
+        confidence_level: 'High',
+        selected_priority: 9,
+        source_title: 'Competitor account guardrail',
+        source_domain: account.domain || '',
+      }
+
+      const { data: updatedAccount, error: updateError } = await supabaseAdmin
+        .from('accounts')
+        .update({
+          intelligence_brief_status: 'ready',
+          intelligence_brief_last_refreshed_at: now,
+          intelligence_brief_headline: competitorBrief.signal_headline,
+          intelligence_brief_detail: competitorBrief.signal_detail,
+          intelligence_brief_opener: null,
+          intelligence_brief_talk_track: competitorBrief.talk_track,
+          intelligence_brief_signal_date: competitorBrief.signal_date,
+          intelligence_brief_reported_at: competitorBrief.source_date,
+          intelligence_brief_source_url: competitorBrief.source_url,
+          intelligence_brief_confidence_level: competitorBrief.confidence_level,
+        })
+        .eq('id', accountId)
+        .select(ACCOUNT_SELECT)
+        .single()
+
+      if (updateError) {
+        console.error('[Intelligence Brief] Competitor account update failed:', updateError)
+        return res.status(200).json({ ok: false, message: FALLBACK_MESSAGE, detail: updateError.message, account: serializeAccount(account) })
+      }
+
+      return res.status(200).json({
+        ok: true,
+        message: 'Account flagged as energy-broker competitor. Standard prospecting brief skipped.',
+        brief: competitorBrief,
+        account: serializeAccount(updatedAccount as AccountRow),
+        diagnostics: buildResearchDiagnostics([]),
+        usedFallback: false,
+      })
     }
 
     const hierarchyIds = extractHierarchyIds(account.metadata)
