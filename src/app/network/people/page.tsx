@@ -324,7 +324,7 @@ export default function PeoplePage() {
             <button
               type="button"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center -ml-1 text-sm font-medium gap-2 bg-transparent border-0 p-0 text-zinc-500 cursor-pointer"
+              className="flex items-center pl-1 text-sm font-medium gap-2 bg-transparent border-0 p-0 text-zinc-500 cursor-pointer"
             >
               Name
               <ArrowUpDown className="ml-1 h-4 w-4" />

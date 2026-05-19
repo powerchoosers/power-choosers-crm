@@ -1028,43 +1028,45 @@ export default function TargetDetailPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
 
-      <CollapsiblePageHeader
-        backHref="/network/targets"
-        title={
-          <div className="flex items-center gap-3">
-            <h1 className="text-4xl font-semibold tracking-tighter text-white uppercase">
-              {targetLoading ? 'Loading...' : target?.name}
-            </h1>
-            <Badge className="bg-white/5 text-zinc-500 border-white/10 uppercase font-mono text-[10px] tracking-widest">
-              {isPeopleList ? 'Human_Intel' : 'Asset_Intel'}
-            </Badge>
-          </div>
-        }
-        description={
-          <p className="text-zinc-500 mt-1">
-            Target Array Cluster: {target?.id?.slice(0, 8)}
-          </p>
-        }
-        globalFilter={globalFilter}
-        onSearchChange={(value) => {
-          setGlobalFilter(value)
-          setPage(0)
-        }}
-        onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
-        isFilterActive={isFilterOpen || columnFilters.length > 0}
-        primaryAction={{
-          label: "Initialize Node",
-          onClick: () => {
-            setRightPanelMode('TARGET_SEARCH')
-            setIngestionContext({
-              listId: id,
-              listName: target?.name || 'Target',
-              listKind: target?.kind || (isPeopleList ? 'people' : 'account')
-            })
-          },
-          icon: <Plus size={18} />
-        }}
-      />
+      <div className="sticky top-0 z-30 -mx-1 bg-zinc-950/95 px-1 pt-4 pb-3 backdrop-blur-md">
+        <CollapsiblePageHeader
+          backHref="/network/targets"
+          title={
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tighter text-white uppercase leading-none">
+                {targetLoading ? 'Loading...' : target?.name}
+              </h1>
+              <Badge className="bg-white/5 text-zinc-500 border-white/10 uppercase font-mono text-[9px] tracking-widest px-2 py-0.5">
+                {isPeopleList ? 'Human_Intel' : 'Asset_Intel'}
+              </Badge>
+            </div>
+          }
+          description={
+            <p className="text-zinc-500 mt-1 text-sm md:text-base">
+              Target Array Cluster: {target?.id?.slice(0, 8)}
+            </p>
+          }
+          globalFilter={globalFilter}
+          onSearchChange={(value) => {
+            setGlobalFilter(value)
+            setPage(0)
+          }}
+          onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
+          isFilterActive={isFilterOpen || columnFilters.length > 0}
+          primaryAction={{
+            label: "Initialize Node",
+            onClick: () => {
+              setRightPanelMode('TARGET_SEARCH')
+              setIngestionContext({
+                listId: id,
+                listName: target?.name || 'Target',
+                listKind: target?.kind || (isPeopleList ? 'people' : 'account')
+              })
+            },
+            icon: <Plus size={18} />
+          }}
+        />
+      </div>
 
       <FilterCommandDeck
         isOpen={isFilterOpen}
