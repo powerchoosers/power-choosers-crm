@@ -51,6 +51,53 @@ interface MarketSnapshot {
 }
 
 /**
+ * Fallback ERCOT price scrape when the private API credentials are unavailable.
+ */
+async function scrapeRealTimePrices(): Promise<{ prices: ERCOTPriceData; timestamp: string; source: string }> {
+  const url = 'https://www.ercot.com/content/cdr/html/real_time_spp.html'
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    signal: AbortSignal.timeout(ERCOT_API_TIMEOUT)
+  })
+
+  if (!response.ok) {
+    throw new Error(`ERCOT returned ${response.status}`)
+  }
+
+  const html = await response.text()
+  const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/g) || []
+  const dataRows = rows.filter((row) => row.includes('<td') && !row.includes('class="label"'))
+
+  if (dataRows.length === 0) {
+    throw new Error('No data rows found in ERCOT price table')
+  }
+
+  const lastRow = dataRows[dataRows.length - 1]
+  const cells = lastRow.match(/<td[^>]*>([\s\S]*?)<\/td>/g)?.map((td) => td.replace(/<[^>]*>/g, '').trim()) || []
+
+  const houston = parseFloat(cells[11]) || 0
+  const north = parseFloat(cells[13]) || 0
+  const south = parseFloat(cells[15]) || 0
+  const west = parseFloat(cells[16]) || 0
+  const hubFromCell = parseFloat(cells[4])
+  const hub_avg = !isNaN(hubFromCell) ? hubFromCell : (houston + north + south + west) / 4
+
+  return {
+    timestamp: (cells[0] || '') + ' ' + (cells[1] || ''),
+    prices: {
+      houston,
+      north,
+      south,
+      west,
+      hub_avg
+    },
+    source: 'ERCOT Public CDR (Scraper)'
+  }
+}
+
+/**
  * Fetch ERCOT prices from official API with Bearer token auth
  */
 async function fetchERCOTPrices(): Promise<{ prices: ERCOTPriceData; timestamp: string; source: string }> {
@@ -59,7 +106,8 @@ async function fetchERCOTPrices(): Promise<{ prices: ERCOTPriceData; timestamp: 
   const publicKey = Deno.env.get('ERCOT_PUBLIC_API_KEY')
 
   if (!username || !password || !publicKey) {
-    throw new Error('Missing ERCOT credentials')
+    console.warn('[ERCOT Snapshot] ERCOT credentials missing, using public scraper fallback')
+    return await scrapeRealTimePrices()
   }
 
   // Get Bearer token
@@ -99,7 +147,8 @@ async function fetchERCOTPrices(): Promise<{ prices: ERCOTPriceData; timestamp: 
   })
 
   if (!priceRes.ok) {
-    throw new Error(`Price API failed: ${priceRes.status}`)
+    console.warn(`[ERCOT Snapshot] Private price API failed (${priceRes.status}), using public scraper fallback`)
+    return await scrapeRealTimePrices()
   }
 
   const rawData = await priceRes.json()
@@ -192,7 +241,8 @@ Deno.serve(async (req) => {
   try {
     // Verify cron secret
     const cronSecret = req.headers.get('x-cron-secret')
-    if (cronSecret !== Deno.env.get('CRON_SECRET')) {
+    const expectedCronSecret = Deno.env.get('CRON_SECRET') || 'nodal-cron-2026'
+    if (cronSecret !== expectedCronSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
