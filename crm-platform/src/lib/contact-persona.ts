@@ -298,38 +298,38 @@ function buildOpenerHint(profile: AudienceProfile): string {
   const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
   switch (profile.roleFamily) {
     case 'finance':
-      return `Most finance leaders want budget clarity at ${company}, especially on which sites are driving the spikes.`
+      return `At ${company}, finance leaders usually care about budget surprises and which sites are driving the spikes.`
     case 'operations':
-      return `Most operations leaders care about site-by-site usage at ${company} and what is driving the spikes.`
+      return `At ${company}, operations leaders usually care about site usage, timing, and what is driving the spikes.`
     case 'facilities':
-      return `Most facilities leaders care about building uptime at ${company} and which buildings need the most attention.`
+      return `At ${company}, facilities leaders usually care about building uptime and which buildings need the most attention.`
     case 'procurement':
-      return `Most procurement leaders are looking at renewal timing at ${company} and whether the current setup still makes sense.`
+      return `At ${company}, procurement leaders usually care about renewal timing and whether the current setup still makes sense.`
     case 'executive':
-      return `Most executives care about the risk side at ${company} and whether this deserves attention now.`
+      return `At ${company}, executives usually care about the risk side and whether this deserves attention now.`
     case 'real_estate':
-      return `Most real estate leaders are focused on the site and lease side at ${company}.`
+      return `At ${company}, real estate leaders usually focus on the site and lease side.`
     case 'technology':
-      return `Most technology leaders care about uptime and growth at ${company}.`
+      return `At ${company}, technology leaders usually care about uptime and growth.`
     case 'healthcare':
-      return `Most healthcare leaders care about reliability at ${company}.`
+      return `At ${company}, healthcare leaders usually care about reliability.`
     case 'education':
-      return `Most education leaders care about campus timing at ${company}.`
+      return `At ${company}, education leaders usually care about campus timing.`
     case 'public_sector':
     case 'nonprofit':
-      return `Most public-sector and nonprofit leaders care about protecting the budget at ${company}.`
+      return `At ${company}, public-sector and nonprofit leaders usually care about protecting the budget.`
     case 'hospitality':
-      return `Most hospitality leaders care about guest comfort and usage at ${company}.`
+      return `At ${company}, hospitality leaders usually care about guest comfort and usage.`
     case 'retail':
       return automotiveBusiness
-        ? `Most dealership leaders care about dealership-level usage at ${company}.`
-        : `Most retail leaders care about store-level usage at ${company}.`
+        ? `At ${company}, dealership leaders usually care about dealership-level usage.`
+        : `At ${company}, retail leaders usually care about store-level usage.`
     case 'logistics':
-      return `Most logistics leaders care about dock timing at ${company}.`
+      return `At ${company}, logistics leaders usually care about dock timing.`
     case 'manufacturing':
-      return `Most manufacturing leaders care about production timing at ${company}.`
+      return `At ${company}, manufacturing leaders usually care about production timing.`
     default:
-      return `Most operators want to know what is driving the bill at ${company}.`
+      return `At ${company}, operators usually want to know what is driving the bill.`
   }
 }
 

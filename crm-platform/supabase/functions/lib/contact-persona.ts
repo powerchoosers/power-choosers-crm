@@ -288,36 +288,36 @@ function buildOpenerHint(profile: AudienceProfile): string {
   const company = profile.companyName || 'the company'
   switch (profile.roleFamily) {
     case 'finance':
-      return `I was curious how ${firstName} is looking at the budget side at ${company}.`
+      return `At ${company}, ${firstName} usually cares about budget surprises and which sites are driving the spikes.`
     case 'operations':
-      return `I was curious how ${firstName} is thinking about the site-by-site usage at ${company}.`
+      return `At ${company}, ${firstName} usually cares about site usage, timing, and what is driving the spikes.`
     case 'facilities':
-      return `I was curious how ${firstName} is thinking about building uptime at ${company}.`
+      return `At ${company}, ${firstName} usually cares about building uptime and which buildings need the most attention.`
     case 'procurement':
-      return `I was curious how ${firstName} is looking at renewal timing at ${company}.`
+      return `At ${company}, ${firstName} usually cares about renewal timing and whether the current setup still makes sense.`
     case 'executive':
-      return `I was curious how ${firstName} is weighing the risk side at ${company}.`
+      return `At ${company}, ${firstName} usually cares about the risk side and whether this deserves attention now.`
     case 'real_estate':
-      return `I was curious how ${firstName} is handling the site and lease side at ${company}.`
+      return `At ${company}, ${firstName} usually focuses on the site and lease side.`
     case 'technology':
-      return `I was curious how ${firstName} is thinking about uptime and growth at ${company}.`
+      return `At ${company}, ${firstName} usually cares about uptime and growth.`
     case 'healthcare':
-      return `I was curious how ${firstName} is thinking about reliability at ${company}.`
+      return `At ${company}, ${firstName} usually cares about reliability.`
     case 'education':
-      return `I was curious how ${firstName} is thinking about campus timing at ${company}.`
+      return `At ${company}, ${firstName} usually cares about campus timing.`
     case 'public_sector':
     case 'nonprofit':
-      return `I was curious how ${firstName} is protecting the budget at ${company}.`
+      return `At ${company}, ${firstName} usually cares about protecting the budget.`
     case 'hospitality':
-      return `I was curious how ${firstName} is thinking about guest comfort and usage at ${company}.`
+      return `At ${company}, ${firstName} usually cares about guest comfort and usage.`
     case 'retail':
-      return `I was curious how ${firstName} is comparing store-level usage at ${company}.`
+      return `At ${company}, ${firstName} usually cares about store-level usage.`
     case 'logistics':
-      return `I was curious how ${firstName} is thinking about dock timing at ${company}.`
+      return `At ${company}, ${firstName} usually cares about dock timing.`
     case 'manufacturing':
-      return `I was curious how ${firstName} is thinking about production timing at ${company}.`
+      return `At ${company}, ${firstName} usually cares about production timing.`
     default:
-      return `I was curious how ${firstName} is looking at the bill at ${company}.`
+      return `At ${company}, ${firstName} usually wants a plain-English explanation of what is driving the bill.`
   }
 }
 
@@ -566,4 +566,3 @@ export function buildAudienceLead(profile: AudienceProfile | null | undefined): 
   if (!profile) return ''
   return profile.openerHint || ''
 }
-
