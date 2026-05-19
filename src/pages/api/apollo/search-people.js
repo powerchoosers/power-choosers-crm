@@ -35,6 +35,37 @@ function contactCacheKey(contact) {
   )
 }
 
+function hasMeaningfulCompanyData(company) {
+  if (!company || typeof company !== 'object') return false
+
+  const textFields = [
+    'domain',
+    'website',
+    'description',
+    'industry',
+    'city',
+    'state',
+    'country',
+    'address',
+    'companyPhone',
+    'logoUrl',
+    'linkedin',
+    'revenue'
+  ]
+
+  return textFields.some((field) => sanitizeText(company?.[field]).length > 0) ||
+    (company?.employees !== null && company?.employees !== undefined)
+}
+
+function pickBetterCompany(existingCompany, nextCompany) {
+  const existingHasData = hasMeaningfulCompanyData(existingCompany)
+  const nextHasData = hasMeaningfulCompanyData(nextCompany)
+
+  if (nextHasData) return nextCompany
+  if (existingHasData) return existingCompany
+  return null
+}
+
 function mergeApolloContact(existing, fresh) {
   const pick = (...values) => {
     for (const value of values) {
@@ -289,9 +320,10 @@ export default async function handler(req, res) {
         contactsForCache.forEach(insertContact);
 
         const mergedContactsForCache = Array.from(mergedContactsByKey.values());
-        const existingCompany = existingData.find((data) => data.company && typeof data.company === 'object')?.company || null;
+        const existingCompany = existingData.find((data) => hasMeaningfulCompanyData(data?.company))?.company || null;
+        const resolvedCompany = pickBetterCompany(existingCompany, companySummary);
         const cacheData = {
-          company: existingCompany || companySummary,
+          company: resolvedCompany,
           contacts: mergedContactsForCache,
           timestamp: Date.now(),
           source: 'search-people',
