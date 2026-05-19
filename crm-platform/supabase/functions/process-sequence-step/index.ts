@@ -715,7 +715,7 @@ function buildContextualFallbackBody(member: any, replyStage: string, location?:
     const leadSentence = String(audienceLead || '').trim();
 
     if (stage === 'no_reply') {
-        return `${opener}${leadSentence || `I think I have the right person for ${companyPhrase}`}. The first question I would check is ${valueLane}.\n\nReply yes and I'll send what I'd check first.`;
+        return `${opener}${leadSentence || `This looks like the right person for ${companyPhrase}`}. The first question to check is ${valueLane}.\n\nReply yes and I'll send what I'd check first.`;
     }
 
     if (stage === 'follow_up') {
@@ -723,7 +723,7 @@ function buildContextualFallbackBody(member: any, replyStage: string, location?:
     }
 
     if (stage === 'first_touch') {
-        return `${opener}${leadSentence || `${companyPhrase} stood out because ${valueLane} usually shows up quietly on the bill`}. The first thing I would check is ${valueLane}.\n\nWant me to send what I'd check first?`;
+        return `${opener}${leadSentence || `${companyPhrase} stood out because ${valueLane} usually shows up quietly on the bill`}. The first thing to check is ${valueLane}.\n\nWant me to send what I'd check first?`;
     }
 
     return `${opener}${leadSentence || `${companyPhrase} stood out because of ${valueLane}`}. I can send a quick breakdown first, and if it matters, we can confirm the hard numbers later.`;
@@ -1968,8 +1968,8 @@ async function handleCallTask(execution, job) {
         const label = (metadata?.label || 'Call Step').trim();
         const taskOwnerId = resolveTaskOwnerId(member);
         const callScript = audienceLead
-            ? `${audienceLead}. The one thing I would focus on is ${pickValueLane(member)}.`
-            : `I was curious how ${contactName} is looking at the bill at ${member.company_name || 'the company'}. The one thing I would focus on is ${pickValueLane(member)}.`;
+            ? `${audienceLead}. The one thing to focus on is ${pickValueLane(member)}.`
+            : `Most leaders at ${member.company_name || 'the company'} are looking at ${pickValueLane(member)} first. The one thing to focus on is ${pickValueLane(member)}.`;
 
         const inserted = await sql`
       INSERT INTO tasks (

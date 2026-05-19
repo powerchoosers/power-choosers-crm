@@ -1228,8 +1228,8 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   if (!candidate) {
     return cleanText(account.domain)
-      ? `I was looking at how ${companyName} runs the business.`
-      : `I came across an update about ${companyName}.`
+      ? `The useful thing to understand about ${companyName} is how the business runs day to day.`
+      : `There’s a useful update about ${companyName}.`
   }
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const hasSpecificAnchor = signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()
@@ -1237,44 +1237,44 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const blockedOpening = hasStrongNewLocationEvidence(candidateText) && !isTexasRelevantLocationSignal(candidateText)
 
   if (blockedOpening) {
-    return `I came across an update about ${companyName}.`
+    return `There’s a recent update about ${companyName} worth paying attention to.`
   }
 
   if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
     if (isOfficialCompanyAnnouncement(account, candidate)) {
       return hasSpecificAnchor
-        ? `I saw your announcement about ${signalAnchor}.`
-        : `I saw your announcement about ${companyName}.`
+        ? `The announcement about ${signalAnchor} is the part that matters here.`
+        : `The announcement from ${companyName} is the part that matters here.`
     }
-    return `I was looking at how ${companyName} runs the business.`
+    return `The website update from ${companyName} points to how the business is operating right now.`
   }
 
   // Add variation based on priority to prevent repetition
   const variations = {
     linkedin: [
-      hasSpecificAnchor ? `I saw a post from ${companyName} about ${signalAnchor}.` : `I was curious about the update ${companyName} posted on LinkedIn.`,
-      hasSpecificAnchor ? `I caught the LinkedIn update about ${signalAnchor}.` : `I was looking at the recent activity on ${companyName}'s LinkedIn page.`,
-      hasSpecificAnchor ? `I noticed ${companyName} shared an update about ${signalAnchor}.` : `I was curious about some of the recent activity from ${companyName} online.`,
+      hasSpecificAnchor ? `The post about ${signalAnchor} shows what ${companyName} is working on.` : `The recent LinkedIn activity from ${companyName} is worth a look.`,
+      hasSpecificAnchor ? `The LinkedIn update about ${signalAnchor} points to how ${companyName} is changing.` : `The recent activity on ${companyName}'s LinkedIn page is worth a look.`,
+      hasSpecificAnchor ? `The update about ${signalAnchor} shows the direction ${companyName} is moving.` : `The recent activity from ${companyName} online is worth paying attention to.`,
     ],
     sec: [
-      hasSpecificAnchor ? `I saw the note about ${signalAnchor} in a recent public filing.` : `I was reviewing some of the recent operational updates for ${companyName}.`,
-      hasSpecificAnchor ? `I noticed ${companyName} mentioned ${signalAnchor} in a public report.` : `I was curious about how the recent filings for ${companyName} are landing.`,
-      hasSpecificAnchor ? `I caught the update about ${signalAnchor} in one of the public filings.` : `I was looking into the recent reporting for ${companyName}.`,
+      hasSpecificAnchor ? `The note about ${signalAnchor} in a recent public filing is worth paying attention to.` : `The recent filings for ${companyName} give a useful view of the business.`,
+      hasSpecificAnchor ? `The public report about ${signalAnchor} shows what ${companyName} is focused on.` : `The recent reporting for ${companyName} is worth a look.`,
+      hasSpecificAnchor ? `The filing update about ${signalAnchor} is the part that matters here.` : `The recent reporting on ${companyName} is worth understanding.`,
     ],
     web_official: [
-      hasSpecificAnchor ? `I saw the announcement about ${signalAnchor}.` : `I was curious about the update on ${companyName}'s newsroom.`,
-      hasSpecificAnchor ? `I caught the recent announcement about ${signalAnchor}.` : `I was looking at the recent updates from ${companyName}.`,
-      hasSpecificAnchor ? `I noticed the update about ${signalAnchor}.` : `I was curious about the news from ${companyName}.`,
+      hasSpecificAnchor ? `The announcement about ${signalAnchor} is the part that matters here.` : `The recent updates from ${companyName}'s newsroom are worth a look.`,
+      hasSpecificAnchor ? `The recent announcement about ${signalAnchor} is the key detail.` : `The recent updates from ${companyName} are worth a look.`,
+      hasSpecificAnchor ? `The news about ${signalAnchor} is the part that matters here.` : `The news from ${companyName} is worth paying attention to.`,
     ],
     web: [
-      hasSpecificAnchor ? `I saw the piece about ${signalAnchor}.` : `I was looking at ${companyName}'s current footprint.`,
-      hasSpecificAnchor ? `I caught an article about ${signalAnchor}.` : `I was curious about the operational setup at ${companyName}.`,
-      hasSpecificAnchor ? `I noticed the piece on ${signalAnchor}.` : `I was looking into ${companyName} online.`,
+      hasSpecificAnchor ? `The piece about ${signalAnchor} points to the current setup at ${companyName}.` : `The current footprint at ${companyName} is the part worth understanding.`,
+      hasSpecificAnchor ? `The article about ${signalAnchor} points to the current setup at ${companyName}.` : `The operational setup at ${companyName} is worth understanding.`,
+      hasSpecificAnchor ? `The piece on ${signalAnchor} points to how ${companyName} is operating.` : `The current setup at ${companyName} is worth understanding.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the recent update on ${companyName}.`,
-      hasSpecificAnchor ? `I caught the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was looking at the recent reporting on ${companyName}.`,
-      hasSpecificAnchor ? `I noticed the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the news around ${companyName} lately.`,
+      hasSpecificAnchor ? `The update that ${companyName} ${buildEventClause(signalAnchor)} is the part that matters.` : `The recent update on ${companyName} is worth paying attention to.`,
+      hasSpecificAnchor ? `The report that ${companyName} ${buildEventClause(signalAnchor)} points to what is changing.` : `The recent reporting on ${companyName} is worth understanding.`,
+      hasSpecificAnchor ? `The news that ${companyName} ${buildEventClause(signalAnchor)} is the key detail.` : `The news around ${companyName} is worth a look.`,
     ],
   }
 
@@ -2482,7 +2482,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
           openers: [
             sourceLead,
             `A new hotel is a different kind of load because guest rooms, kitchens, laundry, and HVAC all start shaping the bill before opening day.`,
-            `With a 24/7 property, I would want to know whether the power plan is being lined up now or still waiting on the buildout.`,
+            `With a 24/7 property, the useful question is whether the power plan is lined up now or still waiting on the buildout.`,
           ],
           focus: ['hotel opening', 'guest-room load', 'kitchens', 'laundry', 'HVAC', '24/7 operations'],
         }
@@ -2500,8 +2500,8 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
           futureOpen
             ? `If the site is still coming, the electricity piece usually needs to be handled before move-in, not after.`
             : alreadyOpen
-              ? `I would want to know whether the meter, billing, and operating load were already lined up when the site opened.`
-              : `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
+              ? `The useful question is whether the meter, billing, and operating load were already lined up when the site opened.`
+              : `The first thing to sanity-check is whether the new meter and ramp-up are being planned ahead of time.`,
         ],
         focus: ['new meter timing', 'lease or buildout timing', 'ramp-up load'],
       }
@@ -2525,7 +2525,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
           angle: 'Practice acquisition, operatories, imaging, sterilization, and patient flow adding load across the office network.',
           question: 'Has anyone checked which practices are driving the biggest spikes on their own meters as the network grows?',
           openers: [
-            `For a dental partnership organization, the thing I would watch is whether the busier offices are quietly changing the load pattern across the network.`,
+            `What most dental partnership teams care about is whether the busier offices are quietly changing the load pattern across the network.`,
             `When a practice adds more locations, patient flow and sterilization usually change before the budget line does.`,
             `With a growing practice network, the useful question is which offices are carrying the heaviest load and whether the power side has kept up.`,
           ],
@@ -2540,7 +2540,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
           angle: 'Specialist hiring, patient volume, and imaging or surgical equipment adding load across the clinic network.',
           question: 'Has anyone checked whether the busier locations are starting to change the load pattern on the power side?',
           openers: [
-            `For a specialty medical practice, the thing I would watch is whether the busier clinics are quietly changing the load pattern across the network.`,
+            `What most specialty medical teams care about is whether the busier clinics are quietly changing the load pattern across the network.`,
             `When a practice adds specialists, the patient flow and imaging footprint usually change before the budget line does.`,
             `With 15 locations, the useful question is which sites are carrying the heaviest clinical load and whether the power side has kept up.`,
           ],
@@ -2554,7 +2554,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         openers: [
           sourceLead,
           `When headcount or capex starts moving, the electricity side usually changes before anyone notices it in the budget.`,
-          `The thing I’d want to understand is what part of the operation is driving the extra usage.`,
+          `The useful question is what part of the operation is driving the extra usage.`,
         ],
         focus: ['load growth', 'equipment additions', 'budget creep'],
       }
@@ -2648,14 +2648,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             : `With ${locationDesc}${regionDesc}, are you comparing which sites have their own locked-in peak charge, or is the portfolio view still too blended?`,
           openers: acquisitionHeavy
             ? [
-                `For a network like this, the useful question is which acquired branches or yards are carrying their own locked-in peak charge.`,
-                `Acquisition-heavy footprints tend to hide different peak histories in each branch, even when the company looks unified on paper.`,
-                `The thing I would watch is whether the newest locations are being checked against their own meter history instead of averaged into the portfolio.`,
+              `For a network like this, the useful question is which acquired branches or yards are carrying their own locked-in peak charge.`,
+              `Acquisition-heavy footprints tend to hide different peak histories in each branch, even when the company looks unified on paper.`,
+              `What most operators want to know is whether the newest locations are being checked against their own meter history instead of averaged into the portfolio.`,
               ]
             : [
-                `For a portfolio like this, the useful question is which sites have their own locked-in peak charge and which ones do not.`,
-                `Large multi-site footprints tend to hide peak history because each meter can behave differently even inside the same company.`,
-                `The thing I would watch is whether one site is carrying a peak history that should really be handled on its own meter.`,
+              `For a portfolio like this, the useful question is which sites have their own locked-in peak charge and which ones do not.`,
+              `Large multi-site footprints tend to hide peak history because each meter can behave differently even inside the same company.`,
+              `What most operators want to know is whether one site is carrying a peak history that should really be handled on its own meter.`,
               ],
           focus: acquisitionHeavy
             ? ['acquired branches', 'meter history', 'portfolio comparison', 'locked-in peak charges', 'site-level review']
@@ -2670,7 +2670,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           'For a multi-site portfolio like this, the useful question is which sites have their own locked-in peak charge and which ones do not.',
           'Large multi-site footprints tend to hide peak history because each meter can behave differently even inside the same company.',
-          'The thing I would watch is whether one site is carrying a peak history that should really be handled on its own meter.',
+          'What most operators want to know is whether one site is carrying a peak history that should really be handled on its own meter.',
         ],
         focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
       }
@@ -2705,7 +2705,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you mapped which refrigeration, cooking, packaging, or sanitation cycles are creating the biggest usage spikes on the bill?',
           openers: [
             `Food production is different because refrigeration, cooking, packaging, and sanitation can all hit the meter during the same production windows.`,
-            `The part I would watch is whether cooling, cooking, or packaging cycles are creating the highest usage moments on the meter.`,
+            `The useful check is whether cooling, cooking, or packaging cycles are creating the highest usage moments on the meter.`,
             `For a food plant, the power side usually comes down to which production lines create the spikes, not the average usage.`,
           ],
           focus: ['refrigeration', 'cooking', 'packaging', 'sanitation', 'production timing', 'peak charges'],
@@ -2730,7 +2730,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `Environmental products businesses like this usually have a hidden blind spot in how mixing, packaging, and warehouse support are showing up on the bill.`,
               `With that kind of footprint${regionDesc}, one facility's climate control or packaging load can set a billing floor that sticks around.`,
-              `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from warehouse climate control or production support load.`,
+              `The useful check is whether any of those ${locationDesc} are carrying a demand ratchet from warehouse climate control or production support load.`,
             ],
             focus: ['mixing', 'packaging', 'warehouse climate control', 'distribution', 'billing floors', 'demand ratchets'],
           }
@@ -2742,7 +2742,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you looked at which part of the operation is creating the peaks, or is that still buried in the bill?',
           openers: [
             `For a spill-control manufacturer, the power side is usually about mixing, packaging, warehouse climate control, and how the product moves out the door.`,
-            `The thing I would watch is whether the support load is setting a billing floor that is bigger than it looks on paper.`,
+            `What most support teams care about is whether the support load is setting a billing floor that is bigger than it looks on paper.`,
             `For CEP, the useful question is which part of the plant or warehouse is actually driving the peaks, not the average bill.`,
           ],
           focus: ['mixing', 'packaging', 'warehouse climate control', 'distribution', 'billing floors', 'demand ratchets'],
@@ -2803,7 +2803,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `Equipment support networks like this usually need a location-by-location view because deliveries, inventory, and turnaround can differ a lot by branch.`,
               `With that kind of footprint${regionDesc}, one direct-service location can carry a very different load even when the company looks uniform on paper.`,
-              `The question I'd want answered is which locations are carrying the heaviest equipment and storage load.`,
+              `The useful question is which locations are carrying the heaviest equipment and storage load.`,
             ],
             focus: ['equipment deliveries', 'inventory', 'service turnaround', 'storage', 'branch-level review', 'meter-level exposure'],
           }
@@ -2815,7 +2815,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you looked at whether deliveries, inventory, or service turnaround are what create the biggest spikes on the bill?',
           openers: [
             'Equipment support businesses are different because the load comes from inventory, handling, and turnaround rather than patient rooms or clinic space.',
-            'The part I would watch is whether storage, delivery timing, or equipment processing is creating the biggest usage moments.',
+            'The useful check is whether storage, delivery timing, or equipment processing is creating the biggest usage moments.',
             'For an equipment support provider, the power side usually comes down to which part of the support operation is really driving the charge.',
           ],
           focus: ['equipment deliveries', 'inventory', 'service turnaround', 'storage', 'distribution support'],
@@ -2838,7 +2838,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
               openers: [
                 `Distribution networks like this usually hide different peak histories in each acquired branch or yard.`,
                 `When a company grows by acquisition, the main question is whether the new locations have been reviewed on their own meters or just blended into the portfolio.`,
-                `The part I would watch is whether one branch's summer spike is still sitting on that branch's meter instead of being cleaned up.`,
+                `The useful check is whether one branch's summer spike is still sitting on that branch's meter instead of being cleaned up.`,
               ],
               focus: ['acquired branches', 'meter history', 'locked-in peak charges', 'portfolio comparison', 'branch-level review'],
             }
@@ -2906,7 +2906,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone checked whether the summer cooling load or school calendar left this campus with a locked-in peak charge?',
         openers: [
           `School districts have a different pattern than a normal office because the calendar, athletics, cafeterias, and device charging all push the bill in different directions.`,
-          `The thing I would watch is whether one hot campus month is still showing up as a locked-in peak charge long after school is back in session.`,
+          `What most school leaders care about is whether one hot campus month is still showing up as a locked-in peak charge long after school is back in session.`,
           `For a district, the power side is usually about campus timing and HVAC more than anything else.`,
         ],
         focus: ['campus calendar', 'summer HVAC', 'athletics', 'cafeterias', 'device charging', 'district budget'],
@@ -2927,7 +2927,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `For a college or university with ${locationDesc}${regionDesc}, the useful question is which buildings have their own locked-in peak charge.`,
             `Higher-ed footprints tend to hide peaks because residence halls, labs, and dining do not all move at the same time.`,
-            `The thing I would watch is whether one building has a peak history that is still sitting on that meter.`,
+            `What most campus leaders care about is whether one building has a peak history that is still sitting on that meter.`,
           ],
           focus: ['campus load', 'student housing', 'labs', 'occupancy swings', 'billing floors', 'dining'],
         }
@@ -2939,7 +2939,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone looked at which buildings are setting the peak, or are the residence halls and labs all getting lumped together?',
         openers: [
           `Colleges and universities usually have a very different load profile because residence halls, classrooms, labs, and dining all peak on different schedules.`,
-          `The part I would watch is whether student housing or lab spaces are setting the billing floor for the whole campus.`,
+          `The useful question is whether student housing or lab spaces are setting the billing floor for the whole campus.`,
           `For a campus like this, the useful question is which buildings are really carrying the load, not just the average bill.`,
         ],
         focus: ['campus load', 'student housing', 'labs', 'occupancy swings', 'billing floors', 'dining'],
@@ -2960,7 +2960,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `For a residential care campus like this, the useful question is whether the homes, counseling spaces, and support services are carrying their own locked-in peak charges.`,
             `With that kind of footprint${regionDesc}, each residential building can have its own peak history on the meter.`,
-            `The part I would want to understand is which program spaces are carrying the heaviest load on the power side.`,
+            `The useful question is which program spaces are carrying the heaviest load on the power side.`,
           ],
           focus: ['residential care', 'counseling spaces', 'program load', 'billing floors', 'budget protection'],
         }
@@ -2972,7 +2972,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at which residential buildings or program spaces left this site with a locked-in peak charge?',
         openers: [
           `Residential care facilities are different because the homes, counseling spaces, and support services keep the load on longer than a normal office.`,
-          `The thing I would watch is whether the 24/7 care load left a locked-in peak charge that stays in place all year.`,
+          `What most care teams care about is whether the 24/7 care load left a locked-in peak charge that stays in place all year.`,
           `For a children’s home or residential campus, the useful question is which parts of the property are actually driving the peaks.`,
         ],
         focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
@@ -2995,7 +2995,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `For a hotel portfolio like this, the useful question is which property has its own locked-in peak charge.`,
             `Even within the same brand, each hotel can carry a different peak history because the guest rooms, laundry, and HVAC are not identical.`,
-            `The thing I would watch is whether one property is still carrying a summer spike on its own meter.`,
+            `What most hotel owners care about is whether one property is still carrying a summer spike on its own meter.`,
           ],
           focus: ['property comparison', 'guest rooms', 'laundry', 'HVAC', 'portfolio view', 'locked-in peak charges'],
         }
@@ -3007,7 +3007,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at whether the room load or laundry is what is actually driving the peak on that hotel meter?',
         openers: [
           `A single hotel property is different from an event space because the guest rooms, laundry, kitchen, and HVAC all keep the meter busy in a steady way.`,
-          `The thing I would watch is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
+          `What most hotel owners care about is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
           `For a branded hotel owner, the useful question is which part of the property is actually driving the peak, not the average usage.`,
         ],
         focus: ['guest rooms', 'laundry', 'kitchen service', 'HVAC', 'hotel meter', 'locked-in peak charges'],
@@ -3050,7 +3050,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you looked at whether operatories, imaging, or sterilization are what create the biggest spikes on that office meter?',
           openers: [
             `A dental practice is different from a generic clinic because operatories, imaging, sterilization, and HVAC can all hit the meter during patient hours.`,
-            `The part I would want to separate is whether the operatories, imaging, or sterilization are pushing the bill hardest.`,
+            `What most dental teams care about is whether the operatories, imaging, or sterilization are pushing the bill hardest.`,
             `For a dental office, the useful question is which clinical areas are driving the bigger bill days, not just what the monthly total looks like.`,
           ],
           focus: ['operatories', 'imaging', 'sterilization', 'patient flow', 'HVAC', 'bill spikes'],
@@ -3069,7 +3069,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Blood centers are different from logistics businesses because the power profile is tied to donor collection, lab testing, refrigerated storage, and hospital supply reliability.`,
             `With ${locationDesc}, the useful question is which parts of the clinical operation are creating the biggest spikes on their own meters.`,
-            `The part I would want to separate is donor collection, lab processing, and cold storage because each one can create a different power pattern.`,
+            `What most blood-service teams care about is donor collection, lab processing, and cold storage because each one can create a different power pattern.`,
           ],
           focus: ['donor collection', 'lab processing', 'refrigerated storage', 'mobile blood drives', 'hospital supply reliability', 'peak charges'],
         }
@@ -3114,7 +3114,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `A regional behavioral health network like this usually has very different load profiles between clinics, crisis services, and administrative sites, so the meter history matters more than the average.`,
               `With ${locationDesc}${regionDesc}, the useful check is which sites are carrying their own locked-in peak charge and which ones are not.`,
-              `The part I would want to isolate is whether the crisis centers, outpatient sites, or support buildings are the ones carrying the highest billing floor on their own meters.`,
+              `The useful question is whether the crisis centers, outpatient sites, or support buildings are the ones carrying the highest billing floor on their own meters.`,
             ],
             focus: ['behavioral health network', 'crisis services', 'outpatient sites', 'administrative buildings', 'meter-level peak history', 'locked-in peak charges'],
           }
@@ -3128,7 +3128,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `Medical networks with ${locationDesc} can look normal in the group total while one clinic is creating the biggest peak charge on its own meter.`,
               `With a clinical footprint like this, the useful check is which clinics use the most power during patient hours and which ones do not.`,
-              `The question I would ask is whether newer clinics are creating usage spikes that do not match their current patient volume.`,
+              `The useful question is whether newer clinics are creating usage spikes that do not match their current patient volume.`,
             ],
             focus: ['clinical peaks', 'equipment startup', 'portfolio comparison', 'peak charges', 'site-specific exposure'],
           }
@@ -3141,7 +3141,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Healthcare groups with ${locationDesc} can look fine in the group total while one facility is creating the biggest peak charge on its own meter.`,
             `With that kind of footprint${regionDesc}, the useful check is which facilities are driving the highest usage moments and which ones are not.`,
-            `The question I would ask is whether any of those ${locationDesc} have a peak charge sitting on the bill that no one is watching.`,
+            `The useful question is whether any of those ${locationDesc} have a peak charge sitting on the bill that no one is watching.`,
           ],
           focus: ['portfolio comparison', 'reliability', 'peak charges', 'meter-level exposure'],
         }
@@ -3154,7 +3154,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you looked at whether emergency care, imaging, or short-stay rooms are what create the biggest spikes on that bill?',
           openers: [
             `A small-format hospital is different from a clinic because emergency care, imaging, inpatient rooms, and HVAC can all hit the bill at the same time.`,
-            `The part I would want to separate is whether the emergency department, imaging, or short-stay rooms are pushing the bill hardest.`,
+            `What most hospital teams care about is whether the emergency department, imaging, or short-stay rooms are pushing the bill hardest.`,
             `For a neighborhood hospital, the useful question is which clinical areas are driving the bigger bill days, not just what the monthly total looks like.`,
           ],
           focus: ['emergency care', 'imaging', 'inpatient rooms', 'lab work', 'HVAC', 'bill spikes'],
@@ -3168,7 +3168,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Have you looked at whether patient hours, treatment-room equipment, or HVAC are what create the highest spike on that meter?',
           openers: [
             `Clinical environments are different because patient comfort, treatment-room equipment, lighting, and HVAC can all hit the meter during the same business hours.`,
-            `The part I would watch is whether patient hours and cooling load are creating the highest usage spike on that clinic meter.`,
+            `The useful question is whether patient hours and cooling load are creating the highest usage spike on that clinic meter.`,
             `For a medical practice, the power side usually comes down to which part of the clinic creates the biggest usage moment of the month.`,
           ],
           focus: ['patient hours', 'treatment-room equipment', 'HVAC', 'peak charges', 'clinic meter'],
@@ -3195,7 +3195,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Are you checking which systems create the highest usage moments, or is the 24/7 reliability requirement making that hard to see?',
         openers: [
           `Healthcare facilities that run around the clock can hide the highest usage moments inside the normal rhythm of patient care.`,
-          `Because the building never really stops, the part I would separate is normal patient-care usage from the specific spikes that set the highest charge.`,
+          `Because the building never really stops, the useful question is how normal patient-care usage compares with the specific spikes that set the highest charge.`,
           `In a 24/7 environment, the useful question is which systems create the top usage moments on the meter.`,
         ],
         focus: ['patient-care usage', 'peak charges', 'reliability', 'clinical equipment', 'capacity mismatch'],
@@ -3218,7 +3218,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Banks with ${locationDesc} usually need a portfolio view rather than managing each branch separately.`,
             `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how branches are contracted and how usage is tracked.`,
-            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or branch-by-branch.`,
+            `The useful question is whether your ${locationDesc} are being managed centrally or branch-by-branch.`,
           ],
           focus: ['portfolio management', 'multi-branch coordination', 'budget predictability', 'operational consistency', 'HVAC'],
         }
@@ -3230,7 +3230,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone looked at whether the branch IT loads or HVAC cycles are triggering a demand ratchet during peak hours?',
         openers: [
           `Banking footprints are interesting because the IT and HVAC load is constant, but the billing floor usually isn't.`,
-          `The part I care about is whether the branch portfolio is carrying hidden demand ratchets from summer cooling peaks.`,
+          `What most branch banking teams care about is whether the branch portfolio is carrying hidden demand ratchets from summer cooling peaks.`,
           `With branch operations, the load factor usually changes faster than the billing structure can keep up with.`,
         ],
         focus: ['branch portfolio', 'demand ratchets', 'IT load', 'HVAC', 'billing floors'],
@@ -3257,7 +3257,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `Auto groups with ${locationDesc} usually need a dealership-by-dealership view, because showroom traffic, service bays, parts, and lot lighting all behave differently.`,
               `With that kind of footprint${regionDesc}, one dealership can carry a very different peak history even when the group total looks fine.`,
-              `The question I'd want answered is which dealerships are carrying the biggest charges on their own meters.`,
+              `The useful question is which dealerships are carrying the biggest charges on their own meters.`,
             ],
             focus: ['dealership-by-dealership review', 'showroom lighting', 'service bays', 'parts', 'lot lighting', 'meter-level exposure'],
           }
@@ -3269,7 +3269,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: `Have you looked at whether the showroom, service bays, parts, or lot lighting are what create the biggest spikes on ${companyName}?`,
           openers: [
             `${companyName} is different because showroom traffic, service bays, parts, and lot lighting all show up differently on the meter.`,
-            `The part I would watch is whether the showroom, service department, or lot lighting is creating the biggest usage moments.`,
+            `The useful question is whether the showroom, service department, or lot lighting is creating the biggest usage moments.`,
             `For a dealership, the power side usually comes down to which part of the site is really driving the charge.`,
           ],
           focus: ['showroom traffic', 'service bays', 'parts department', 'lot lighting', 'meter-level exposure'],
@@ -3291,7 +3291,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Retail chains with ${locationDesc} usually benefit from a portfolio view rather than managing each store separately.`,
             `With that kind of footprint${regionDesc}, a few locations can carry very different meter histories even when the group total looks stable.`,
-            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or location-by-location.`,
+            `The useful question is whether your ${locationDesc} are being managed centrally or location-by-location.`,
           ],
           focus: ['portfolio management', 'multi-store coordination', 'seasonal swings', 'demand ratchets', 'centralized procurement'],
         }
@@ -3326,7 +3326,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Restaurant groups with ${locationDesc} usually have a significant blind spot in how kitchen service rushes are setting local demand ratchets.`,
             `With that kind of footprint${regionDesc}, one unit's kitchen spike can leave a higher charge on that meter even if the rest of the group looks normal.`,
-            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet from service peaks.`,
+            `The useful check is whether any of those ${locationDesc} are carrying a stealth demand ratchet from service peaks.`,
           ],
           focus: ['coincident peaks', 'service rushes', 'kitchen load', 'demand ratchets', 'portfolio visibility', 'billing floors'],
         }
@@ -3341,7 +3341,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           question: 'Are you tracking the peak exposure on that 24/7 base load, or is the lodging HVAC masking the ratchets?',
           openers: [
             `Hospitality and event venues are unique because the load never really gets to sleep, especially with on-site lodging.`,
-            `With 24/7 operations, the part I care about is how the base load hides the very peaks that set your billing floor.`,
+          `With 24/7 operations, the useful question is how the base load hides the peaks that set the billing floor.`,
             `The power side matters here because the constant load from HVAC and lodging can quietly set a demand ratchet that lasts for months.`,
           ],
           focus: ['24/7 base load', 'lodging HVAC', 'event peaks', 'demand ratchets', 'billing floors', 'capacity mismatch'],
@@ -3366,7 +3366,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at whether the room load or laundry is what is actually driving the peak on that hotel meter?',
         openers: [
           `A single hotel property is different from an event space because the guest rooms, laundry, kitchen, and HVAC all keep the meter busy in a steady way.`,
-          `The thing I would watch is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
+          `What most hotel owners care about is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
           `For a branded hotel owner, the useful question is which part of the property is actually driving the peak, not the average usage.`,
         ],
         focus: ['guest rooms', 'laundry', 'kitchen service', 'HVAC', 'hotel meter', 'locked-in peak charges'],
@@ -3399,7 +3399,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `For a portfolio with ${locationDesc}, the useful check is which sites have their own locked-in peak charge and which ones do not.`,
             `With that kind of footprint${regionDesc}, the budget risk is that some campuses look fine until you compare the meter history side by side.`,
-            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a one-time peak charge from a summer event.`,
+            `The useful check is whether any of those ${locationDesc} are carrying a one-time peak charge from a summer event.`,
           ],
           focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
         }
@@ -3412,7 +3412,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           `In the non-profit sector, the stealth liability is usually a locked-in peak charge that keeps the site paying for one hot month long after the event ends.`,
           `Most campus budgets are designed for steady load, but seasonal spikes can leave a site with a peak charge for a full 12 months.`,
-          `I was curious if anyone has checked the current billing floor against your actual off-peak usage.`,
+          `What most nonprofit teams care about is whether the billing floor matches actual off-peak usage.`,
         ],
         focus: ['stealth liability', 'billing floors', 'budget erosion', 'seasonal spikes', 'locked-in peak charges', 'mission fund protection'],
       }
@@ -3446,7 +3446,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at which city buildings left the highest locked-in peak charge, or is everything still sitting in one bucket?',
         openers: [
           `City facilities have a different profile because public safety, utility infrastructure, and administrative offices do not all use power the same way.`,
-          `The part I would watch is whether one summer peak left a locked-in charge on a specific meter.`,
+          `The useful check is whether one summer peak left a locked-in charge on a specific meter.`,
           `For a city, the power side is usually about which buildings are carrying the critical load, not just the average bill.`,
         ],
         focus: ['public safety', 'utility infrastructure', 'administrative offices', 'summer cooling', 'budget protection'],
@@ -3459,7 +3459,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           `Religious organizations are uniquely exposed to phantom demand charges because the entire week of low usage is billed against one single weekend peak.`,
           `The stealth liability in a sanctuary is that one hot Sunday service can set a billing floor for the next 11 months.`,
-          `I was looking at the usage profile and I'm curious if the locked-in peak charge on the bill matches the actual sanctuary peak.`,
+          `What most sanctuary teams care about is whether the locked-in peak charge on the bill matches the actual sanctuary peak.`,
         ],
         focus: ['stealth liability', 'billing floors', 'mission fund erosion', 'sanctuary HVAC', 'demand ratchets', 'weekend peaks'],
       }
@@ -3494,8 +3494,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Are you guys tracking the transmission exposure on that compute load yet, or is the 24/7 cooling masking the peaks?',
         openers: [
           `Data-heavy operations have a unique liability because high-density compute usually creates a very flat base load that hides massive transmission charges.`,
-          `With 24/7 uptime requirements, the part I care about is whether your load factor is being penalized by a mismatch in the billing structure.`,
-          `The forensic check I'd want to run is whether your UPS and cooling cycles are triggering a demand ratchet during peak hours.`,
+          `With 24/7 uptime requirements, the useful question is whether your load factor is being penalized by a mismatch in the billing structure.`,
+          `The useful check is whether your UPS and cooling cycles are triggering a demand ratchet during peak hours.`,
         ],
         focus: ['compute load factor', '24/7 cooling', 'transmission exposure', 'UPS cycles', 'billing floors'],
       }
@@ -3506,7 +3506,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone mapped the process start-up times against the ERCOT transmission windows to see if you are carrying a stealth liability?',
         openers: [
           `Heavy industrial sites are basically market-reading instruments, and the biggest liability is usually the timing of the process peaks.`,
-          `The part I care about is whether your equipment start-ups are happening inside the ERCOT transmission exposure windows.`,
+          `What most heavy industrial operators care about is whether equipment start-ups are happening inside the ERCOT transmission exposure windows.`,
           `With this kind of load, the rate doesn't matter nearly as much as the transmission exposure and the demand ratchet floor.`,
         ],
         focus: ['process timing', 'transmission exposure', 'peak start-ups', 'demand ratchets', 'billing floors', 'load factor'],
@@ -3518,7 +3518,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Are you guys tracking whether the summer HVAC peaks are setting a demand ratchet that sticks for the rest of the year?',
         openers: [
           `Professional office spaces have a specific liability because the cooling load during peak business hours usually sets a billing floor that hides in the budget for 11 months.`,
-          `The forensic check I'd want to run is whether your occupancy peaks are triggering a demand ratchet that is dragging down the budget.`,
+          `The useful check is whether your occupancy peaks are triggering a demand ratchet that is dragging down the budget.`,
           `With office footprints, the power side matters because the load factor is usually much lower than the occupancy suggests.`,
         ],
         focus: ['HVAC peaks', 'occupancy drivers', 'demand ratchets', 'billing floors', 'load factor'],
@@ -3530,7 +3530,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone mapped the portfolio meter by meter to see which sites are carrying peak charges that stick on their own bills?',
         openers: [
           `Multi-site footprints usually have a blind spot where a few site bills look very different from the portfolio summary.`,
-          `The part I care about is whether any of the sites in your group are carrying peak charges that stick on those local meters.`,
+          `What most multi-site operators care about is whether any of the sites in the group are carrying peak charges that stick on those local meters.`,
           `With multiple locations, the forensic check is whether a few specific meters are setting a billing floor that you're stuck with for the rest of the year.`,
         ],
         focus: ['stealth billing floors', 'portfolio visibility', 'meter-specific peak charges', 'transmission exposure'],
@@ -3543,7 +3543,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Has anyone mapped the operation to see exactly which processes or schedules are driving the peak demand charges?',
         openers: [
           `The biggest liability in ERCOT right now is transmission exposure, where one operational spike creates a permanent demand ratchet on the bill.`,
-          `I was reviewing the footprint, and the primary question is whether the billing floor is actually matched to the operational reality.`,
+          `The primary question is whether the billing floor is actually matched to the operational reality.`,
           `Most companies look at the rate, but the real cost creep comes from stealth demand ratchets that stay on the bill long after a peak event.`,
         ],
         focus: ['transmission exposure', 'stealth demand ratchets', 'billing floors', 'operational peaks'],
@@ -3597,7 +3597,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
           marketOpeners: [
             'We are moving into the ERCOT summer window, and that is when peak-hour behavior starts to matter a lot more.',
             'This is usually the time of year when a Texas account finds out whether the bill is ready for summer or just looked fine in spring.',
-            'If the site has real load behind it, I would want to know how it handles the hotter months before the bills start moving.',
+            'If the site has real load behind it, the useful question is how it handles the hotter months before the bills start moving.',
           ],
           marketFocus: ['summer volatility', 'transmission fees', 'peak-hour exposure', 'cooling load', 'budget risk'],
         }
@@ -3612,7 +3612,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
       marketOpeners: [
         'Winter is when a lot of Texas accounts find out whether the bill is actually steady or just looked steady.',
         'The question in the cold months is usually more about reliability and exposure than about one big load number.',
-        'If a cold snap hits, I would want to know what part of the bill or building gets stressed first.',
+        'If a cold snap hits, the useful question is what part of the bill or building gets stressed first.',
       ],
       marketFocus: ['winter reliability', 'cold-snap exposure', 'morning/evening volatility', 'heating load', 'budget risk'],
     }
@@ -3642,7 +3642,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
       ? [
           'We are in the shoulder season, which is usually the best time to get ahead of summer instead of reacting to it.',
           'For smaller offices and service businesses, this is less about a heavy-load conversation and more about budget predictability and cooling.',
-          'The question I would want answered now is whether the account is ready for the hotter months or still getting by on old assumptions.',
+          'The question to answer now is whether the account is ready for the hotter months or still getting by on old assumptions.',
         ]
       : [
           'We are in the shoulder season, which is usually the best time to get ahead of ERCOT summer exposure instead of reacting to it.',
@@ -3775,8 +3775,9 @@ VOICE:
 - Conversational, peer-to-peer, and undeniably expert. 
 - Avoid "broker-speak" or sounding like you're selling a service. 
 - Sound like someone who is looking at a diagnostic report and has identified a specific anomaly or liability.
-- Do not use "I came across your website" or "I was looking at the operational footprint."
-- Use "I was curious about..." or "I noticed a detail in the recent [Source] update regarding..."
+- Do not use first-person curiosity language like "I was curious about" or "I was looking at."
+- Prefer customer-centered phrasing such as "What most [title] leaders care about is..." or "The useful question is..."
+- Use customer-centered phrasing like "What most [role] leaders care about is..." or "The update about [event] is the part that matters here."
 
 COMPANY CONTEXT:
 - Company: ${companyName}
@@ -3796,7 +3797,7 @@ ${identityContext}
 ${audienceProfileBlock ? `AUDIENCE PROFILE:\n${audienceProfileBlock}\n` : ''}
 
 REQUIREMENTS:
-1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
+1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned. Use third-person or customer-centered phrasing, for example: "The new Haslet campus expansion is the part that matters here" or "What most facilities leaders want to know is how that technical load affects the bill."
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
 3. BUSINESS PAIN POINT: Connect the technical detail directly to a bill issue:
    - Electrification shift: The risk of adding electric equipment and changing usage faster than the bill structure catches up.
@@ -3816,7 +3817,7 @@ ${dentalContext}${behavioralHealthContext}
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
-9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
+9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
@@ -4091,14 +4092,14 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     // This feels more peer-to-peer than "I saw your website"
     const observationalOpenerOptions = multiSiteInfo.isMultiSite
       ? [
-          `I was curious how ${companyName} is comparing electricity across those locations.`,
-          `I wanted to understand whether a few ${companyName} locations are carrying more of the bill than the rest.`,
-          `I was curious how ${companyName} is keeping track of the higher-cost locations.`,
+          `What most multi-site operators care about is which ${companyName} locations are carrying the highest electricity costs.`,
+          `The question most operators ask is whether a few ${companyName} locations are carrying more of the bill than the rest.`,
+          `What most operators need to know is how ${companyName} is keeping track of the higher-cost locations.`,
         ]
       : [
-          `I caught the update about ${companyName} online.`,
-          `I was curious what is driving the bill at ${companyName}.`,
-          `I was curious about what is driving the bill at ${companyName}.`,
+          `The update about ${companyName} is the part that matters here.`,
+          `What most operators want to know is what is driving the bill at ${companyName}.`,
+          `The real question at ${companyName} is what is driving the bill.`,
         ]
     const observationalOpener = observationalOpenerOptions[hashString(variantSeed) % observationalOpenerOptions.length]
 
