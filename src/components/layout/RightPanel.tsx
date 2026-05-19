@@ -9,7 +9,7 @@ import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccountContacts } from '@/hooks/useContacts'
-import { useAccount } from '@/hooks/useAccounts'
+import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useTasks } from '@/hooks/useTasks'
 import { useDeal } from '@/hooks/useDeals'
 import { cn } from '@/lib/utils'
@@ -72,9 +72,12 @@ export function RightPanel() {
   const contractId = isContractsPage ? searchParams?.get('contractId') : null
 
   const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
-  const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : (contact?.accountId || ''))
-  const { data: accountContacts } = useAccountContacts(isAccountPage ? entityId : '')
   const { data: selectedContract, isLoading: isContractLoading, isError: isContractError } = useDeal(contractId ?? undefined)
+  const contractAccountId = isContractsPage ? selectedContract?.accountId ?? '' : ''
+  const resolvedAccountId = isAccountPage ? entityId : (contact?.accountId || contractAccountId || '')
+  const { data: account, refetch: refetchAccount } = useAccount(resolvedAccountId)
+  const { data: accountContacts } = useAccountContacts(resolvedAccountId)
+  const { mutate: updateAccount } = useUpdateAccount()
 
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -305,6 +308,15 @@ export function RightPanel() {
             deal={selectedContract ?? null}
             isLoading={isContractLoading}
             isError={isContractError}
+            accountId={resolvedAccountId || selectedContract?.accountId || null}
+            accountName={account?.name || selectedContract?.account?.name || null}
+            contacts={accountContacts || []}
+            primaryContactId={account?.primaryContactId}
+            isLoadingContacts={!accountContacts && !!resolvedAccountId}
+            onSetHolder={(contactId) => {
+              if (!resolvedAccountId) return
+              updateAccount({ id: resolvedAccountId, primaryContactId: contactId })
+            }}
             onClose={handleClearContractSelection}
             onOpenFullDossier={(deal) => {
               saveContractsScroll()
