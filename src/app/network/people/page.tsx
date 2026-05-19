@@ -14,7 +14,7 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter, GripVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -319,27 +319,19 @@ export default function PeoplePage() {
       },
       {
         accessorKey: 'name',
-        header: ({ column }) => {
-          return (
-            <button
-              type="button"
-              onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center text-sm font-medium gap-2 bg-transparent border-0 p-0 text-zinc-500 cursor-pointer"
-            >
-              Name
-              <ArrowUpDown className="ml-1 h-4 w-4" />
-              {/* Health legend — 3 dots showing what top-left badge means */}
-              <span
-                className="flex items-center gap-0.5 ml-1"
-                title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
-              </span>
-            </button>
-          )
-        },
+        header: () => (
+          <span
+            className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
+          >
+            Name
+            <span className="flex items-center gap-0.5 shrink-0">
+              <span className="w-1 h-1 rounded-full bg-emerald-500 opacity-60" />
+              <span className="w-1 h-1 rounded-full bg-amber-500 opacity-60" />
+              <span className="w-1 h-1 rounded-full bg-rose-500 opacity-60" />
+            </span>
+          </span>
+        ),
         cell: ({ row, table }) => {
           const contact = row.original
           const meta = table.options.meta as any
@@ -378,7 +370,7 @@ export default function PeoplePage() {
       },
       {
         accessorKey: 'company',
-        header: 'Company',
+        header: () => <span className="pl-3">Company</span>,
         cell: ({ row }) => {
           const companyName = row.getValue('company') as string
           const contact = row.original
