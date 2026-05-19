@@ -13,6 +13,33 @@ function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
 }
 
+function normalizeSentenceKey(value: string): string {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+function stripRepeatedLeadSentence(opener: string, talkTrack: string): string {
+  const cleanOpener = cleanText(opener)
+  const cleanTalkTrack = cleanText(talkTrack)
+  if (!cleanOpener || !cleanTalkTrack) return cleanTalkTrack
+
+  const talkSegments = cleanTalkTrack.split(/(?<=[.!?])\s+/).map(cleanText).filter(Boolean)
+  const openerKey = normalizeSentenceKey(cleanOpener)
+  const firstSegment = talkSegments[0] || ''
+  if (firstSegment && normalizeSentenceKey(firstSegment) === openerKey) {
+    return talkSegments.slice(1).join(' ').trim()
+  }
+
+  if (cleanTalkTrack.toLowerCase().startsWith(cleanOpener.toLowerCase())) {
+    return cleanTalkTrack.slice(cleanOpener.length).replace(/^[\s,;:-]+/, '').trim()
+  }
+
+  return cleanTalkTrack
+}
+
 export function splitIntelligenceBriefSections(
   openerValue?: string | null,
   talkTrackValue?: string | null,
@@ -21,7 +48,10 @@ export function splitIntelligenceBriefSections(
   const talkTrack = cleanText(talkTrackValue)
 
   if (opener && talkTrack) {
-    return { opener, talkTrack }
+    return {
+      opener,
+      talkTrack: stripRepeatedLeadSentence(opener, talkTrack),
+    }
   }
 
   const source = talkTrack || opener
@@ -41,9 +71,12 @@ export function splitIntelligenceBriefSections(
     }
   }
 
+  const resolvedOpener = opener || segments.shift() || ''
+  const resolvedTalkTrack = talkTrack || segments.join(' ')
+
   return {
-    opener: opener || segments.shift() || '',
-    talkTrack: talkTrack || segments.join(' '),
+    opener: resolvedOpener,
+    talkTrack: stripRepeatedLeadSentence(resolvedOpener, resolvedTalkTrack),
   }
 }
 
