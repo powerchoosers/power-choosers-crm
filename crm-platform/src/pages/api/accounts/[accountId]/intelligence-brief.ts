@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { buildAudienceLead, buildAudienceProfile, buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
+import { splitIntelligenceBriefSections } from '@/lib/intelligence-brief-context'
 
 // Simple LRU Cache for talk track deduplication
 class TalkTrackCache {
@@ -119,6 +120,7 @@ type AccountRow = {
   annual_usage?: string | null
   intelligence_brief_headline: string | null
   intelligence_brief_detail: string | null
+  intelligence_brief_opener: string | null
   intelligence_brief_talk_track: string | null
   intelligence_brief_signal_date: string | null
   intelligence_brief_reported_at: string | null
@@ -149,15 +151,20 @@ type BriefResult = {
   usable_signal: boolean
   signal_headline?: string
   signal_detail?: string
+  opener?: string | null
   talk_track?: string
   signal_date?: string
-  source_date?: string
+  source_date?: string | null
   source_url?: string
   confidence_level?: string
   selected_priority?: number
   source_title?: string
   source_domain?: string
   reason?: string
+}
+
+type StoredBriefResult = Partial<BriefResult> & {
+  opener?: string | null
 }
 
 type ResearchDiagnostics = {
@@ -280,7 +287,7 @@ type TalkTrackContext = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, "primaryContactId", city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, "primaryContactId", city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_opener, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
   'acquired',
@@ -4604,6 +4611,7 @@ function serializeAccount(account: AccountRow) {
     id: account.id,
     intelligenceBriefHeadline: account.intelligence_brief_headline || null,
     intelligenceBriefDetail: account.intelligence_brief_detail || null,
+    intelligenceBriefOpener: account.intelligence_brief_opener || null,
     intelligenceBriefTalkTrack: account.intelligence_brief_talk_track || null,
     intelligenceBriefSignalDate: account.intelligence_brief_signal_date || null,
     intelligenceBriefReportedAt: account.intelligence_brief_reported_at || null,
@@ -4611,6 +4619,23 @@ function serializeAccount(account: AccountRow) {
     intelligenceBriefConfidenceLevel: account.intelligence_brief_confidence_level || null,
     intelligenceBriefLastRefreshedAt: account.intelligence_brief_last_refreshed_at || null,
     intelligenceBriefStatus: (account.intelligence_brief_status || 'idle') as BriefStatus,
+  }
+}
+
+function composeBriefText(opener?: string | null, talkTrack?: string | null) {
+  return [cleanText(opener), cleanText(talkTrack)].filter(Boolean).join(' ').trim()
+}
+
+function normalizeBriefSections(result: StoredBriefResult): StoredBriefResult {
+  const sections = splitIntelligenceBriefSections(
+    result.opener || null,
+    result.talk_track || null,
+  )
+
+  return {
+    ...result,
+    opener: cleanText(sections.opener) || null,
+    talk_track: cleanText(sections.talkTrack) || '',
   }
 }
 
@@ -5326,8 +5351,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     })
 
     let outcomeStatus: BriefStatus = 'empty'
-    let validated: ReturnType<typeof validateBriefResult> = null
-    let generatedBrief: ReturnType<typeof validateBriefResult> = null
+    let validated: StoredBriefResult | null = null
+    let generatedBrief: StoredBriefResult | null = null
     let usedFallback = false
     let rescueCandidates = candidateResults
 
@@ -5478,7 +5503,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates)
         : rescueCandidates[0] || null
     const talkTrackRewriteContext = buildTalkTrackContext(briefingAccount, talkTrackCandidate, false, audienceProfile)
-    const previousTalkTrack = cleanText(briefingAccount.intelligence_brief_talk_track || '')
+    const previousTalkTrack = composeBriefText(
+      briefingAccount.intelligence_brief_opener,
+      briefingAccount.intelligence_brief_talk_track,
+    )
     if (validated) {
       const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, briefingAccount, talkTrackCandidate) ||
         (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack)) ||
@@ -5527,9 +5555,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
       }
 
+      validated = normalizeBriefSections(validated)
+
       // Add to cache after successful generation
-      if (validated.talk_track) {
-        talkTrackCache.add(validated.talk_track)
+      const cacheText = composeBriefText((validated as BriefResult).opener, validated.talk_track)
+      if (cacheText) {
+        talkTrackCache.add(cacheText)
       }
     }
 
@@ -5545,6 +5576,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (validated) {
       updatePayload.intelligence_brief_headline = validated.signal_headline
       updatePayload.intelligence_brief_detail = validated.signal_detail
+      updatePayload.intelligence_brief_opener = validated.opener || null
       updatePayload.intelligence_brief_talk_track = validated.talk_track
       updatePayload.intelligence_brief_signal_date = validated.signal_date
       updatePayload.intelligence_brief_reported_at = formatDateForDb(validated.source_date, talkTrackCandidate?.publishedAt || null)

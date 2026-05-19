@@ -537,7 +537,7 @@ export default async function handler(req, res) {
     if (contact.accountId) {
       const { data: acc } = await supabase
         .from('accounts')
-        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata, "primaryContactId", intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_confidence_level, intelligence_brief_status')
+        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata, "primaryContactId", intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_opener, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_confidence_level, intelligence_brief_status')
         .eq('id', contact.accountId)
         .maybeSingle();
       account = acc || null;
@@ -647,6 +647,7 @@ export default async function handler(req, res) {
     const briefContext = buildIntelligenceBriefContext({
       intelligenceBriefHeadline: account?.intelligence_brief_headline || null,
       intelligenceBriefDetail: account?.intelligence_brief_detail || null,
+      intelligenceBriefOpener: account?.intelligence_brief_opener || null,
       intelligenceBriefTalkTrack: account?.intelligence_brief_talk_track || null,
       intelligenceBriefSignalDate: account?.intelligence_brief_signal_date || null,
       intelligenceBriefReportedAt: account?.intelligence_brief_reported_at || null,
@@ -851,6 +852,7 @@ export default async function handler(req, res) {
           notes: noteContext || null,
           intelligence_brief_headline: account?.intelligence_brief_headline || null,
           intelligence_brief_detail: account?.intelligence_brief_detail || null,
+          intelligence_brief_opener: account?.intelligence_brief_opener || null,
           intelligence_brief_talk_track: account?.intelligence_brief_talk_track || null,
           intelligence_brief_signal_date: account?.intelligence_brief_signal_date || null,
           intelligence_brief_reported_at: account?.intelligence_brief_reported_at || null,

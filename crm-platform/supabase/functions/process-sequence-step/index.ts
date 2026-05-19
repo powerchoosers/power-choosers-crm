@@ -987,6 +987,7 @@ async function handleGeneration(execution, job) {
            a.contract_end_date as account_contract_end_date,
            a.intelligence_brief_headline as account_intelligence_brief_headline,
            a.intelligence_brief_detail as account_intelligence_brief_detail,
+           a.intelligence_brief_opener as account_intelligence_brief_opener,
            a.intelligence_brief_talk_track as account_intelligence_brief_talk_track,
            a.intelligence_brief_signal_date as account_intelligence_brief_signal_date,
            a.intelligence_brief_reported_at as account_intelligence_brief_reported_at,
@@ -1130,6 +1131,7 @@ async function handleGeneration(execution, job) {
     const briefContext = buildIntelligenceBriefContext({
         intelligenceBriefHeadline: member.account_intelligence_brief_headline || null,
         intelligenceBriefDetail: member.account_intelligence_brief_detail || null,
+        intelligenceBriefOpener: member.account_intelligence_brief_opener || null,
         intelligenceBriefTalkTrack: member.account_intelligence_brief_talk_track || null,
         intelligenceBriefSignalDate: member.account_intelligence_brief_signal_date || null,
         intelligenceBriefReportedAt: member.account_intelligence_brief_reported_at || null,
@@ -1331,6 +1333,7 @@ async function handleGeneration(execution, job) {
                 notes: noteContext || null,
                 intelligence_brief_headline: member.account_intelligence_brief_headline || null,
                 intelligence_brief_detail: member.account_intelligence_brief_detail || null,
+                intelligence_brief_opener: member.account_intelligence_brief_opener || null,
                 intelligence_brief_talk_track: member.account_intelligence_brief_talk_track || null,
                 intelligence_brief_signal_date: member.account_intelligence_brief_signal_date || null,
                 intelligence_brief_reported_at: member.account_intelligence_brief_reported_at || null,
