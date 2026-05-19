@@ -83,6 +83,7 @@ import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStat
 import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import {
   FrozenHoverText,
+  getColumnAfterName,
   getFrozenNameCellClass,
   getFrozenSelectCellClass,
 } from '@/components/network/frozenTable'
@@ -218,6 +219,7 @@ export default function TargetDetailPage() {
 
   const columnOrder = isPeopleList ? peopleColumnOrder : accountColumnOrder
   const setColumnOrder = isPeopleList ? setPeopleColumnOrder : setAccountColumnOrder
+  const nextAfterNameColumnId = getColumnAfterName(columnOrder)
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -1090,7 +1092,7 @@ export default function TargetDetailPage() {
                       strategy={horizontalListSortingStrategy}
                     >
                       {headerGroup.headers.map((header) => (
-                        <DraggableTableHeader key={header.id} header={header} />
+                        <DraggableTableHeader key={header.id} header={header} columnOrder={columnOrder} />
                       ))}
                     </SortableContext>
                   </TableRow>
@@ -1126,7 +1128,8 @@ export default function TargetDetailPage() {
                         className={cn(
                           "py-3 border-b border-white/5",
                           cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
-                          cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected())
+                          cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected()),
+                          cell.column.id === nextAfterNameColumnId && "pl-5"
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
