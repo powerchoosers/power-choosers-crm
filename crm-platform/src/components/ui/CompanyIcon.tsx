@@ -190,7 +190,7 @@ function CompanyIconInner({
 
   if (!currentSrc) {
     return (
-      <div className="relative inline-block shrink-0">
+      <div className="relative z-10 inline-block shrink-0">
         <motion.div
           layout
           initial={false}
@@ -211,7 +211,7 @@ function CompanyIconInner({
           <Building2 size={size * 0.5} />
         </motion.div>
         {/* Health badge — top-LEFT corner */}
-        <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+        <div className="absolute -top-0.5 -left-0.5 z-20 w-2.5 h-2.5">
           <AnimatePresence mode="wait">
             {showHealthSpinner && (
               <motion.div
@@ -254,7 +254,7 @@ function CompanyIconInner({
   }
 
   return (
-    <div className="relative inline-block shrink-0">
+    <div className="relative z-10 inline-block shrink-0">
       <motion.div
         layout
         initial={false}
@@ -346,7 +346,7 @@ function CompanyIconInner({
         </AnimatePresence>
       </motion.div>
       {/* Health badge — top-LEFT corner */}
-      <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+      <div className="absolute -top-0.5 -left-0.5 z-20 w-2.5 h-2.5">
         <AnimatePresence mode="wait">
           {showHealthSpinner && (
             <motion.div
