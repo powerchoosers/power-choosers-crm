@@ -322,8 +322,9 @@ export default function PeoplePage() {
         header: ({ column }) => {
           return (
             <button
+              type="button"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium gap-2"
+              className="flex items-center -ml-1 text-sm font-medium gap-2 bg-transparent border-0 p-0 text-zinc-500 cursor-pointer"
             >
               Name
               <ArrowUpDown className="ml-1 h-4 w-4" />
@@ -712,7 +713,7 @@ export default function PeoplePage() {
                       strategy={horizontalListSortingStrategy}
                     >
                       {headerGroup.headers.map((header) => (
-                        <DraggableTableHeader key={header.id} header={header} />
+                        <DraggableTableHeader key={header.id} header={header} columnOrder={columnOrder} />
                       ))}
                     </SortableContext>
                   </TableRow>

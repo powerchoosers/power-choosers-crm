@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Account } from '@/hooks/useAccounts'
 import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 import {
+    getColumnAfterName,
     getFrozenNameCellClass,
     getFrozenSelectCellClass,
 } from '@/components/network/frozenTable'
@@ -34,6 +35,7 @@ export const AccountTableRow = memo(function AccountTableRow({
     isSelected
 }: AccountTableRowProps) {
     const isAnimated = index < 12
+    const nextAfterNameColumnId = getColumnAfterName(columnOrder)
     return (
         <motion.tr
             initial={isAnimated ? { opacity: 0 } : false}
@@ -62,7 +64,8 @@ export const AccountTableRow = memo(function AccountTableRow({
                     className={cn(
                         "py-3 border-b border-white/5",
                         cell.column.id === 'select' && getFrozenSelectCellClass(isSelected),
-                        cell.column.id === 'name' && getFrozenNameCellClass(isSelected)
+                        cell.column.id === 'name' && getFrozenNameCellClass(isSelected),
+                        cell.column.id === nextAfterNameColumnId && "pl-5"
                     )}
                 >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

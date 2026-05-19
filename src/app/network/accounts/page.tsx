@@ -399,8 +399,9 @@ export default function AccountsPage() {
         header: ({ column }) => {
           return (
             <button
+              type="button"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center gap-1.5 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 transition-colors hover:text-zinc-300"
+              className="flex items-center gap-1.5 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
             >
               <span>Account Name</span>
               <ArrowUpDown className="h-2.5 w-2.5" />
@@ -445,7 +446,7 @@ export default function AccountsPage() {
               <div className="min-w-0 flex-1">
                 <FrozenHoverText
                   text={account.name}
-                  className="font-medium text-zinc-200 group-hover/acc:text-white transition-colors flex items-center gap-1.5 origin-left"
+                  className="font-medium text-zinc-200 group-hover/acc:text-white transition-colors origin-left"
                 />
                 {account.domain && (
                   <div className="truncate text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
@@ -770,7 +771,7 @@ export default function AccountsPage() {
                       strategy={horizontalListSortingStrategy}
                     >
                       {headerGroup.headers.map((header) => (
-                        <DraggableTableHeader key={header.id} header={header} />
+                        <DraggableTableHeader key={header.id} header={header} columnOrder={columnOrder} />
                       ))}
                     </SortableContext>
                   </TableRow>
