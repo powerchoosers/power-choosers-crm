@@ -16,6 +16,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    const now = new Date();
+
     const [priceData, gridData] = await Promise.all([
       getErcotMarketData('prices'),
       getErcotMarketData('grid')
