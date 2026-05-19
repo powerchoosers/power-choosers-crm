@@ -16,7 +16,7 @@ const frozenNameCellActive = "bg-[#002FA7]/10 group-hover:bg-[#002FA7]/12"
 const frozenHeaderSelectCellBase =
   "!sticky !left-0 z-50 transform-gpu box-border w-10 min-w-10 max-w-10 px-0 transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
 const frozenHeaderNameCellBase =
-  "!sticky !left-10 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-0 overflow-visible border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-right-6 before:w-6 before:bg-gradient-to-r before:from-black/70 before:via-black/20 before:to-transparent transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "!sticky !left-10 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-3 overflow-visible border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-right-6 before:w-6 before:bg-gradient-to-r before:from-black/70 before:via-black/20 before:to-transparent transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
 
 export function getFrozenSelectCellClass(isSelected: boolean) {
   return cn(

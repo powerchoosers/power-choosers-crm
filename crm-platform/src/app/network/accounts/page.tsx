@@ -401,7 +401,7 @@ export default function AccountsPage() {
             <button
               type="button"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center gap-1.5 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
+              className="flex items-center gap-1.5 pl-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
             >
               <span>Account Name</span>
               <ArrowUpDown className="h-2.5 w-2.5" />
