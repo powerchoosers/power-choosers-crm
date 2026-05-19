@@ -2414,6 +2414,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
   if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
+  if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
   if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
@@ -4995,7 +4996,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
     signal_date: signalDate,
     source_date: sourceDate,
     source_url: sourceUrl,
-    confidence_level: candidate?.sourceKind === 'sec' ? 'Medium' : 'Low',
+    confidence_level: 'Medium',
     selected_priority: candidate?.priority ?? 9,
     source_title: candidate?.title || '',
     source_domain: candidate?.source || '',
@@ -5189,17 +5190,26 @@ VOICE & TONE (For both "opener" and "talk_track"):
 - Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
+CONFIDENCE LEVEL RULES:
+- The "confidence_level" must be exactly High, Medium, or Low:
+  * "High": Specific, verified corporate/news events (e.g. new facility opening, merger/acquisition, leadership hire, major contract) sourced from official press releases, SEC filings, or reputable news articles.
+  * "Medium": General verified company profiles, official homepage descriptions, or local community updates with less immediate structural/strategic impact.
+  * "Low": Unverified sources, generic web directories, third-party catalogs, or fallback briefs with no company-specific updates.
+
 OPENER RULES (Exactly one sentence):
 - Must start with a greeting using the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - Must introduce himself: 'it's Lewis with Nodal Point'.
 - Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website'). It must mention the specific news signal or operational fact (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
 - Must end with a permission question: 'and wanted to ask one quick question, do you have a quick second?' or 'do you have a quick second?'.
+- Do NOT repeat words or phrases redundantly (e.g., do NOT say "expanding the footprint of Remington College's 13-location footprint"). Keep it clean and natural.
 
 TALK TRACK RULES (Exactly two sentences):
 - Sentence 1: A specific, third-person or company-centered observation about the company's operations/industry, connecting it to a commercial energy billing mechanic.
 - Sentence 2: A simple, open-ended operational question.
 - Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
+- The Talk Track MUST connect the specific operational details of the signal (e.g., "culinary program kitchen equipment", "trailer fabrication machinery", "flight simulator electricity draw", "commercial freight warehousing") directly to how that specific activity consumes power. Be forensic and concrete about the actual machinery, equipment, or facility type involved in the news.
+- Never use generic placeholders or vague phrases like "the extra usage as it grows" or "changes the bill before anyone notices."
 - Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".`
 
   const newsSignalPrompt = `${basePrompt}
@@ -5221,7 +5231,10 @@ Decision rules:
 - If it is an out-of-state opening, do not use new_location at all. Fall back to industry_context or a different signal.
 - For hotel, resort, restaurant, venue, or clinic openings, stay on the opening itself. Do not pivot into side hires like chef appointments unless the hire is the actual signal. Name the property and the city in the first sentence if you can.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
-- Signal Detail must be 2 to 4 sentences.
+- A "usable news signal" is a specific event, announcement, press release, SEC filing, or news story that has occurred recently (e.g. facility openings, new programs, acquisitions, hires, financial reports).
+- Do NOT treat root homepages, generic landing pages, or basic directory listings (such as Yelp, YellowPages, or main corporate homepages) as news signals.
+- If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage (e.g. "Home - Brazos Trailers"), you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
+- Signal Detail must be a synthesized, coherent, and useful summary of the event (who, what, where, and when) in 2 to 4 sentences. Explain what happened clearly to give the reader real value. Do NOT just copy/paste the source title, a raw list of product categories, or a raw unstructured snippet.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
@@ -5747,7 +5760,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
           source_url: briefingAccount.domain ? `https://${cleanText(briefingAccount.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
-          confidence_level: 'Low',
+          confidence_level: 'Medium',
           selected_priority: 9,
           source_title: 'Industry Context',
           source_domain: briefingAccount.domain || '',
@@ -5775,7 +5788,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
           source_url: briefingAccount.domain ? `https://${cleanText(briefingAccount.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
-          confidence_level: 'Low',
+          confidence_level: 'Medium',
           selected_priority: 9,
           source_title: 'Industry Context',
           source_domain: briefingAccount.domain || '',
