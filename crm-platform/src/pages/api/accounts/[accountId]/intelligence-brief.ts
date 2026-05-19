@@ -4008,49 +4008,65 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
-function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string) {
+function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string, candidate: ResearchHit | null = null) {
   const companyName = cleanText(account.name) || 'the company'
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const greeting = firstName
     ? `Hey ${firstName}, it's Lewis with Nodal Point`
     : "Hey, it's Lewis with Nodal Point"
+  const sourceLead = cleanText(buildSourceLead(account, candidate))
+  const reasonLead = sourceLead
+    ? sourceLead.replace(/\.$/, '').replace(/^The\s+/i, 'the ')
+    : cleanText(companyName)
+
+  const reasonBySignal: Record<SignalFamily, string> = {
+    acquisition: reasonLead || 'the acquisition',
+    new_location: reasonLead || 'the new site',
+    leadership_change: reasonLead || 'the leadership change',
+    growth: reasonLead || 'the growth',
+    restructuring: reasonLead || 'the footprint change',
+    contract_win: reasonLead || 'the new contract',
+    funding: reasonLead || 'the new funding',
+    technical_load: reasonLead || 'the equipment side',
+    industry_context: reasonLead || companyName,
+  }
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `${greeting} - I’m calling out of the blue about the acquisition, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because the acquisition usually changes what is worth checking on the power side, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.acquisition}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.acquisition}, do you have a quick second?`,
     ],
     new_location: [
-      `${greeting} - I’m calling out of the blue about the new site, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because a new site usually means a quick power-side check, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.new_location}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.new_location}, do you have a quick second?`,
     ],
     leadership_change: [
-      `${greeting} - I’m calling out of the blue about the leadership change, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because new leadership usually means a fresh look at the electricity setup, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.leadership_change}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.leadership_change}, do you have a quick second?`,
     ],
     growth: [
-      `${greeting} - I’m calling out of the blue about the growth, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because growth usually changes the power side before the bill catches up, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.growth}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.growth}, do you have a quick second?`,
     ],
     restructuring: [
-      `${greeting} - I’m calling out of the blue about the footprint change, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because a footprint change usually leaves something to clean up on the power side, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.restructuring}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.restructuring}, do you have a quick second?`,
     ],
     contract_win: [
-      `${greeting} - I’m calling out of the blue about the new contract or project, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because a new contract usually changes the load mix fast, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.contract_win}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.contract_win}, do you have a quick second?`,
     ],
     funding: [
-      `${greeting} - I’m calling out of the blue about the new funding, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because fresh capital usually means a new facility plan or equipment plan, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.funding}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.funding}, do you have a quick second?`,
     ],
     technical_load: [
-      `${greeting} - I’m calling out of the blue about the equipment side, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue because new equipment usually changes the usage pattern before the bill catches up, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.technical_load}, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue about ${reasonBySignal.technical_load}, do you have a quick second?`,
     ],
     industry_context: [
-      `${greeting} - I’m calling out of the blue about ${companyName}, do you have a quick second?`,
-      `${greeting} - I found a detail on ${companyName} that looked worth a quick call, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because ${reasonBySignal.industry_context}, do you have a quick second?`,
+      `${greeting} - I found a detail on ${reasonBySignal.industry_context} that looked worth a quick call, do you have a quick second?`,
     ],
   }
 
@@ -5591,6 +5607,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       validated = {
         ...validated,
         talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
+      }
+
+      const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate)
+      validated = {
+        ...validated,
+        opener: cleanText(validated.opener) || generatedOpener,
       }
 
       validated = normalizeBriefSections(validated)
