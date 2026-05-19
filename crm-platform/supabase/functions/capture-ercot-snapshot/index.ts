@@ -50,6 +50,163 @@ interface MarketSnapshot {
   }
 }
 
+interface SnapshotRow {
+  created_at: string
+  timestamp: string
+  prices: ERCOTPriceData
+  grid: ERCOTGridData
+  metadata: MarketSnapshot['metadata'] & {
+    operating_day?: string
+    archive_url?: string
+  }
+}
+
+const ARCHIVE_CAPTURE_HOURS = [7, 12, 17, 22]
+
+function parseTableRows(html: string): string[] {
+  const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/g) || []
+  return rows.filter((row) => row.includes('<td') && !row.includes('class="label"'))
+}
+
+function extractCells(row: string): string[] {
+  return row
+    .match(/<td[^>]*>([\s\S]*?)<\/td>/g)
+    ?.map((td) => td.replace(/<[^>]*>/g, '').trim()) || []
+}
+
+function toArchiveDate(operatingDay: string): string {
+  const [month, day, year] = operatingDay.split('/')
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+function chicagoLocalToUtcIso(dateIso: string, timeHHMM: string): string {
+  const [year, month, day] = dateIso.split('-').map(Number)
+  const [hour, minute] = timeHHMM.split(':').map(Number)
+  const format = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+
+  let guess = Date.UTC(year, month - 1, day, hour, minute, 0)
+
+  for (let i = 0; i < 3; i++) {
+    const parts = format.formatToParts(new Date(guess))
+    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+    const gotYear = Number(lookup.year)
+    const gotMonth = Number(lookup.month)
+    const gotDay = Number(lookup.day)
+    const gotHour = Number(lookup.hour)
+    const gotMinute = Number(lookup.minute)
+
+    const desiredMinutes = Date.UTC(year, month - 1, day, hour, minute, 0) / 60000
+    const currentMinutes = Date.UTC(gotYear, gotMonth - 1, gotDay, gotHour, gotMinute, 0) / 60000
+    const deltaMinutes = desiredMinutes - currentMinutes
+
+    if (deltaMinutes === 0) {
+      return new Date(guess).toISOString()
+    }
+
+    guess += deltaMinutes * 60_000
+  }
+
+  return new Date(guess).toISOString()
+}
+
+function buildArchiveUrl(dateIso: string): string {
+  const compact = dateIso.replace(/-/g, '')
+  return `https://www.ercot.com/content/cdr/html/${compact}_real_time_spp.html`
+}
+
+function buildSnapshotFromCells(
+  cells: string[],
+  archiveDateIso: string,
+  archiveUrl: string,
+  captureHour: number
+): SnapshotRow {
+  const houston = parseFloat(cells[11]) || 0
+  const north = parseFloat(cells[13]) || 0
+  const south = parseFloat(cells[15]) || 0
+  const west = parseFloat(cells[16]) || 0
+  const hubFromCell = parseFloat(cells[4])
+  const hub_avg = !isNaN(hubFromCell) ? hubFromCell : (houston + north + south + west) / 4
+
+  const interval = (cells[1] || '').padStart(4, '0')
+  const intervalHHMM = `${interval.slice(0, 2)}:${interval.slice(2, 4)}`
+
+  return {
+    created_at: chicagoLocalToUtcIso(archiveDateIso, intervalHHMM),
+    timestamp: `${cells[0] || ''} ${cells[1] || ''}`.trim(),
+    prices: {
+      houston,
+      north,
+      south,
+      west,
+      hub_avg
+    },
+    grid: {},
+    metadata: {
+      price_source: 'ERCOT Public CDR Archive',
+      grid_source: 'Historic grid conditions not backfilled',
+      transmission_rates: {
+        houston: 0.6597,
+        north: 0.7234,
+        south: 0.5821,
+        west: 0.8943
+      },
+      last_updated: new Date().toISOString(),
+      source: 'ercot_archive_backfill',
+      capture_hour: captureHour,
+      operating_day: cells[0] || archiveDateIso,
+      archive_url: archiveUrl
+    }
+  }
+}
+
+async function scrapeArchiveSnapshotsForDate(archiveDateIso: string): Promise<SnapshotRow[]> {
+  const archiveUrl = buildArchiveUrl(archiveDateIso)
+  const response = await fetch(archiveUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    },
+    signal: AbortSignal.timeout(ERCOT_API_TIMEOUT)
+  })
+
+  if (!response.ok) {
+    throw new Error(`ERCOT archive returned ${response.status} for ${archiveDateIso}`)
+  }
+
+  const html = await response.text()
+  const rows = parseTableRows(html)
+  if (rows.length === 0) {
+    throw new Error(`No data rows found in ERCOT archive table for ${archiveDateIso}`)
+  }
+
+  const parsedRows = rows.map(extractCells).filter((cells) => cells.length >= 17)
+  const snapshots: SnapshotRow[] = []
+
+  for (const captureHour of ARCHIVE_CAPTURE_HOURS) {
+    const interval = `${String(captureHour).padStart(2, '0')}00`
+    const found = parsedRows.find((cells) => cells[1] === interval)
+    if (!found) {
+      console.warn(`[ERCOT Snapshot] Missing ${interval} row for ${archiveDateIso}`)
+      continue
+    }
+    snapshots.push(buildSnapshotFromCells(found, archiveDateIso, archiveUrl, captureHour))
+  }
+
+  if (snapshots.length === 0) {
+    throw new Error(`No target snapshot rows found for ${archiveDateIso}`)
+  }
+
+  return snapshots
+}
+
 /**
  * Fallback ERCOT price scrape when the private API credentials are unavailable.
  */
@@ -251,7 +408,79 @@ Deno.serve(async (req) => {
 
     console.log('[ERCOT Snapshot] Starting capture...')
 
-    // Fetch both prices and grid in parallel
+    const url = new URL(req.url)
+    const archiveDate = url.searchParams.get('date')
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    if (archiveDate) {
+      const snapshots = await scrapeArchiveSnapshotsForDate(archiveDate)
+      const existingHours = new Set<number>()
+
+      const { data: existingRows, error: existingError } = await supabase
+        .from('market_telemetry')
+        .select('id, metadata')
+        .eq('metadata->>source', 'ercot_archive_backfill')
+        .contains('metadata', { operating_day: snapshots[0]?.metadata.operating_day })
+
+      if (existingError) {
+        throw existingError
+      }
+
+      for (const row of existingRows ?? []) {
+        const hour = Number((row as any)?.metadata?.capture_hour)
+        if (!isNaN(hour)) {
+          existingHours.add(hour)
+        }
+      }
+
+      const rowsToInsert = snapshots.filter((snapshot) => !existingHours.has(snapshot.metadata.capture_hour))
+
+      if (rowsToInsert.length === 0) {
+        return new Response(JSON.stringify({
+          success: true,
+          mode: 'archive_backfill',
+          inserted: 0,
+          skipped: snapshots.length,
+          date: archiveDate
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+
+      const { error: insertError } = await supabase
+        .from('market_telemetry')
+        .insert(rowsToInsert.map((snapshot) => ({
+          created_at: snapshot.created_at,
+          timestamp: snapshot.timestamp,
+          prices: snapshot.prices,
+          grid: snapshot.grid,
+          metadata: snapshot.metadata
+        })))
+
+      if (insertError) {
+        console.error('[ERCOT Snapshot] Archive insert failed:', insertError)
+        throw insertError
+      }
+
+      console.log(`[ERCOT Snapshot] Archived ${rowsToInsert.length} snapshots for ${archiveDate}`)
+
+      return new Response(JSON.stringify({
+        success: true,
+        mode: 'archive_backfill',
+        inserted: rowsToInsert.length,
+        skipped: snapshots.length - rowsToInsert.length,
+        date: archiveDate
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Fetch both prices and grid in parallel for the live capture path
     const [priceData, gridData] = await Promise.all([
       fetchERCOTPrices(),
       scrapeGridConditions()
@@ -281,10 +510,6 @@ Deno.serve(async (req) => {
     }
 
     // Save to database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseKey)
-
     const { error: insertError } = await supabase
       .from('market_telemetry')
       .insert({
