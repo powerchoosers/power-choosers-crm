@@ -628,6 +628,7 @@ export default async function handler(req, res) {
       const intelligenceBriefContext = buildIntelligenceBriefContext({
         intelligenceBriefHeadline: contact?.intelligence_brief_headline || contact?.intelligenceBriefHeadline || null,
         intelligenceBriefDetail: contact?.intelligence_brief_detail || contact?.intelligenceBriefDetail || null,
+        intelligenceBriefOpener: contact?.intelligence_brief_opener || contact?.intelligenceBriefOpener || null,
         intelligenceBriefTalkTrack: contact?.intelligence_brief_talk_track || contact?.intelligenceBriefTalkTrack || null,
         intelligenceBriefSignalDate: contact?.intelligence_brief_signal_date || contact?.intelligenceBriefSignalDate || null,
         intelligenceBriefReportedAt: contact?.intelligence_brief_reported_at || contact?.intelligenceBriefReportedAt || null,

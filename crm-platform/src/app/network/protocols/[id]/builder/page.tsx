@@ -1008,6 +1008,7 @@ function ProtocolArchitectInner() {
             hierarchy_summary: testAccountContext.hierarchySummary,
             intelligence_brief_headline: testAccount?.intelligenceBriefHeadline || null,
             intelligence_brief_detail: testAccount?.intelligenceBriefDetail || null,
+            intelligence_brief_opener: testAccount?.intelligenceBriefOpener || null,
             intelligence_brief_talk_track: testAccount?.intelligenceBriefTalkTrack || null,
             intelligence_brief_signal_date: testAccount?.intelligenceBriefSignalDate || null,
             intelligence_brief_reported_at: testAccount?.intelligenceBriefReportedAt || null,
