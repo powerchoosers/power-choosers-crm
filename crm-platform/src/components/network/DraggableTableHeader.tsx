@@ -75,7 +75,7 @@ export function DraggableTableHeader({ header, columnOrder }: DraggableTableHead
             {...(isFrozenColumn ? {} : listeners)}
             style={style}
             className={cn(
-                "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 relative select-none",
+                "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3 select-none",
                 isFrozenColumn ? "overflow-visible cursor-default" : "overflow-hidden cursor-grab active:cursor-grabbing",
                 isFrozenSelectColumn && getFrozenSelectHeaderClass(),
                 isFrozenNameColumn && getFrozenNameHeaderClass(),

@@ -58,19 +58,24 @@ export const AccountTableRow = memo(function AccountTableRow({
                 router.push(`/network/accounts/${row.original.id}`)
             }}
         >
-            {row.getVisibleCells().map((cell) => (
-                <TableCell
-                    key={cell.id}
-                    className={cn(
-                        "py-3 border-b border-white/5",
-                        cell.column.id === 'select' && getFrozenSelectCellClass(isSelected),
-                        cell.column.id === 'name' && getFrozenNameCellClass(isSelected),
-                        cell.column.id === nextAfterNameColumnId && "pl-5"
-                    )}
-                >
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-            ))}
+            {row.getVisibleCells().map((cell) => {
+                const isFrozenCell = cell.column.id === 'select' || cell.column.id === 'name'
+
+                return (
+                    <TableCell
+                        key={cell.id}
+                        className={cn(
+                            "py-3",
+                            !isFrozenCell && "border-b border-white/5",
+                            cell.column.id === 'select' && getFrozenSelectCellClass(isSelected),
+                            cell.column.id === 'name' && getFrozenNameCellClass(isSelected),
+                            cell.column.id === nextAfterNameColumnId && "pl-5"
+                        )}
+                    >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                )
+            })}
         </motion.tr>
     )
 }, (prev, next) => {

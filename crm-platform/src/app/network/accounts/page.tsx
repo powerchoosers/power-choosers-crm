@@ -763,7 +763,7 @@ export default function AccountsPage() {
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+              <TableHeader className="sticky top-0 z-20">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     <SortableContext
