@@ -4159,6 +4159,53 @@ function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | nu
   return companyName
 }
 
+/**
+ * Builds contextual opener options for industry_context signal family.
+ * Instead of saying "I saw y'all run [company name]" — which is useless when calling them directly —
+ * this uses what we know about their actual operation (industry cluster, company type, location, size)
+ * to say something specific about WHAT they do or HOW they operate.
+ */
+function buildIndustryContextOpeners(greeting: string, account: AccountRow, context: TalkTrackContext): string[] {
+  const companyName = cleanText(account.name) || 'the company'
+  const city = cleanText(account.city)
+  const state = cleanText(account.state)
+  const locationClause = city && state ? `in ${city}` : state ? `in ${state}` : 'in Texas'
+  const profile = getAccountIdentityProfile(account)
+  const companyType = cleanText(profile?.companyType || '')
+  const facilityType = cleanText(profile?.facilityType || '')
+  const cluster = context.industryCluster
+
+  // Build an operational descriptor from what we actually know
+  const operationDescriptor = (() => {
+    if (cluster === 'manufacturing') return `a manufacturing operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'logistics') return `a logistics and distribution operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'food_storage') return `a food storage and distribution operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'healthcare') return `a healthcare operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'banking') return `a banking and branch operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'retail') return `a retail operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'restaurant') return `a restaurant operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'hotel_owner') return `a hotel property${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'hospitality_group') return `a hospitality group${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'school_district') return `a school district${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'higher_education') return `a higher education campus${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'residential_care') return `a residential care facility${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'technology') return `a technology operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'energy_intensive') return `an energy-intensive industrial site${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'multi_site') return `a multi-site operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'public_sector') return `a public sector operation${locationClause ? ` ${locationClause}` : ''}`
+    if (companyType) return companyType.toLowerCase()
+    if (facilityType) return facilityType.toLowerCase()
+    // Last resort — describe the company by name but phrase it as what they do
+    return `${companyName}'s operation`
+  })()
+
+  return [
+    `${greeting} — I was looking into ${companyName} and had a quick question about how y'all manage the power side of the business, do you have a quick second?`,
+    `${greeting} — I've been researching ${operationDescriptor} and wanted to ask one quick question, do you have a quick second?`,
+    `${greeting} — I came across ${companyName} while looking at ${cluster === 'manufacturing' ? 'industrial' : cluster === 'restaurant' ? 'restaurant' : cluster === 'retail' ? 'retail' : 'commercial'} accounts in Texas and had a quick question, do you have a quick second?`,
+  ]
+}
+
 function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string, candidate: ResearchHit | null = null) {
   const companyName = cleanText(account.name) || 'the company'
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
@@ -4201,10 +4248,7 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
       `${greeting} — I saw y'all are running the infrastructure at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
       `${greeting} — I saw y'all operate the technical facilities at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
-    industry_context: [
-      `${greeting} — I saw y'all are operating ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} — I saw y'all run ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
-    ],
+    industry_context: buildIndustryContextOpeners(greeting, account, context),
   }
 
   return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
@@ -4323,8 +4367,53 @@ function extractMetaContent(html: string, names: string[]) {
 }
 
 function extractTitle(html: string) {
-  const match = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html)
+  const match = /<title\b[\s\S]*?<\/title>/i.exec(html)
   return match ? stripXml(match[1]) : ''
+}
+
+/**
+ * Detects whether a page title is homepage/nav boilerplate that has no signal value.
+ * Titles like "Home - Company Name", "Welcome to Company Name", "Company Name | Home" etc.
+ * should never be used as a signal_headline — they are meaningless as research hits.
+ */
+function isBoilerplatePageTitle(title: string, accountName: string): boolean {
+  const t = cleanText(title)
+  if (!t) return true
+  const lower = t.toLowerCase()
+  const companyLower = cleanText(accountName).toLowerCase()
+
+  // Pure homepage title patterns
+  if (/^home\s*[-|–]\s*/i.test(t)) return true
+  if (/\s*[-|–]\s*home$/i.test(t)) return true
+  if (/^welcome to\b/i.test(t)) return true
+  if (/^about\s*[-|–]\s*/i.test(t)) return true
+  if (/^(home|about|contact|services|products|solutions|default)$/i.test(t.trim())) return true
+
+  // Title is just the company name (with optional site name separator)
+  const strippedCompanyChars = companyLower.replace(/[^a-z0-9]/g, '')
+  const strippedTitleChars = lower.replace(/[^a-z0-9]/g, '')
+  if (strippedCompanyChars.length > 3 && strippedTitleChars === strippedCompanyChars) return true
+
+  // Title starts/ends with the domain-separator pattern and contains only company info
+  if (/^[^|–-]{3,80}\s*[|–-]\s*(home|homepage|official site|official website|welcome)$/i.test(t)) return true
+  if (/^(home|homepage|official site|official website|welcome)\s*[|–-]\s*[^|–-]{3,80}$/i.test(t)) return true
+
+  return false
+}
+
+/**
+ * Sanitizes a research hit title before sending to AI.
+ * If the title is nav boilerplate, replaces it with a descriptive fallback
+ * so the AI has something meaningful to work with instead of "Home - Company Name".
+ */
+function sanitizeResearchTitle(title: string, accountName: string, snippet: string): string {
+  if (!isBoilerplatePageTitle(title, accountName)) return title
+  // Try to extract a meaningful phrase from the snippet instead
+  const snippetPreview = cleanText(snippet).split(/[.!?]/)[0]?.trim()
+  if (snippetPreview && snippetPreview.length > 20 && snippetPreview.length < 120) {
+    return snippetPreview
+  }
+  return `${cleanText(accountName)} — Company Overview`
 }
 
 function extractTimeDatetime(html: string) {
@@ -5160,7 +5249,9 @@ async function runOpenRouterResearch(
     research_results: selectedCandidates.map((item) => ({
       priority: item.priority,
       bucket: item.label,
-      title: isLikelyNonEnglishText(item.title) ? `${cleanText(account.name) || 'Company'} update` : item.title,
+      title: isLikelyNonEnglishText(item.title)
+        ? `${cleanText(account.name) || 'Company'} update`
+        : sanitizeResearchTitle(item.title, account.name || '', item.snippet),
       url: item.url,
       snippet: isLikelyNonEnglishText(item.snippet) ? '' : item.snippet,
       published_at: item.publishedAt,
@@ -5233,8 +5324,9 @@ Decision rules:
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - A "usable news signal" is a specific event, announcement, press release, SEC filing, or news story that has occurred recently (e.g. facility openings, new programs, acquisitions, hires, financial reports).
 - Do NOT treat root homepages, generic landing pages, or basic directory listings (such as Yelp, YellowPages, or main corporate homepages) as news signals.
-- If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage (e.g. "Home - Brazos Trailers"), you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
-- Signal Detail must be a synthesized, coherent, and useful summary of the event (who, what, where, and when) in 2 to 4 sentences. Explain what happened clearly to give the reader real value. Do NOT just copy/paste the source title, a raw list of product categories, or a raw unstructured snippet.
+- If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage (e.g. "Home - Brazos Trailers", "Welcome to [Company]", "[Company] | Home"), you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
+- Signal Headline must be a meaningful, human-readable summary of the actual event or company context — NEVER a raw page title, browser tab title, domain name, or the company name alone. Do NOT output anything like "Home - Lincoln Manufacturing, Inc." or "Welcome to Acme Corp" as the headline. Write it as a real intelligence insight: e.g. "Lincoln Manufacturing Expands Oil Field Threading Operations in Texas" or "Avalanche Food Group Opens Bread Zeppelin Location in Shenandoah."
+- Signal Detail must be a synthesized, coherent, and useful summary of the event (who, what, where, and when) in 2 to 4 complete sentences. Explain what happened clearly to give the reader real value. Do NOT copy/paste raw product category lists, cookie consent banners, nav menu text, boilerplate homepage copy, or unstructured website snippets. If the only available data is homepage boilerplate, set usable_signal to false instead.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
@@ -5338,8 +5430,8 @@ FALLBACK MODE: No recent news signals were found. Generate an intelligence brief
 
 Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
-- Create a headline that positions the company within their industry context.
-- Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
+- Create a headline that positions the company within their industry context. The headline must be a meaningful intelligence insight — NEVER a raw page title, browser tab title, or the company name alone. Write it like a research analyst would: e.g. "Texas-Based Oil Field Equipment Manufacturer with Multi-Site Production Footprint" or "Multi-Location Restaurant Group Operating Across Houston Metro."
+- Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector. Write 2 to 4 complete synthesized sentences. Do NOT copy raw product lists, cookie banners, nav menu text, or homepage boilerplate. If the company site lists specific products or services (like "API threading, pup joints, inflatable packers"), translate those into what they mean operationally: "a manufacturer of precision oil field completion components including threaded connections and downhole tools."
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
