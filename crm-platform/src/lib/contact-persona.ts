@@ -258,79 +258,78 @@ function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, company
   const automotiveBusiness = looksAutomotiveBusiness(`${title} ${companyName}`)
   switch (roleFamily) {
     case 'finance':
-      return `${base} usually cares about budget surprises and whether the bill is still making sense at ${company}.`
+      return `${base} is usually focused on budget surprises and whether the bill still makes sense at ${company}.`
     case 'operations':
-      return `${base} usually cares about how site usage, timing, and uptime are showing up at ${company}.`
+      return `${base} is usually focused on how site usage, timing, and uptime are showing up at ${company}.`
     case 'facilities':
-      return `${base} usually cares about building uptime, comfort, and which sites are carrying the heaviest load at ${company}.`
+      return `${base} is usually focused on building uptime, comfort, and which sites are carrying the heaviest load at ${company}.`
     case 'procurement':
-      return `${base} usually cares about renewal timing, supplier fit, and whether the current setup still makes sense at ${company}.`
+      return `${base} is usually focused on renewal timing, supplier fit, and whether the current setup still makes sense at ${company}.`
     case 'executive':
-      return `${base} usually cares about risk, timing, and whether this deserves attention now at ${company}.`
+      return `${base} is usually focused on risk, timing, and whether this deserves attention now at ${company}.`
     case 'real_estate':
-      return `${base} usually cares about site openings, leases, and which properties are carrying the cost at ${company}.`
+      return `${base} is usually focused on site openings, leases, and which properties are carrying the cost at ${company}.`
     case 'technology':
-      return `${base} usually cares about uptime, equipment load, and growth pressure at ${company}.`
+      return `${base} is usually focused on uptime, equipment load, and growth pressure at ${company}.`
     case 'healthcare':
-      return `${base} usually cares about reliability, patient comfort, and equipment uptime at ${company}.`
+      return `${base} is usually focused on reliability, patient comfort, and equipment uptime at ${company}.`
     case 'education':
-      return `${base} usually cares about campus schedules, comfort, and summer load at ${company}.`
+      return `${base} is usually focused on campus schedules, comfort, and summer load at ${company}.`
     case 'public_sector':
     case 'nonprofit':
-      return `${base} usually cares about stewardship, mission funds, and avoiding surprise costs at ${company}.`
+      return `${base} is usually focused on stewardship, mission funds, and avoiding surprise costs at ${company}.`
     case 'hospitality':
-      return `${base} usually cares about guest comfort, laundry, HVAC, and site-level usage at ${company}.`
+      return `${base} is usually focused on guest comfort, laundry, HVAC, and site-level usage at ${company}.`
     case 'retail':
       return automotiveBusiness
-        ? `${base} usually cares about dealership traffic, showroom load, service bays, and which locations are the outliers at ${company}.`
-        : `${base} usually cares about store-level traffic, lighting, HVAC, and which locations are the outliers at ${company}.`
+        ? `${base} is usually focused on dealership traffic, showroom load, service bays, and which locations are the outliers at ${company}.`
+        : `${base} is usually focused on store-level traffic, lighting, HVAC, and which locations are the outliers at ${company}.`
     case 'logistics':
-      return `${base} usually cares about dock timing, refrigeration if any, and which sites are carrying the peaks at ${company}.`
+      return `${base} is usually focused on dock timing, refrigeration if any, and which sites are carrying the peaks at ${company}.`
     case 'manufacturing':
-      return `${base} usually cares about production timing, equipment starts, and the plant peak at ${company}.`
+      return `${base} is usually focused on production timing, equipment starts, and the plant peak at ${company}.`
     default:
-      return `${base} needs a plain-English explanation of what is driving the bill at ${company}.`
+      return `${base} usually wants a plain-English explanation of what is driving the bill at ${company}.`
   }
 }
 
 function buildOpenerHint(profile: AudienceProfile): string {
-  const firstName = profile.contactFirstName || profile.contactName.split(/\s+/)[0] || 'there'
   const company = profile.companyName || 'the company'
   const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
   switch (profile.roleFamily) {
     case 'finance':
-      return `I was curious how ${firstName} is looking at the budget side at ${company}.`
+      return `Most finance leaders want budget clarity at ${company}, especially on which sites are driving the spikes.`
     case 'operations':
-      return `I was curious how ${firstName} is thinking about the site-by-site usage at ${company}.`
+      return `Most operations leaders care about site-by-site usage at ${company} and what is driving the spikes.`
     case 'facilities':
-      return `I was curious how ${firstName} is thinking about building uptime at ${company}.`
+      return `Most facilities leaders care about building uptime at ${company} and which buildings need the most attention.`
     case 'procurement':
-      return `I was curious how ${firstName} is looking at renewal timing at ${company}.`
+      return `Most procurement leaders are looking at renewal timing at ${company} and whether the current setup still makes sense.`
     case 'executive':
-      return `I was curious how ${firstName} is weighing the risk side at ${company}.`
+      return `Most executives care about the risk side at ${company} and whether this deserves attention now.`
     case 'real_estate':
-      return `I was curious how ${firstName} is handling the site and lease side at ${company}.`
+      return `Most real estate leaders are focused on the site and lease side at ${company}.`
     case 'technology':
-      return `I was curious how ${firstName} is thinking about uptime and growth at ${company}.`
+      return `Most technology leaders care about uptime and growth at ${company}.`
     case 'healthcare':
-      return `I was curious how ${firstName} is thinking about reliability at ${company}.`
+      return `Most healthcare leaders care about reliability at ${company}.`
     case 'education':
-      return `I was curious how ${firstName} is thinking about campus timing at ${company}.`
+      return `Most education leaders care about campus timing at ${company}.`
     case 'public_sector':
     case 'nonprofit':
-      return `I was curious how ${firstName} is protecting the budget at ${company}.`
+      return `Most public-sector and nonprofit leaders care about protecting the budget at ${company}.`
     case 'hospitality':
-      return `I was curious how ${firstName} is thinking about guest comfort and usage at ${company}.`
+      return `Most hospitality leaders care about guest comfort and usage at ${company}.`
     case 'retail':
       return automotiveBusiness
-        ? `I was curious how ${firstName} is comparing dealership-level usage at ${company}.`
-        : `I was curious how ${firstName} is comparing store-level usage at ${company}.`
+        ? `Most dealership leaders care about dealership-level usage at ${company}.`
+        : `Most retail leaders care about store-level usage at ${company}.`
     case 'logistics':
-      return `I was curious how ${firstName} is thinking about dock timing at ${company}.`
+      return `Most logistics leaders care about dock timing at ${company}.`
     case 'manufacturing':
-      return `I was curious how ${firstName} is thinking about production timing at ${company}.`
+      return `Most manufacturing leaders care about production timing at ${company}.`
     default:
-      return `I was curious how ${firstName} is looking at the bill at ${company}.`
+      return `Most operators want to know what is driving the bill at ${company}.`
   }
 }
 
