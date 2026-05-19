@@ -39,7 +39,7 @@ export function useMarketTelemetryHistory() {
       const { data, error } = await supabase
         .from('market_telemetry')
         .select('created_at, timestamp, prices, metadata')
-        .or('metadata->>source.eq.cron_snapshot,metadata->>source.eq.ercot_snapshot,metadata->>source.is.null')
+        .or('metadata->>source.eq.cron_snapshot,metadata->>source.eq.ercot_snapshot,metadata->>source.eq.ercot_archive_backfill,metadata->>source.is.null')
         .order('created_at', { ascending: false })
         .limit(HISTORY_LIMIT)
 

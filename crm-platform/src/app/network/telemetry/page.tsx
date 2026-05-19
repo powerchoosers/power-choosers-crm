@@ -206,7 +206,7 @@ export default function TelemetryPage() {
           ERCOT Price History
         </h2>
         <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
-          Historic settlement prices from the scheduled ERCOT snapshot job (7am, 12pm, 5pm, 10pm CT), plus older legacy captures already stored in Supabase. The graph excludes the one-off manual trigger row.
+          Historic settlement prices from the scheduled ERCOT snapshot job (7am, 12pm, 5pm, 10pm CT), plus archived daily backfill rows already stored in Supabase. The graph excludes the one-off manual trigger row.
         </p>
         <div className="nodal-void-card overflow-hidden">
           {ercotHistoryError ? (
