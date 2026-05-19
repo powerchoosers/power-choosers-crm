@@ -3827,7 +3827,7 @@ REQUIREMENTS:
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
 ${audienceRule}${sequencePriorityRule}
 ${dentalContext}${behavioralHealthContext}
-   - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
+   - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
    - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
    - For dental groups, speak in practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
    - For hospital operators and neighborhood-hospital networks, use hospital language like emergency departments, inpatient rooms, imaging, lab work, and health-system partnerships. Never use hotel, guest-room, laundry, lodging, banquet, or hospitality language for hospitals.
@@ -3978,6 +3978,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(hospital|hospitality|clinic|medical practice|patient rooms?|patient care|emergency department|emergency room|inpatient|short-stay rooms?|acute care|guest rooms?|laundry|lodging|banquet|event venue)\b/i.test(lower)
   const accountSchoolManufacturingJargon = accountIsSchool &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|shift(?:s)?|bake line)\b/i.test(lower)
+  const accountSchoolPracticeJargon = accountIsSchool &&
+    /\b(practice(?:s)?|operatories?|patient flow|sterilization|imaging|clinic|dental|medical practice|hospitals?)\b/i.test(lower)
   const accountSchoolRetailJargon = accountIsSchool &&
     /\b(retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group|showroom)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
@@ -4005,7 +4007,30 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+}
+
+function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+  const companyName = cleanText(account.name) || 'the company'
+  const signalAnchor = cleanText(deriveSignalAnchor(account, candidate))
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
+  const companyKey = companyName.toLowerCase()
+  const anchorKey = signalAnchor.toLowerCase()
+
+  if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount > 1) {
+    const unit =
+      context.industryCluster === 'school_district' || context.industryCluster === 'higher_education'
+        ? 'campus'
+        : 'location'
+    const countLabel = `${multiSiteInfo.locationCount}-${unit} footprint`
+    return `${companyName}'s ${countLabel}`
+  }
+
+  if (signalAnchor && anchorKey !== companyKey && signalAnchor.length <= 60 && signalAnchor.split(/\s+/).length <= 8) {
+    return signalAnchor
+  }
+
+  return companyName
 }
 
 function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string, candidate: ResearchHit | null = null) {
@@ -4014,59 +4039,45 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   const greeting = firstName
     ? `Hey ${firstName}, it's Lewis with Nodal Point`
     : "Hey, it's Lewis with Nodal Point"
-  const sourceLead = cleanText(buildSourceLead(account, candidate))
-  const reasonLead = sourceLead
-    ? sourceLead.replace(/\.$/, '').replace(/^The\s+/i, 'the ')
-    : cleanText(companyName)
-
-  const reasonBySignal: Record<SignalFamily, string> = {
-    acquisition: reasonLead || 'the acquisition',
-    new_location: reasonLead || 'the new site',
-    leadership_change: reasonLead || 'the leadership change',
-    growth: reasonLead || 'the growth',
-    restructuring: reasonLead || 'the footprint change',
-    contract_win: reasonLead || 'the new contract',
-    funding: reasonLead || 'the new funding',
-    technical_load: reasonLead || 'the equipment side',
-    industry_context: reasonLead || companyName,
-  }
+  const openerHook = buildConciseOpenerHook(account, candidate, context)
+  const openerLead = openerHook === companyName ? `a detail on ${companyName}` : openerHook
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.acquisition}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.acquisition}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     new_location: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.new_location}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.new_location}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     leadership_change: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.leadership_change}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.leadership_change}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     growth: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.growth}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.growth}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     restructuring: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.restructuring}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.restructuring}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     contract_win: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.contract_win}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.contract_win}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     funding: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.funding}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.funding}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     technical_load: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.technical_load}, do you have a quick second?`,
-      `${greeting} - I’m calling out of the blue about ${reasonBySignal.technical_load}, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
     industry_context: [
-      `${greeting} - I’m calling out of the blue because ${reasonBySignal.industry_context}, do you have a quick second?`,
-      `${greeting} - I found a detail on ${reasonBySignal.industry_context} that looked worth a quick call, do you have a quick second?`,
+      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
     ],
   }
 
@@ -4225,6 +4236,7 @@ function extractBodyText(html: string) {
       .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
       .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
       .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<(header|nav|footer|aside|form)\b[\s\S]*?<\/\1>/gi, ' ')
       .replace(/<[^>]+>/g, ' ')
   )
 }
@@ -4264,6 +4276,28 @@ const OFFICIAL_ANNOUNCEMENT_PATTERNS = [
   /release/i,
 ]
 
+const COMPANY_NAV_BOILERPLATE_PATTERNS = [
+  /create a purchase order/i,
+  /acknowledge a purchase order/i,
+  /create an invoice/i,
+  /submit a price change/i,
+  /change a promise date/i,
+  /submit a quantity change/i,
+  /view invoices and payments/i,
+  /how to login/i,
+  /\biSupplier\b/i,
+  /privacy policy/i,
+  /terms of use/i,
+  /datasheet feed/i,
+  /energy management/i,
+  /brownfield expansion/i,
+  /utilization of idle assets/i,
+  /reliability centered maintenance/i,
+  /infrastructure improvements/i,
+  /materiality assessment/i,
+  /sustainability roadmap/i,
+]
+
 function countMatchingPatterns(value: string, patterns: RegExp[]) {
   const text = cleanText(value)
   if (!text) return 0
@@ -4279,6 +4313,19 @@ function looksLikeCommercialListingPage(title: string, snippet: string, bodyText
   if (officialHits > 0) return false
   if (/\/(inventory|vehicle|vehicles|cars|trucks|suvs|used-cars|new-cars|pre-owned|shop|store|catalog)\b/i.test(lower)) return true
   return listingHits >= 2
+}
+
+function shouldPreferCompanyDescription(description: string, bodyText: string, url: string) {
+  const cleanDescription = cleanText(description)
+  if (!cleanDescription) return false
+
+  const boilerplateHits = countMatchingPatterns([bodyText, url].join(' '), COMPANY_NAV_BOILERPLATE_PATTERNS)
+  const bodyWordCount = cleanText(bodyText).split(/\s+/).filter(Boolean).length
+
+  if (boilerplateHits >= 3) return true
+  if (boilerplateHits >= 2 && bodyWordCount > 120) return true
+
+  return cleanDescription.length >= 80 && boilerplateHits >= 1
 }
 
 function extractPagePreview(html: string, fallbackTitle: string, url: string, sourceKind: ResearchSourceKind) {
@@ -4310,7 +4357,9 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
     return null
   }
 
-  const snippet = extractKeywordSnippet(bodyText) || description || bodyText.slice(0, 420) || title
+  const snippet = sourceKind === 'web' && shouldPreferCompanyDescription(description, bodyText, url)
+    ? description
+    : extractKeywordSnippet(bodyText) || description || bodyText.slice(0, 420) || title
 
   let publishedAt: string | null = null
   if (publishedAtRaw) {
@@ -5112,6 +5161,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
+- For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
 - The opener is handled separately. Do not write it into talk_track.
 - Start with the concrete business fact or footprint detail, then end with one direct question. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
