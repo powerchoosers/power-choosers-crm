@@ -7,6 +7,9 @@ import { supabase } from '@/lib/supabase'
 export interface MarketTelemetryRow {
   created_at: string
   timestamp?: string
+  metadata?: {
+    source?: string
+  }
   prices: {
     houston?: number
     north?: number
@@ -35,7 +38,8 @@ export function useMarketTelemetryHistory() {
     queryFn: async (): Promise<MarketTelemetryRow[]> => {
       const { data, error } = await supabase
         .from('market_telemetry')
-        .select('created_at, timestamp, prices')
+        .select('created_at, timestamp, prices, metadata')
+        .filter('metadata->>source', 'eq', 'cron_snapshot')
         .order('created_at', { ascending: false })
         .limit(HISTORY_LIMIT)
 
