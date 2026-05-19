@@ -6,6 +6,10 @@ import { flexRender, Row } from '@tanstack/react-table'
 import { TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { Deal } from '@/types/deals'
+import {
+    getFrozenNameCellClass,
+    getFrozenSelectCellClass,
+} from '@/components/network/frozenTable'
 
 interface DealTableRowProps {
     row: Row<Deal>
@@ -46,11 +50,23 @@ export const DealTableRow = memo(function DealTableRow({
                 onSelect(row.original)
             }}
         >
-            {row.getVisibleCells().map((cell) => (
-                <TableCell key={cell.id} className="py-3">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-            ))}
+            {row.getVisibleCells().map((cell) => {
+                const isFrozenCell = cell.column.id === 'select' || cell.column.id === 'name'
+                return (
+                    <TableCell
+                        key={cell.id}
+                        className={cn(
+                            "py-3",
+                            !isFrozenCell && "border-b border-white/5",
+                            cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
+                            cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected()),
+                            cell.column.id === 'stage' && "pl-5"
+                        )}
+                    >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                )
+            })}
         </motion.tr>
     )
 }, (prev, next) => {
