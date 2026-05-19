@@ -1,6 +1,8 @@
 'use client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 const frozenSelectCellBase =
@@ -61,6 +63,7 @@ export function FrozenHoverText({
   const textRef = useRef<HTMLSpanElement | null>(null)
   const [isHovered, setIsHovered] = useState(false)
   const [isTruncated, setIsTruncated] = useState(false)
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null)
 
   useLayoutEffect(() => {
     const element = textRef.current
@@ -84,6 +87,31 @@ export function FrozenHoverText({
     return () => observer.disconnect()
   }, [text, className])
 
+  useLayoutEffect(() => {
+    const element = textRef.current
+    if (!element || !isHovered || !isTruncated) {
+      setTooltipPosition(null)
+      return
+    }
+
+    const updatePosition = () => {
+      const rect = element.getBoundingClientRect()
+      setTooltipPosition({
+        left: Math.max(12, Math.min(rect.left, window.innerWidth - 396)),
+        top: rect.bottom + 6,
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [isHovered, isTruncated, text])
+
   return (
     <span
       className="group/frozen-text relative block min-w-0"
@@ -93,16 +121,29 @@ export function FrozenHoverText({
       <span ref={textRef} className={cn("block min-w-0 truncate", className)}>
         {text}
       </span>
-      {isTruncated && isHovered && (
-        <span
-          role="tooltip"
-          className={cn(
-            "pointer-events-none absolute left-0 top-[calc(100%+0.35rem)] z-50 max-w-[24rem] rounded-xl border border-[#002FA7]/20 bg-zinc-950/95 px-3 py-2 text-sm font-medium leading-5 text-zinc-100 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-[#002FA7]/10 backdrop-blur-2xl whitespace-normal break-words",
-            revealClassName
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {isTruncated && isHovered && tooltipPosition && (
+            <motion.span
+              role="tooltip"
+              initial={{ opacity: 0, y: -4, scale: 0.98, filter: 'blur(3px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -3, scale: 0.98, filter: 'blur(2px)' }}
+              transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+              className={cn(
+                "pointer-events-none fixed z-[9999] max-w-[24rem] rounded-xl border border-[#002FA7]/20 bg-zinc-950/95 px-3 py-2 text-sm font-medium leading-5 text-zinc-100 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-[#002FA7]/10 backdrop-blur-2xl whitespace-normal break-words",
+                revealClassName
+              )}
+              style={{
+                left: tooltipPosition.left,
+                top: tooltipPosition.top,
+              }}
+            >
+              {text}
+            </motion.span>
           )}
-        >
-          {text}
-        </span>
+        </AnimatePresence>,
+        document.body
       )}
     </span>
   )
