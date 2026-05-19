@@ -67,7 +67,7 @@ export function ContactAvatar({
   const health = healthScore ? HEALTH_DOT[healthScore] : null
 
   return (
-    <div className="relative inline-block">
+    <div className="relative z-10 inline-block">
       <motion.div
         initial={false}
         animate={{ opacity: 1, scale: 1 }}
@@ -124,7 +124,7 @@ export function ContactAvatar({
       </motion.div>
 
       {/* Health badge — top-LEFT corner */}
-      <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+      <div className="absolute -top-0.5 -left-0.5 z-20 w-2.5 h-2.5">
         <AnimatePresence mode="wait">
           {healthLoading && !health && (
             <motion.div
@@ -162,7 +162,7 @@ export function ContactAvatar({
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.1 }}
           className={cn(
-            'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
+            'absolute -top-0.5 -right-0.5 z-20 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
             showListBadge
               ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]'
               : 'bg-zinc-100 shadow-[0_0_8px_rgba(255,255,255,0.4)]'

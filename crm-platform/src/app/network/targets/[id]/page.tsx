@@ -348,8 +348,8 @@ export default function TargetDetailPage() {
           <button
             onClick={table.getToggleAllPageRowsSelectedHandler()}
             className={cn(
-              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
-              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+              "w-4 h-4 rounded border transition-all flex items-center justify-center backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-white/[0.03] border-white/10 opacity-70 hover:opacity-100"
             )}
           >
             {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
@@ -660,8 +660,8 @@ export default function TargetDetailPage() {
           <button
             onClick={table.getToggleAllPageRowsSelectedHandler()}
             className={cn(
-              "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
-              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+              "w-4 h-4 rounded border transition-all flex items-center justify-center backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+              table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-white/[0.03] border-white/10 opacity-70 hover:opacity-100"
             )}
           >
             {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}

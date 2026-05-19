@@ -352,8 +352,8 @@ export default function AccountsPage() {
             <button
               onClick={table.getToggleAllPageRowsSelectedHandler()}
               className={cn(
-                "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
-                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+                "w-4 h-4 rounded border transition-all flex items-center justify-center backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-white/[0.03] border-white/10 opacity-70 hover:opacity-100"
               )}
             >
               {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
@@ -401,7 +401,7 @@ export default function AccountsPage() {
             <button
               type="button"
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="flex items-center gap-1.5 pl-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
+              className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
             >
               <span>Account Name</span>
               <ArrowUpDown className="h-2.5 w-2.5" />

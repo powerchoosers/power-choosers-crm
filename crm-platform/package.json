@@ -20,6 +20,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "typecheck:fast": "tsc --noEmit -p tsconfig.typecheck-fast.json",
     "typecheck:strict": "next build --webpack",
     "desktop:dev": "concurrently -k \"npm run dev:turbo\" \"wait-on tcp:3000 && cross-env ELECTRON_START_URL=http://localhost:3000/network electron .\"",
     "desktop:prod": "cross-env ELECTRON_START_URL=https://www.nodalpoint.io/network electron .",
