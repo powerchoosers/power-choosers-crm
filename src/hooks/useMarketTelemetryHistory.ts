@@ -30,7 +30,7 @@ export interface ERCOTHistoryChartPoint {
   south: number | null
 }
 
-const HISTORY_LIMIT = 500
+const HISTORY_LIMIT = 1000
 
 export function useMarketTelemetryHistory() {
   const query = useQuery({
