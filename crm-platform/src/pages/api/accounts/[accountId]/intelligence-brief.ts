@@ -411,12 +411,20 @@ function hasStrongHealthcareSignals(text: string) {
   return /(healthcare|hospital|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|specialist|wellness|doctor)/i.test(text)
 }
 
+function hasStrongBehavioralHealthSignals(text: string) {
+  return /(psychiatric|psychiatry|mental health|behavioral health|behavioral healthcare|substance use|substance abuse|chemical dependency|addiction treatment|inpatient mental health|partial hospitalization|intensive outpatient|residential treatment|crisis services|counseling|therapy|trauma-informed|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health)/i.test(text)
+}
+
 function hasStrongDentalSignals(text: string) {
   return /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/i.test(text)
 }
 
 function hasStrongAutomotiveSignals(text: string) {
   return /(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
+}
+
+function hasStrongAutoPartsDistributionSignals(text: string) {
+  return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket parts|aftermarket collision parts|parts house|parts stores?|parts supplier|parts distribution|distribution centers?|same[-\s]?day parts|automotive service centers|repair centers|fleet and municipal)/i.test(text)
 }
 
 function hasStrongDmeSignals(text: string) {
@@ -428,6 +436,7 @@ function hasStrongRestaurantSignals(text: string) {
 }
 
 function hasStrongManufacturingSignals(text: string) {
+  if (hasStrongBehavioralHealthSignals(text)) return false
   return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
 }
 
@@ -464,6 +473,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const dmeSignals = hasStrongDmeSignals(accountText)
   const restaurantSignals = hasStrongRestaurantSignals(accountText)
   const logisticsSignals = hasStrongLogisticsSignals(accountText)
+  const autoPartsDistributionSignals = hasStrongAutoPartsDistributionSignals(accountText)
   const officeSignals = hasStrongOfficeServicesSignals(accountText)
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
   const petrochemicalSignals = hasStrongPetrochemicalSignals(accountText)
@@ -506,6 +516,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (petrochemicalSignals && /(logistics|warehouse|distribution network|distribution and logistics|dock activity|terminal-adjacent|no manufacturing language)/i.test(profileText)) {
+    return true
+  }
+
+  if (autoPartsDistributionSignals && /(dealership|showroom|service bays?|lot lighting|vehicle inventory|auto dealer)/i.test(profileText)) {
     return true
   }
 
@@ -1747,7 +1761,7 @@ function buildStructuredIdentityProfile(
   if (!text && savedProfile) return savedProfile
 
   const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
-  const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
+  const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
   const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
   const isDentalPractice = hasStrongDentalSignals(text)
   const isDmeProvider = hasStrongDmeSignals(text)
@@ -1755,6 +1769,7 @@ function buildStructuredIdentityProfile(
   const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|foodservice|production facilities)/i.test(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
+  const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
   const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
@@ -1800,12 +1815,13 @@ function buildStructuredIdentityProfile(
       }
 
       if (isBehavioralHealth) {
-        companyType = multiSiteInfo.isMultiSite ? 'behavioral health network' : 'behavioral health provider'
-        operatingModel = multiSiteInfo.isMultiSite ? 'distributed community-care network' : 'community-care facility'
-        facilityType = 'clinic / crisis center / support building'
-        identityKeywords = selectIdentityKeywords(text, ['behavioral health', 'mental health', 'crisis services', 'counseling', 'care coordination', 'community programs'], ['behavioral health', 'community care', 'crisis services'])
-        powerKeywords = selectIdentityKeywords(text, ['hvac', 'clinical space', 'support buildings', 'crisis center', 'counseling center'], ['HVAC', 'clinical space', 'support buildings'])
-        talkTrackGuardrails = ['No senior-living language', 'No hotel language', 'No restaurant language', 'No manufacturing language']
+        const isPsychHospital = hasHospitalSignals || /(acute care|inpatient|beds?|residential treatment|partial hospitalization|intensive outpatient)/i.test(text)
+        companyType = isPsychHospital ? 'behavioral health hospital' : (multiSiteInfo.isMultiSite ? 'behavioral health network' : 'behavioral health provider')
+        operatingModel = isPsychHospital ? 'inpatient and outpatient psychiatric care facility' : (multiSiteInfo.isMultiSite ? 'distributed community-care network' : 'community-care facility')
+        facilityType = isPsychHospital ? 'psychiatric hospital / treatment facility' : 'clinic / crisis center / support building'
+        identityKeywords = selectIdentityKeywords(text, ['psychiatric care', 'behavioral health', 'mental health', 'substance use disorder', 'chemical dependency', 'inpatient care', 'partial hospitalization', 'intensive outpatient', 'residential treatment'], ['behavioral health', 'psychiatric care', 'treatment programs'])
+        powerKeywords = selectIdentityKeywords(text, ['patient safety', 'patient comfort', 'HVAC', 'inpatient units', 'residential treatment', 'clinical space', 'support buildings'], ['patient comfort', 'HVAC', 'inpatient units'])
+        talkTrackGuardrails = ['No manufacturing language', 'No emergency-room language unless source confirms ER', 'No imaging/lab language unless source confirms it', 'No restaurant language', 'No hotel language']
         break
       }
 
@@ -1867,6 +1883,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'logistics':
+      if (isAutoPartsDistributor) {
+        companyType = multiSiteInfo.isMultiSite ? 'wholesale auto-parts distribution network' : 'wholesale auto-parts supplier'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location parts distribution network' : 'parts supply and distribution site'
+        facilityType = 'parts branch / distribution center'
+        identityKeywords = selectIdentityKeywords(text, ['wholesale auto parts', 'automotive parts supplier', 'aftermarket parts', 'parts stores', 'distribution centers', 'same-day parts', 'repair centers'], ['wholesale auto parts', 'parts supplier', 'distribution network'])
+        powerKeywords = selectIdentityKeywords(text, ['branch traffic', 'inventory turns', 'warehouse support', 'delivery timing', 'HVAC', 'parts counter'], ['branch traffic', 'inventory turns', 'delivery timing'])
+        talkTrackGuardrails = ['No dealership language', 'No showroom/service-bay language unless the source confirms it', 'No lot-lighting language']
+        break
+      }
+
       if (isDmeProvider) {
         companyType = multiSiteInfo.isMultiSite ? 'medical equipment distribution network' : 'durable medical equipment provider'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-site DME distribution and service network' : 'direct-service equipment support site'
@@ -2209,6 +2235,11 @@ function hashString(value: string) {
 
 function simplifyTalkTrackLanguage(value: string) {
   return cleanText(value)
+    .replace(/\bthe useful check is whether\b/gi, 'the question is whether')
+    .replace(/\bthe useful check is how\b/gi, 'the question is how')
+    .replace(/\bthe useful check is\b/gi, 'the question is')
+    .replace(/\bthe useful question is\b/gi, 'the question is')
+    .replace(/\bfor ([^,.!?]{2,80}), the question is\b/gi, 'for $1, most operators care about')
     .replace(/\bforensic signal\b/gi, 'thing to watch')
     .replace(/\bforensic driver\b/gi, 'thing to watch')
     .replace(/\bforensic check\b/gi, 'check')
@@ -2380,8 +2411,10 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
+  if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
   if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
+  if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
@@ -2389,7 +2422,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
   if (hotelProperty && (verifiedLocationCount === null || verifiedLocationCount <= 1)) return 'hotel_owner'
-  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
+  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy|psychiatric|partial hospitalization|intensive outpatient|substance use|chemical dependency)/.test(text)) return 'healthcare'
   if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
@@ -2840,6 +2873,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
       const logisticsAcquisitionHeavy = /\b(acquisition|acquisitions|acquired|rollup|distribution|building materials|wholesale|lumber|yards?|branches?)\b/i.test(text)
 
+      if (hasStrongAutoPartsDistributionSignals(text)) {
+        const locationDesc = logisticsMultiSite.locationCount
+          ? `${logisticsMultiSite.locationCount}+ parts locations`
+          : 'a parts supply network'
+        const regionDesc = logisticsMultiSite.regions.length > 1
+          ? ` across ${logisticsMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'Wholesale auto-parts distribution',
+          angle: `Branch traffic, inventory turns, delivery timing, warehouse support, and HVAC shaping the bill across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you comparing the branches and distribution centers separately to see where the biggest bill spikes are coming from?`,
+          openers: [
+            `Most wholesale parts distributors care about keeping parts moving fast, but branch traffic, inventory turns, delivery timing, and HVAC can make one location cost a lot more than another.`,
+            `Auto-parts distribution is different from a dealership because the power pattern is tied to inventory movement, branch counters, delivery timing, and warehouse support.`,
+            `The question is whether the branches or distribution centers are creating the biggest spikes on their own meters.`,
+          ],
+          focus: ['parts branches', 'distribution centers', 'inventory turns', 'delivery timing', 'warehouse support', 'branch-level bill spikes'],
+        }
+      }
+
       if (hasStrongDmeSignals(text)) {
         if (logisticsMultiSite.isMultiSite && logisticsMultiSite.locationCount && logisticsMultiSite.locationCount >= 3) {
           const locationDesc = logisticsMultiSite.locationCount >= 10
@@ -3069,7 +3123,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
       const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic imaging|imaging center|ortho|orthopedic|pediatric|wellness|doctor)/i.test(text) && !hasHospitalSignals
-      const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
+  const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
       const isDentalPractice = /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/i.test(text)
       const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
@@ -3153,7 +3207,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             openers: [
               `A neighborhood-hospital network like this can look steady in the group total while one hospital is carrying a much heavier bill pattern than the rest.`,
               `When each site combines emergency care, imaging, short-stay rooms, lab work, and HVAC, the power pattern can vary a lot from one hospital to the next.`,
-              `The useful check is whether the busier hospitals are the ones creating the biggest spikes on their own bills.`,
+              `Most hospital operators care about patient safety and budget control, so the question is which sites are creating the biggest spikes on their own bills.`,
             ],
             focus: ['emergency care', 'imaging', 'inpatient rooms', 'lab work', 'hospital comparison', 'site-specific bill spikes'],
           }
@@ -3166,8 +3220,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             question: `With ${locationDesc}${regionDesc}, are you comparing the clinics, crisis sites, and admin buildings meter by meter, or is the portfolio still too blended to see where the locked-in peak charges are sitting?`,
             openers: [
               `A regional behavioral health network like this usually has very different load profiles between clinics, crisis services, and administrative sites, so the meter history matters more than the average.`,
-              `With ${locationDesc}${regionDesc}, the useful check is which sites are carrying their own locked-in peak charge and which ones are not.`,
-              `The useful question is whether the crisis centers, outpatient sites, or support buildings are the ones carrying the highest billing floor on their own meters.`,
+              `Most behavioral health leaders care about keeping patient programs stable without letting one site quietly carry the biggest bill problem.`,
+              `The question is whether the crisis centers, outpatient sites, or support buildings are creating the highest charges on their own meters.`,
             ],
             focus: ['behavioral health network', 'crisis services', 'outpatient sites', 'administrative buildings', 'meter-level peak history', 'locked-in peak charges'],
           }
@@ -3229,13 +3283,28 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
 
       if (isBehavioralHealth) {
+        const isPsychHospital = hasHospitalSignals || /(acute care|inpatient|beds?|residential treatment|partial hospitalization|intensive outpatient)/i.test(text)
+        if (isPsychHospital) {
+          return {
+            label: 'Behavioral health hospital',
+            angle: 'Patient safety, comfort, inpatient units, treatment programs, and 24-hour building reliability shaping the bill at a psychiatric hospital.',
+            question: 'Has anyone separated patient-area HVAC, inpatient units, and treatment-program spaces to see what is actually creating the biggest spikes?',
+            openers: [
+              `Most behavioral health hospitals care about patient safety, comfort, and predictable facility costs because the building has to support inpatient and outpatient programs at the same time.`,
+              `For a psychiatric hospital, the power side is usually tied to patient-area HVAC, inpatient units, treatment spaces, and 24-hour reliability.`,
+              `The question is whether patient spaces or support areas are creating the biggest usage spikes on that meter.`,
+            ],
+            focus: ['patient safety', 'patient comfort', 'inpatient units', 'treatment programs', 'HVAC', '24-hour reliability'],
+          }
+        }
+
         return {
           label: 'Behavioral health / community care',
           angle: 'Different care programs and support buildings leaving different peak histories on their own meters.',
           question: 'Have you looked at whether the crisis, counseling, or administrative spaces are the ones leaving a locked-in peak charge on that meter?',
           openers: [
             `Behavioral health facilities are different because the crisis, counseling, and support programs do not all use power the same way.`,
-            `The useful check is whether the site’s peak is really coming from clinical activity, support space, or simple HVAC overlap.`,
+            `Most behavioral health operators care about keeping programs stable without letting support-space costs creep up in the background.`,
             `For a community care operation like this, the question is which part of the property is actually setting the billing floor on that meter.`,
           ],
           focus: ['behavioral health', 'crisis services', 'counseling space', 'support buildings', 'meter-level peaks', 'billing floors'],
@@ -3818,8 +3887,8 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? '- For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.\n'
     : ''
   
-  const behavioralHealthContext = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
-    ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
+  const behavioralHealthContext = hasStrongBehavioralHealthSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+    ? '- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.\n'
     : ''
 
   const prompt = `You are a plainspoken energy analyst and strategist. You are writing the TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
@@ -3859,7 +3928,8 @@ REQUIREMENTS:
    - Transmission exposure: Hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
    - Usage mismatch: When the operating schedule changes but the bill structure still reflects the old pattern.
 5. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
-6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
+6. CUSTOMER LENS: Do not say "the useful check." Say what leaders in that industry usually care about, then ask the question in plain English.
+7. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
 ${audienceRule}${sequencePriorityRule}
 ${dentalContext}${behavioralHealthContext}
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
@@ -3868,13 +3938,13 @@ ${dentalContext}${behavioralHealthContext}
    - For hospital operators and neighborhood-hospital networks, use hospital language like emergency departments, inpatient rooms, imaging, lab work, and health-system partnerships. Never use hotel, guest-room, laundry, lodging, banquet, or hospitality language for hospitals.
    - For multi-site care organizations, keep the comparison portfolio-wide but the liability meter-specific. Say each site can carry its own locked-in peak charge rather than implying one site changes every other site.
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
-7. NO REPETITION: Do not repeat the core question or the opening observation.
-8. LENGTH: Exactly 2 sentences. Aim for 14-50 words total.
-9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
-10. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
-11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
-12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
-13. IDENTITY PROFILE: If an identity profile is provided, treat it as the source of truth for what kind of company this is unless the signal text directly contradicts it. Do not use language blocked by the guardrails.
+8. NO REPETITION: Do not repeat the core question or the opening observation.
+9. LENGTH: Exactly 2 sentences. Aim for 14-50 words total.
+10. FORBIDDEN PHRASES: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
+11. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
+12. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
+13. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
+14. IDENTITY PROFILE: If an identity profile is provided, treat it as the source of truth for what kind of company this is unless the signal text directly contradicts it. Do not use language blocked by the guardrails.
 
 Generate a plain-English, peer-to-peer talk track for ${companyName}:`
 
@@ -3944,6 +4014,7 @@ Generate a plain-English, peer-to-peer talk track for ${companyName}:`
       /i took a look at/i,
       /staple/i,
       /long-standing/i,
+      /useful check/i,
     ]
     
     if (forbiddenPatterns.some(pattern => pattern.test(talkTrack))) {
@@ -4019,6 +4090,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountSchoolRetailJargon = accountIsSchool &&
     /\b(retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group|showroom)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
+  const accountIsAutoPartsDistribution = hasStrongAutoPartsDistributionSignals(accountText)
+  const accountAutoPartsDealershipJargon = accountIsAutoPartsDistribution &&
+    /\b(dealership|dealerships|showroom traffic|service bays?|lot lighting|vehicle inventory|auto dealer)\b/i.test(lower)
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
   const accountAutomotiveRetailJargon = accountIsAutomotive &&
@@ -4045,12 +4119,14 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const companyName = cleanText(account.name) || 'the company'
   const signalAnchor = cleanText(deriveSignalAnchor(account, candidate))
+  const title = cleanText(candidate?.title || '')
+    .replace(/\s*[-|]\s*(AftermarketNews|Google News|PR Newswire|Business Wire|GlobeNewswire|News)\s*$/i, '')
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const companyKey = companyName.toLowerCase()
   const anchorKey = signalAnchor.toLowerCase()
@@ -4068,6 +4144,11 @@ function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | nu
     return signalAnchor
   }
 
+  if (/\b(launches?|launched|redesigns?|redesigned|opens?|opened|expands?|expanded|acquires?|acquired|appoints?|appointed|promotes?|promoted)\b/i.test(title)) {
+    const shortTitle = shortenText(title, 80)
+    if (shortTitle && shortTitle.toLowerCase() !== companyKey) return shortTitle
+  }
+
   return companyName
 }
 
@@ -4078,7 +4159,7 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
     ? `Hey ${firstName}, it's Lewis with Nodal Point`
     : "Hey, it's Lewis with Nodal Point"
   const openerHook = buildConciseOpenerHook(account, candidate, context)
-  const openerLead = openerHook === companyName ? `a detail on ${companyName}` : openerHook
+  const openerLead = openerHook === companyName ? `${companyName}'s business` : openerHook
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
@@ -4776,10 +4857,41 @@ function normalizeBriefSections(result: StoredBriefResult): StoredBriefResult {
   }
 }
 
+function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit | null) {
+  const description = cleanText(account.description)
+  if (description && description.split(/\s+/).filter(Boolean).length >= 12) {
+    return shortenText(description, 520)
+  }
+
+  const snippet = cleanText(candidate?.snippet)
+  if (snippet && snippet.split(/\s+/).filter(Boolean).length >= 12) {
+    return shortenText(snippet, 520)
+  }
+
+  return ''
+}
+
+function normalizeSignalDetail(detail: string, headline: string, account: AccountRow, candidate: ResearchHit | null) {
+  const cleaned = cleanText(detail)
+  const normalizedDetail = normalizeEntityToken(cleaned)
+  const normalizedHeadline = normalizeEntityToken(headline)
+  const normalizedCandidateTitle = normalizeEntityToken(candidate?.title || '')
+  const wordCount = cleaned.split(/\s+/).filter(Boolean).length
+  const weakDetail =
+    wordCount < 12 ||
+    (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
+    (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
+    /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned)
+
+  if (!weakDetail) return cleaned
+
+  return buildFallbackSignalDetail(account, candidate) || cleaned
+}
+
 function validateBriefResult(result: BriefResult, candidate: ResearchHit | null, account: AccountRow) {
   const usable = Boolean(result?.usable_signal)
   const headline = cleanText(result?.signal_headline)
-  const detail = cleanText(result?.signal_detail)
+  const detail = normalizeSignalDetail(cleanText(result?.signal_detail), headline, account, candidate)
   const talkTrack = simplifyTalkTrackLanguage(cleanText(result?.talk_track))
   const candidateUrl = cleanText(candidate?.url)
   const resultUrl = cleanText(result?.source_url)
@@ -4829,6 +4941,9 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   if (candidate && isOfficialCompanyAnnouncement(account, candidate)) {
     if (finalConfidence === 'Low') finalConfidence = 'Medium'
     if (finalConfidence === 'Medium') finalConfidence = 'High'
+  }
+  if (candidate?.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate) && finalConfidence === 'Low') {
+    finalConfidence = 'Medium'
   }
 
   return {
@@ -5083,6 +5198,7 @@ Decision rules:
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
+- Do not say "the useful check." Say what leaders in that industry usually care about, then ask the question in plain English.
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5094,6 +5210,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the account is operationally heavy or the research result clearly points to load, production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
+- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
 - The opener is handled separately. Do not write it into talk_track.
 - Start with the concrete event, company fact, or facility detail, then end with one direct question.
@@ -5186,6 +5303,7 @@ Decision rules:
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
+- Do not say "the useful check." Say what leaders in that industry usually care about, then ask the question in plain English.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5199,6 +5317,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
+- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
 - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
 - The opener is handled separately. Do not write it into talk_track.
