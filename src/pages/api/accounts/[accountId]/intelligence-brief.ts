@@ -4011,7 +4011,6 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const sourceLead = buildSourceLead(account, candidate)
-  const audienceLead = buildAudienceLead(context.audienceProfile)
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
@@ -4037,7 +4036,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
   }
 
-  const opener = audienceLead || pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
+  const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const signalLineBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       `After an acquisition, somebody usually has to sort out what got inherited on the power side.`,
@@ -4117,7 +4116,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       fallbackIndustryLine,
       openingIndustryLine,
     ]
-    const companyLead = cleanText(audienceLead) || pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
+    const companyLead = pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
 
     fullTrack = `${companyLead} ${forensicObservation} ${question}`
   } else {
@@ -4937,7 +4936,7 @@ Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
 - If the payload includes an identity_profile block, use it as the operating identity guardrail for the account unless the research clearly proves it wrong.
-- If an audience_profile block is present, use it as the human lens for the talk track. Use the person's first name once if it improves the opener, and use the title to decide what they actually care about. Treat LinkedIn/about/work-history clues as internal only.
+- If an audience_profile block is present, use it as the human lens for the talk track. Use the person's title to shape the question or second sentence. If you use their first name, keep it after the company fact, not before it. Treat LinkedIn/about/work-history clues as internal only.
 - If the payload includes a hierarchy_context block, use it to understand the parent/subsidiary structure and related websites, but keep the operating company as the center of the brief unless the account itself is the parent.
 - Related parent/subsidiary websites are context, not automatic signals. Do not turn a parent-only article into the operating company's headline unless the operating company is clearly named or the account itself is the parent entity.
 - If related_entity_research is present, use it to validate what the company actually is and how the linked businesses describe themselves. It is support context, not a free pass to invent a parent-level event.
@@ -4986,7 +4985,7 @@ Decision rules:
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 - If market context is secondary, keep it to one short clause or leave it out.
-- If an audience profile is present, make the talk track feel aimed at that person, not just the company. Mention the first name once if it sounds natural and helps the opening.
+- If an audience profile is present, make the talk track feel aimed at that person, not just the company. Mention the first name once only after the company fact if it still sounds natural.
 
 Talk Track angle selection (choose ONE based on the actual signal):
 
