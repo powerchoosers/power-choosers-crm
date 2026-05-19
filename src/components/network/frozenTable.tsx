@@ -1,20 +1,22 @@
-import React from 'react'
+'use client'
+
+import { useLayoutEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const frozenSelectCellBase =
-  "sticky left-0 z-30 transform-gpu box-border w-12 min-w-12 max-w-12 px-0 transition-colors backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "sticky left-0 z-30 transform-gpu box-border w-12 min-w-12 max-w-12 px-0 border-b-0 relative transition-colors backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65 after:content-[''] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-20 after:h-px after:bg-white/5"
 const frozenSelectCellIdle = "bg-zinc-950/60 group-hover:bg-white/[0.04]"
 const frozenSelectCellActive = "bg-[#002FA7]/10 group-hover:bg-[#002FA7]/12"
 
 const frozenNameCellBase =
-  "sticky left-12 z-20 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-0 overflow-visible border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-6 after:w-6 after:bg-gradient-to-r after:from-black/70 after:via-black/20 after:to-transparent transition-colors backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "sticky left-12 z-20 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-0 overflow-visible border-b-0 border-r border-white/5 relative shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-right-6 before:w-6 before:bg-gradient-to-r before:from-black/70 before:via-black/20 before:to-transparent after:content-[''] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-20 after:h-px after:bg-white/5 transition-colors backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
 const frozenNameCellIdle = "bg-zinc-950/60 group-hover:bg-white/[0.04]"
 const frozenNameCellActive = "bg-[#002FA7]/10 group-hover:bg-[#002FA7]/12"
 
 const frozenHeaderSelectCellBase =
-  "sticky left-0 z-50 transform-gpu box-border w-12 min-w-12 max-w-12 px-0 border-b border-white/5 transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "sticky left-0 z-50 transform-gpu box-border w-12 min-w-12 max-w-12 px-0 border-b-0 relative transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65 after:content-[''] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-20 after:h-px after:bg-white/5"
 const frozenHeaderNameCellBase =
-  "sticky left-12 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-0 overflow-visible border-b border-white/5 border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-6 after:w-6 after:bg-gradient-to-r after:from-black/70 after:via-black/20 after:to-transparent transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "sticky left-12 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-0 overflow-visible border-b-0 border-r border-white/5 relative shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-right-6 before:w-6 before:bg-gradient-to-r before:from-black/70 before:via-black/20 before:to-transparent after:content-[''] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:z-20 after:h-px after:bg-white/5 transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
 
 export function getFrozenSelectCellClass(isSelected: boolean) {
   return cn(
@@ -38,6 +40,13 @@ export function getFrozenNameHeaderClass() {
   return frozenHeaderNameCellBase
 }
 
+export function getColumnAfterName(columnOrder?: string[]) {
+  if (!columnOrder) return undefined
+  const nameIndex = columnOrder.indexOf('name')
+  if (nameIndex < 0) return undefined
+  return columnOrder[nameIndex + 1]
+}
+
 interface FrozenHoverTextProps {
   text: string
   className?: string
@@ -49,19 +58,52 @@ export function FrozenHoverText({
   className,
   revealClassName,
 }: FrozenHoverTextProps) {
+  const textRef = useRef<HTMLSpanElement | null>(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isTruncated, setIsTruncated] = useState(false)
+
+  useLayoutEffect(() => {
+    const element = textRef.current
+    if (!element) return
+
+    const updateTruncation = () => {
+      const next = element.scrollWidth > element.clientWidth + 1
+      setIsTruncated((current) => (current === next ? current : next))
+    }
+
+    updateTruncation()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateTruncation)
+      return () => window.removeEventListener('resize', updateTruncation)
+    }
+
+    const observer = new ResizeObserver(updateTruncation)
+    observer.observe(element)
+
+    return () => observer.disconnect()
+  }, [text, className])
+
   return (
-    <span className="group/frozen-text relative block min-w-0">
-      <span className={cn("block min-w-0 truncate", className)}>
+    <span
+      className="group/frozen-text relative block min-w-0"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <span ref={textRef} className={cn("block min-w-0 truncate", className)}>
         {text}
       </span>
-      <span
-        className={cn(
-          "pointer-events-none absolute left-0 top-[calc(100%+0.35rem)] z-50 hidden max-w-[24rem] rounded-xl border border-[#002FA7]/20 bg-zinc-950/95 px-3 py-2 text-sm font-medium leading-5 text-zinc-100 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-[#002FA7]/10 backdrop-blur-2xl whitespace-normal break-words group-hover/frozen-text:block",
-          revealClassName
-        )}
-      >
-        {text}
-      </span>
+      {isTruncated && isHovered && (
+        <span
+          role="tooltip"
+          className={cn(
+            "pointer-events-none absolute left-0 top-[calc(100%+0.35rem)] z-50 max-w-[24rem] rounded-xl border border-[#002FA7]/20 bg-zinc-950/95 px-3 py-2 text-sm font-medium leading-5 text-zinc-100 shadow-[0_18px_45px_rgba(0,0,0,0.55)] ring-1 ring-[#002FA7]/10 backdrop-blur-2xl whitespace-normal break-words",
+            revealClassName
+          )}
+        >
+          {text}
+        </span>
+      )}
     </span>
   )
 }
