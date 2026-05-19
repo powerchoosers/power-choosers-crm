@@ -431,6 +431,10 @@ function hasStrongManufacturingSignals(text: string) {
   return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
 }
 
+function hasStrongPetrochemicalSignals(text: string) {
+  return /(petrochemical|petroleum[-\s]?based|c4 hydrocarbons?|crude c4|butadiene|butene[-\s]?1|polyisobutylene|\bmtbe\b|isobutylene|raffinate|chemical products?|chemical manufacturing|processor of crude c4|petrochemical raw materials?|synthetic rubber|lubricant additives|surfactants)/i.test(text)
+}
+
 function hasStrongLogisticsSignals(text: string) {
   return /(freight forwarder|nvo?cc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics|terminal|dock|yard|supply chain)/i.test(text)
 }
@@ -462,6 +466,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const logisticsSignals = hasStrongLogisticsSignals(accountText)
   const officeSignals = hasStrongOfficeServicesSignals(accountText)
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
+  const petrochemicalSignals = hasStrongPetrochemicalSignals(accountText)
   const schoolSignals = hasStrongSchoolSignals(accountText)
 
   if (dmeSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)/i.test(profileText)) {
@@ -497,6 +502,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (officeSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
+    return true
+  }
+
+  if (petrochemicalSignals && /(logistics|warehouse|distribution network|distribution and logistics|dock activity|terminal-adjacent|no manufacturing language)/i.test(profileText)) {
     return true
   }
 
@@ -1744,6 +1753,7 @@ function buildStructuredIdentityProfile(
   const isDmeProvider = hasStrongDmeSignals(text)
   const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
   const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|foodservice|production facilities)/i.test(text)
+  const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
@@ -1835,6 +1845,16 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['food production', 'food manufacturing', 'food processing', 'usda-approved', 'custom proteins', 'soups', 'sauces', 'foodservice'], ['food production', 'food processing', 'USDA production'])
         powerKeywords = selectIdentityKeywords(text, ['refrigeration', 'cooking', 'packaging', 'sanitation', 'freezer', 'cold chain'], ['refrigeration', 'packaging', 'sanitation'])
         talkTrackGuardrails = ['No warehouse-group language', 'No dock-only language']
+        break
+      }
+
+      if (isPetrochemicalProducer) {
+        companyType = 'petrochemical manufacturer'
+        operatingModel = multiSiteInfo.isMultiSite ? 'manufacturing site and terminal network' : 'chemical processing facility'
+        facilityType = 'petrochemical plant / terminal'
+        identityKeywords = selectIdentityKeywords(text, ['petrochemical', 'C4 hydrocarbons', 'crude C4', 'butadiene', 'butene-1', 'MTBE', 'polyisobutylene', 'chemical products', 'Houston Ship Channel', 'product terminals'], ['petrochemical manufacturing', 'C4 processing', 'chemical products'])
+        powerKeywords = selectIdentityKeywords(text, ['process equipment', 'separation', 'purification', 'chemical processing', 'pumps', 'compressors', 'storage terminals', 'safety systems'], ['process equipment', 'pumps', 'compressors', 'terminal operations'])
+        talkTrackGuardrails = ['Do not call this logistics', 'No dock-only language', 'No warehouse language', 'Lead with chemical processing and plant operations']
         break
       }
 
@@ -2361,6 +2381,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
+  if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
@@ -2693,6 +2714,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
       }
     case 'manufacturing':
+      if (hasStrongPetrochemicalSignals(text)) {
+        return {
+          label: 'Petrochemical manufacturing',
+          angle: 'Chemical processing, pumps, compressors, storage terminals, and reliability systems driving usage differently than a normal warehouse or office.',
+          question: 'Have you checked whether the plant equipment, terminal operations, or support systems are creating the biggest spikes on the bill?',
+          openers: [
+            `Petrochemical producers like this usually need to separate process equipment, terminal operations, and support systems because each one hits the meter differently.`,
+            `For a C4 processor, the power side is usually tied to plant equipment and terminal reliability, not generic warehouse usage.`,
+            `The useful check is whether the processing side or the terminal support side is creating the biggest usage spikes.`,
+          ],
+          focus: ['chemical processing', 'process equipment', 'pumps', 'compressors', 'terminal operations', 'reliability systems'],
+        }
+      }
+
       if (/(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
         const foodMultiSite = detectMultiSiteScale(account, candidate)
 
@@ -3968,6 +4003,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsDme = hasStrongDmeSignals(accountText)
   const accountIsRestaurant = hasStrongRestaurantSignals(accountText)
   const accountIsLogistics = hasStrongLogisticsSignals(accountText)
+  const accountIsPetrochemical = hasStrongPetrochemicalSignals(accountText)
   const accountIsOfficeServices = hasStrongOfficeServicesSignals(accountText)
   const accountIsSchool = hasStrongSchoolSignals(accountText)
   const accountHealthcareHotelJargon = accountIsHealthcare &&
@@ -3990,6 +4026,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsFoodProduction = /\b(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice)\b/i.test(accountText)
   const accountFoodLogisticsJargon = accountIsFoodProduction &&
     /\b(warehouse groups?|dock activity|dock work|dock doors?|high-volume logistics|logistics groups?|automation and hvac|warehouse's summer peak)\b/i.test(lower)
+  const accountPetrochemicalLogisticsJargon = accountIsPetrochemical &&
+    /\b(logistics business|warehouse groups?|warehouse support|dock activity|dock doors?|terminal-adjacent|high-volume logistics|distribution centers?)\b/i.test(lower)
   const accountDmeMedicalAllowance = accountIsDme &&
     /\b(dme|durable medical equipment|medical equipment|equipment|inventory|delivery|storage|turnaround)\b/i.test(lower)
   const accountRestaurantManufacturingJargon = accountIsRestaurant &&
@@ -4007,7 +4045,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
