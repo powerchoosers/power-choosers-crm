@@ -4012,45 +4012,45 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   const companyName = cleanText(account.name) || 'the company'
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const greeting = firstName
-    ? `Hi ${firstName}, this is Lewis with Nodal Point`
-    : 'Hi, this is Lewis with Nodal Point'
+    ? `Hey ${firstName}, it's Lewis with Nodal Point`
+    : "Hey, it's Lewis with Nodal Point"
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `${greeting} - can I give you the short reason I’m calling about the acquisition?`,
-      `${greeting} - I’m calling because the acquisition usually changes what is worth checking on the power side, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the acquisition, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because the acquisition usually changes what is worth checking on the power side, do you have a quick second?`,
     ],
     new_location: [
-      `${greeting} - can I give you the short reason I’m calling about the new site?`,
-      `${greeting} - I’m calling because a new site usually means a quick power-side check, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the new site, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because a new site usually means a quick power-side check, do you have a quick second?`,
     ],
     leadership_change: [
-      `${greeting} - can I give you the short reason I’m calling about the leadership change?`,
-      `${greeting} - I’m calling because new leadership usually means a fresh look at the electricity setup, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the leadership change, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because new leadership usually means a fresh look at the electricity setup, do you have a quick second?`,
     ],
     growth: [
-      `${greeting} - can I give you the short reason I’m calling about the growth?`,
-      `${greeting} - I’m calling because growth usually changes the power side before the bill catches up, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the growth, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because growth usually changes the power side before the bill catches up, do you have a quick second?`,
     ],
     restructuring: [
-      `${greeting} - can I give you the short reason I’m calling about the footprint change?`,
-      `${greeting} - I’m calling because a footprint change usually leaves something to clean up on the power side, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the footprint change, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because a footprint change usually leaves something to clean up on the power side, do you have a quick second?`,
     ],
     contract_win: [
-      `${greeting} - can I give you the short reason I’m calling about the new contract or project?`,
-      `${greeting} - I’m calling because a new contract usually changes the load mix fast, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the new contract or project, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because a new contract usually changes the load mix fast, do you have a quick second?`,
     ],
     funding: [
-      `${greeting} - can I give you the short reason I’m calling about the new funding?`,
-      `${greeting} - I’m calling because fresh capital usually means a new facility plan or equipment plan, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the new funding, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because fresh capital usually means a new facility plan or equipment plan, do you have a quick second?`,
     ],
     technical_load: [
-      `${greeting} - can I give you the short reason I’m calling about the equipment side?`,
-      `${greeting} - I’m calling because new equipment usually changes the usage pattern before the bill catches up, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about the equipment side, do you have a quick second?`,
+      `${greeting} - I’m calling out of the blue because new equipment usually changes the usage pattern before the bill catches up, do you have a quick second?`,
     ],
     industry_context: [
-      `${greeting} - can I give you the short reason I’m calling about ${companyName}?`,
-      `${greeting} - I found a detail on ${companyName} that looked worth a quick call, can I give you the reason?`,
+      `${greeting} - I’m calling out of the blue about ${companyName}, do you have a quick second?`,
+      `${greeting} - I found a detail on ${companyName} that looked worth a quick call, do you have a quick second?`,
     ],
   }
 
