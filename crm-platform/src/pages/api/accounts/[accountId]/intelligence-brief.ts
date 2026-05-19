@@ -3850,35 +3850,34 @@ function buildTalkTrackContext(
   }
 }
 
-async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext): Promise<string | null> {
+async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext): Promise<{ opener: string; talk_track: string } | null> {
   const companyName = cleanText(account.name) || 'the company'
-  const industry = cleanText(account.industry) || 'business'
-  const city = cleanText(account.city) || ''
-  const state = cleanText(account.state) || ''
-  const location = [city, state].filter(Boolean).join(', ') || 'Texas'
-  const identityProfile = getAccountIdentityProfile(account, candidate)
-  
-  const multiSiteInfo = detectMultiSiteScale(account, candidate)
-  const multiSiteContext = multiSiteInfo.isMultiSite && multiSiteInfo.locationCount
-    ? `This is a multi-site organization with ${multiSiteInfo.locationCount} locations${multiSiteInfo.regions.length > 1 ? ` across ${multiSiteInfo.regions.length} states` : ''}.`
-    : ''
-  
-  const employeesContext = account.employees ? `- Employee Size: ${account.employees}` : ''
+  const industry = cleanText(account.industry) || 'general commerce'
+  const city = cleanText(account.city)
+  const state = cleanText(account.state)
+  const location = city && state ? `${city}, ${state}` : state || city || 'Texas'
+
+  const employeesContext = account.employees ? `- Employees: ${account.employees}` : ''
   const revenueContext = account.revenue ? `- Revenue: ${account.revenue}` : ''
   const descriptionContext = account.description ? `- Description: ${account.description}` : ''
-  const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage} kWh` : ''
-  const identityContext = identityProfile
-    ? [
-        'IDENTITY PROFILE:',
-        `- Company Type: ${identityProfile.companyType}`,
-        `- Operating Model: ${identityProfile.operatingModel}`,
-        `- Facility Type: ${identityProfile.facilityType}`,
-        `- Identity Keywords: ${identityProfile.identityKeywords.join(', ') || 'n/a'}`,
-        `- Power Keywords: ${identityProfile.powerKeywords.join(', ') || 'n/a'}`,
-        `- Guardrails: ${identityProfile.talkTrackGuardrails.join('; ') || 'n/a'}`,
-      ].join('\n')
+  const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage}` : ''
+  
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
+  const multiSiteContext = multiSiteInfo.isMultiSite ? '- Footprint: Multi-location / multi-site profile' : ''
+
+  const identity = getAccountIdentityProfile(account, candidate)
+  const identityContext = identity
+    ? `IDENTITY PROFILE:
+- Cluster: ${identity.industryCluster}
+- Company Type: ${identity.companyType}
+- Operating Model: ${identity.operatingModel}
+- Facility Type: ${identity.facilityType}
+- Keywords: ${identity.identityKeywords.join(', ')}
+- Power Dynamics: ${identity.powerKeywords.join(', ')}`
     : ''
+
   const audienceProfileBlock = buildAudienceProfileBlock(context.audienceProfile)
+  const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const audienceRule = context.audienceProfile
     ? `- AUDIENCE PROFILE: ${context.audienceProfile.contactName || context.audienceProfile.contactFirstName || 'the contact'} is the person you are writing to. Use their first name once if it helps the opener and use their title to frame what they care about. If the audience profile came from a sequence contact, that person wins over a decision-maker card.\n`
     : ''
@@ -3891,15 +3890,26 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? '- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.\n'
     : ''
 
-  const prompt = `You are a plainspoken energy analyst and strategist. You are writing the TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
+  const prompt = `You are a plainspoken energy analyst and strategist. You are writing BOTH a permission-based OPENER and a TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
-VOICE:
-- Conversational, peer-to-peer, and undeniably expert. 
-- Avoid "broker-speak" or sounding like you're selling a service. 
-- Sound like someone who is looking at a diagnostic report and has identified a specific anomaly or liability.
-- Do not use first-person curiosity language like "I was curious about" or "I was looking at."
-- Do not write the opener. The opener is handled separately.
-- Keep the first sentence about the company or the site, not about the speaker.
+VOICE & TONE:
+- Conversational, peer-to-peer, plainspoken, and expert.
+- Sounds exactly like Lewis Patterson calling out of the blue.
+- Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
+- Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
+
+OPENER RULES (Exactly one sentence):
+- Must start with a greeting using the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
+- Must introduce himself: 'it's Lewis with Nodal Point'.
+- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website'). It must mention the specific news signal or operational fact (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
+- Must end with a permission question: 'and wanted to ask one quick question, do you have a quick second?' or 'do you have a quick second?'.
+
+TALK TRACK RULES (Exactly two sentences):
+- Sentence 1: A specific, third-person or company-centered observation about the company's operations/industry, connecting it to a commercial energy billing mechanic.
+- Sentence 2: A simple, open-ended operational question.
+- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
+- Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
+- Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 
 COMPANY CONTEXT:
 - Company: ${companyName}
@@ -3918,40 +3928,16 @@ ${identityContext}
 
 ${audienceProfileBlock ? `AUDIENCE PROFILE:\n${audienceProfileBlock}\n` : ''}
 
-REQUIREMENTS:
-1. THE PROBLEM: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR a concrete operating fact from the company, site, or footprint, then explain why it matters on the power side. Do not use a generic role-based opener. Use third-person or company-centered phrasing, for example: "UHS runs a 400+ facility healthcare network across 39 states, so the site-by-site differences matter here" or "The new Haslet campus expansion is the part that matters here."
-2. THE DEPTH: Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
-3. THE QUESTION: End with ONE specific, easy-to-answer question about their operations and make the second sentence a question.
-4. BUSINESS PAIN POINT: Connect the technical detail directly to a bill issue:
-   - Electrification shift: The risk of adding electric equipment and changing usage faster than the bill structure catches up.
-   - One-time peak charges that stick: A single spike can leave a higher peak charge on the bill for months.
-   - Transmission exposure: Hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
-   - Usage mismatch: When the operating schedule changes but the bill structure still reflects the old pattern.
-5. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
-6. CUSTOMER LENS: Do not say "the useful check." Say what leaders in that industry usually care about, then ask the question in plain English.
-7. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
-${audienceRule}${sequencePriorityRule}
-${dentalContext}${behavioralHealthContext}
-   - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
-   - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
-   - For dental groups, speak in practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
-   - For hospital operators and neighborhood-hospital networks, use hospital language like emergency departments, inpatient rooms, imaging, lab work, and health-system partnerships. Never use hotel, guest-room, laundry, lodging, banquet, or hospitality language for hospitals.
-   - For multi-site care organizations, keep the comparison portfolio-wide but the liability meter-specific. Say each site can carry its own locked-in peak charge rather than implying one site changes every other site.
-   - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
-8. NO REPETITION: Do not repeat the core question or the opening observation.
-9. LENGTH: Exactly 2 sentences. Aim for 14-50 words total.
-10. FORBIDDEN PHRASES: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
-11. CLEAR AUTHORITY: Never sound like you are selling a service. Sound like you noticed something specific about how the company operates. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor." Never say "forensic signal," "forensic driver," "Thermal Liability," or "artificial liability."
-12. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the concrete business observation immediately.
-13. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
-14. IDENTITY PROFILE: If an identity profile is provided, treat it as the source of truth for what kind of company this is unless the signal text directly contradicts it. Do not use language blocked by the guardrails.
-
-Generate a plain-English, peer-to-peer talk track for ${companyName}:`
+Return JSON only with this shape:
+{
+  "opener": "The one-sentence opener",
+  "talk_track": "The two-sentence talk track"
+}`
 
   try {
-    const openrouterKey = process.env.OPENROUTER_API_KEY
+    const openrouterKey = process.env.OPEN_ROUTER_API_KEY || process.env.OPENROUTER_API_KEY
     if (!openrouterKey) {
-      console.warn('[Intelligence Brief] OPENROUTER_API_KEY not set, skipping AI talk track generation')
+      console.warn('[Intelligence Brief] OPEN_ROUTER_API_KEY not set, skipping AI generation')
       return null
     }
 
@@ -3965,6 +3951,7 @@ Generate a plain-English, peer-to-peer talk track for ${companyName}:`
       },
       body: JSON.stringify({
         model: 'anthropic/claude-3.5-sonnet',
+        response_format: { type: 'json_object' },
         messages: [
           {
             role: 'user',
@@ -3972,28 +3959,46 @@ Generate a plain-English, peer-to-peer talk track for ${companyName}:`
           },
         ],
         temperature: 0.7,
-        max_tokens: 200,
+        max_tokens: 400,
       }),
     })
 
     if (!response.ok) {
-      console.warn('[Intelligence Brief] AI talk track generation failed:', response.status, response.statusText)
+      console.warn('[Intelligence Brief] AI generation failed:', response.status, response.statusText)
       return null
     }
 
     const data = await response.json()
-    const talkTrack = simplifyTalkTrackLanguage(cleanText(data?.choices?.[0]?.message?.content || ''))
+    const content = cleanText(data?.choices?.[0]?.message?.content || '')
     
-    if (!talkTrack) {
-      console.warn('[Intelligence Brief] AI talk track generation returned empty content')
+    if (!content) {
+      console.warn('[Intelligence Brief] AI generation returned empty content')
       return null
     }
+
+    let parsed: { opener: string; talk_track: string } | null = null
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[1].trim())
+      }
+    }
+
+    if (!parsed || !parsed.opener || !parsed.talk_track) {
+      console.warn('[Intelligence Brief] AI generation failed to parse as JSON or missing keys')
+      return null
+    }
+
+    const opener = cleanText(parsed.opener)
+    const talkTrack = simplifyTalkTrackLanguage(cleanText(parsed.talk_track))
 
     // Validate the AI-generated talk track
     const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
     const sentenceCount = splitTalkTrackSentences(talkTrack).length
     if (sentenceCount !== 2 || wordCount < 14 || wordCount > 60) {
-      console.warn('[Intelligence Brief] AI talk track word count out of range:', wordCount)
+      console.warn('[Intelligence Brief] AI talk track word count/sentence count out of range:', wordCount, sentenceCount)
       return null
     }
 
@@ -4015,6 +4020,7 @@ Generate a plain-English, peer-to-peer talk track for ${companyName}:`
       /staple/i,
       /long-standing/i,
       /useful check/i,
+      /coincident kitchen peak/i,
     ]
     
     if (forbiddenPatterns.some(pattern => pattern.test(talkTrack))) {
@@ -4022,9 +4028,9 @@ Generate a plain-English, peer-to-peer talk track for ${companyName}:`
       return null
     }
 
-    return talkTrack
+    return { opener, talk_track: talkTrack }
   } catch (error) {
-    console.error('[Intelligence Brief] AI talk track generation error:', error)
+    console.error('[Intelligence Brief] AI generation error:', error)
     return null
   }
 }
@@ -4157,46 +4163,46 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const greeting = firstName
     ? `Hey ${firstName}, it's Lewis with Nodal Point`
-    : "Hey, it's Lewis with Nodal Point"
+    : "Hey there, it's Lewis with Nodal Point"
   const openerHook = buildConciseOpenerHook(account, candidate, context)
-  const openerLead = openerHook === companyName ? `${companyName}'s business` : openerHook
+  const openerLead = openerHook === companyName ? companyName : openerHook
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw the news about the acquisition of ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all took over the ${openerLead} locations, and wanted to ask one quick question, do you have a quick second?`,
     ],
     new_location: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are opening a new location at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all just added the new site at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     leadership_change: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all recently brought on a new team member to help manage ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw the leadership transition at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     growth: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are expanding the footprint for ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are ramping up operations at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     restructuring: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are consolidating some operations at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw the recent operational shifts at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     contract_win: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all landed the new contract for ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all won the recent project for ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     funding: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw the recent capital raise for ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw the funding round for ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     technical_load: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are running the infrastructure at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all operate the technical facilities at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
     industry_context: [
-      `${greeting} - I saw ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} - I found ${openerLead} and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all are operating ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      `${greeting} — I saw y'all run ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
     ],
   }
 
@@ -4949,6 +4955,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   return {
     signal_headline: headline,
     signal_detail: detail,
+    opener: cleanText(result?.opener) || null,
     talk_track: talkTrack,
     signal_date: signalDate,
     source_date: sourceDate,
@@ -4983,6 +4990,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   return {
     signal_headline: shortenText(headline, 120),
     signal_detail: detailParts.join(' '),
+    opener: null,
     talk_track: talkTrack,
     signal_date: signalDate,
     source_date: sourceDate,
@@ -5173,7 +5181,26 @@ async function runOpenRouterResearch(
   const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
 Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
-If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.`
+If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.
+
+VOICE & TONE (For both "opener" and "talk_track"):
+- Conversational, peer-to-peer, plainspoken, and expert.
+- Sounds exactly like Lewis Patterson calling out of the blue.
+- Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
+- Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
+
+OPENER RULES (Exactly one sentence):
+- Must start with a greeting using the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
+- Must introduce himself: 'it's Lewis with Nodal Point'.
+- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website'). It must mention the specific news signal or operational fact (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
+- Must end with a permission question: 'and wanted to ask one quick question, do you have a quick second?' or 'do you have a quick second?'.
+
+TALK TRACK RULES (Exactly two sentences):
+- Sentence 1: A specific, third-person or company-centered observation about the company's operations/industry, connecting it to a commercial energy billing mechanic.
+- Sentence 2: A simple, open-ended operational question.
+- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
+- Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
+- Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".`
 
   const newsSignalPrompt = `${basePrompt}
 
@@ -5212,7 +5239,7 @@ Decision rules:
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
-- The opener is handled separately. Do not write it into talk_track.
+- For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Start with the concrete event, company fact, or facility detail, then end with one direct question.
 - If you can name the event, keep it specific instead of saying "I saw a report about [company]." Example: "Lambda is moving into Aligned's DFW-04 data center in Plano."
 - If you cannot name the event clearly, use a plain website or company update detail instead.
@@ -5222,7 +5249,7 @@ Decision rules:
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, and the question to ask.
-- Write only the talk_track. The opener is handled separately.
+- For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Rotate the problem sentence and question wording. Do not always sound the same.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
@@ -5320,7 +5347,7 @@ Decision rules:
 - For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
 - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- The opener is handled separately. Do not write it into talk_track.
+- For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Start with the concrete business fact or footprint detail, then end with one direct question. For website-only fallback, name the actual business fact from the site instead of saying you found the website.
 - If the sentence cannot name the event clearly, keep it plain and specific anyway.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
@@ -5333,7 +5360,7 @@ Decision rules:
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
 - If an audience_profile block is present, use it as the human lens. Keep the first name or title tied to the business question instead of generic company language.
-- Write only the talk_track. The opener is handled separately.
+- For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Rotate the problem sentence and question wording. Do not always sound the same.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
@@ -5393,6 +5420,7 @@ Return JSON only with this shape:
   "usable_signal": true,
   "signal_headline": "",
   "signal_detail": "",
+  "opener": "",
   "talk_track": "",
   "signal_date": "YYYY-MM-DD",
   "source_date": "YYYY-MM-DD",
@@ -5706,15 +5734,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       
       const fallbackContext = buildTalkTrackContext(briefingAccount, null, true, audienceProfile)
-      const aiTalkTrack = await generateAITalkTrack(briefingAccount, null, fallbackContext)
+      const aiBriefParts = await generateAITalkTrack(briefingAccount, null, fallbackContext)
       
-      if (aiTalkTrack) {
-        // Create a minimal brief with just the AI talk track
+      if (aiBriefParts) {
+        // Create a minimal brief with the AI opener and talk track
         const industryLabel = cleanText(briefingAccount.industry) || 'this business'
         validated = {
           signal_headline: 'Industry Context',
           signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
-          talk_track: aiTalkTrack,
+          opener: aiBriefParts.opener,
+          talk_track: aiBriefParts.talk_track,
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
           source_url: briefingAccount.domain ? `https://${cleanText(briefingAccount.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
@@ -5725,9 +5754,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
         outcomeStatus = 'ready'
         usedFallback = true
-        console.info('[Intelligence Brief] Successfully generated AI talk track for empty signal case:', {
+        console.info('[Intelligence Brief] Successfully generated AI opener and talk track for empty signal case:', {
           accountId,
-          talkTrackLength: aiTalkTrack.length,
+          talkTrackLength: aiBriefParts.talk_track.length,
         })
       } else {
         // AI generation failed, use manual template as last resort
@@ -5774,24 +5803,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         talkTrackCache.isTooSimilar(validated.talk_track || '')
 
       if (shouldRewrite) {
-        let rewrittenTalkTrack: string | null = null
+        let rewrittenParts: { opener: string; talk_track: string } | null = null
         
         // Always try AI generation first for rewrites
-        rewrittenTalkTrack = await generateAITalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext)
+        rewrittenParts = await generateAITalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext)
         
         // Validate AI-generated talk track
-        if (rewrittenTalkTrack) {
-          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, briefingAccount, talkTrackCandidate) ||
-              (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
-              talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
+        if (rewrittenParts) {
+          if (talkTrackNeedsRewrite(rewrittenParts.talk_track, talkTrackRewriteContext, briefingAccount, talkTrackCandidate) ||
+              (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenParts.talk_track, previousTalkTrack)) ||
+              talkTrackCache.isTooSimilar(rewrittenParts.talk_track)) {
             console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
-            rewrittenTalkTrack = null
+            rewrittenParts = null
           }
         }
         
         // Fall back to manual generation if AI failed or not applicable
-        if (!rewrittenTalkTrack) {
-          rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 0)
+        if (rewrittenParts) {
+          validated = {
+            ...validated,
+            opener: rewrittenParts.opener,
+            talk_track: rewrittenParts.talk_track,
+          }
+        } else {
+          let rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 0)
 
           // Check against cache and previous talk track
           if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
@@ -5803,11 +5838,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
             rewrittenTalkTrack = buildManualTalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, 2)
           }
-        }
 
-        validated = {
-          ...validated,
-          talk_track: rewrittenTalkTrack,
+          validated = {
+            ...validated,
+            talk_track: rewrittenTalkTrack,
+          }
         }
       }
 
