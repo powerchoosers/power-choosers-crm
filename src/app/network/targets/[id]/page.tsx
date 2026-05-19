@@ -1084,7 +1084,7 @@ export default function TargetDetailPage() {
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+              <TableHeader className="sticky top-0 z-20">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     <SortableContext
@@ -1122,19 +1122,24 @@ export default function TargetDetailPage() {
                       : "border-l-transparent hover:bg-white/[0.03]"
                   )}
                 >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell
-                        key={cell.id}
-                        className={cn(
-                          "py-3 border-b border-white/5",
-                          cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
-                          cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected()),
-                          cell.column.id === nextAfterNameColumnId && "pl-5"
-                        )}
-                      >
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const isFrozenCell = cell.column.id === 'select' || cell.column.id === 'name'
+
+                      return (
+                        <TableCell
+                          key={cell.id}
+                          className={cn(
+                            "py-3",
+                            !isFrozenCell && "border-b border-white/5",
+                            cell.column.id === 'select' && getFrozenSelectCellClass(row.getIsSelected()),
+                            cell.column.id === 'name' && getFrozenNameCellClass(row.getIsSelected()),
+                            cell.column.id === nextAfterNameColumnId && "pl-5"
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      )
+                    })}
                   </TableRow>
                 ))
               ) : (
