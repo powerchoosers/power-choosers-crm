@@ -334,6 +334,25 @@ interface ApolloSearchCache {
   currentPage?: number;
 }
 
+function hasMeaningfulApolloCompany(company: ApolloCompany | null | undefined) {
+  if (!company) return false;
+  return Boolean(
+    company.domain ||
+    company.website ||
+    company.description ||
+    company.industry ||
+    company.city ||
+    company.state ||
+    company.country ||
+    company.address ||
+    company.companyPhone ||
+    company.logoUrl ||
+    company.linkedin ||
+    company.revenue ||
+    company.employees
+  );
+}
+
 interface RevealState {
   revealingEmail: boolean;
   revealingPhone: boolean;
@@ -913,7 +932,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       const cachedContacts = Array.isArray(cacheData.contacts) ? cacheData.contacts : [];
       setData(cachedContacts);
-      setCompanySummary(cacheData.company || null);
+      setCompanySummary(hasMeaningfulApolloCompany(cacheData.company) ? cacheData.company : null);
       setScanStatus('complete');
       if (typeof cacheData.searchTerm === 'string') {
         setSearchTerm(cacheData.searchTerm);
