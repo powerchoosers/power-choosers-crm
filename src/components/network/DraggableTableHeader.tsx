@@ -84,7 +84,7 @@ export function DraggableTableHeader({ header, columnOrder }: DraggableTableHead
             )}
         >
             {isFrozenColumn ? (
-                <div className={cn("flex items-center relative h-full", isFrozenSelectColumn && "justify-center")}>
+                <div className={cn("relative z-10 flex items-center h-full", isFrozenSelectColumn && "justify-center")}>
                     {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}

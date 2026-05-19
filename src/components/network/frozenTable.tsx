@@ -14,9 +14,9 @@ const frozenNameCellIdle = "bg-zinc-950/60 group-hover:bg-white/[0.04]"
 const frozenNameCellActive = "bg-[#002FA7]/10 group-hover:bg-[#002FA7]/12"
 
 const frozenHeaderSelectCellBase =
-  "!sticky !left-0 z-50 transform-gpu box-border w-10 min-w-10 max-w-10 px-0 overflow-visible transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65 after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-px after:w-px after:bg-zinc-950/70 after:backdrop-blur-md"
+  "!sticky !left-0 z-50 transform-gpu box-border w-10 min-w-10 max-w-10 px-0 overflow-visible transition-colors !bg-transparent !backdrop-blur-none"
 const frozenHeaderNameCellBase =
-  "!sticky !left-10 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-2 overflow-visible border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-right-6 before:w-6 before:bg-gradient-to-r before:from-black/70 before:via-black/20 before:to-transparent transition-colors bg-zinc-950/70 backdrop-blur-md supports-[backdrop-filter]:bg-zinc-950/65"
+  "!sticky !left-10 z-40 transform-gpu box-border w-[18rem] min-w-[18rem] max-w-[18rem] px-2 overflow-visible border-r border-white/5 shadow-[18px_0_28px_-24px_rgba(0,0,0,0.72)] before:content-[''] before:pointer-events-none before:absolute before:inset-y-0 before:-left-10 before:w-[calc(18rem+2.5rem)] before:bg-zinc-950/70 before:backdrop-blur-md after:content-[''] after:pointer-events-none after:absolute after:inset-y-0 after:-right-6 after:w-6 after:bg-gradient-to-r after:from-black/70 after:via-black/20 after:to-transparent transition-colors !bg-transparent !backdrop-blur-none"
 
 export function getFrozenSelectCellClass(isSelected: boolean) {
   return cn(
