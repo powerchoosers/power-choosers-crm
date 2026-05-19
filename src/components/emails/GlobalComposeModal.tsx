@@ -22,6 +22,7 @@ type ContactRow = {
     description?: string | null
     intelligence_brief_headline?: string | null
     intelligence_brief_detail?: string | null
+    intelligence_brief_opener?: string | null
     intelligence_brief_talk_track?: string | null
     intelligence_brief_signal_date?: string | null
     intelligence_brief_reported_at?: string | null
@@ -34,6 +35,7 @@ type ContactRow = {
     description?: string | null
     intelligence_brief_headline?: string | null
     intelligence_brief_detail?: string | null
+    intelligence_brief_opener?: string | null
     intelligence_brief_talk_track?: string | null
     intelligence_brief_signal_date?: string | null
     intelligence_brief_reported_at?: string | null
@@ -85,6 +87,7 @@ export function GlobalComposeModal() {
               description,
               intelligence_brief_headline,
               intelligence_brief_detail,
+              intelligence_brief_opener,
               intelligence_brief_talk_track,
               intelligence_brief_signal_date,
               intelligence_brief_reported_at,

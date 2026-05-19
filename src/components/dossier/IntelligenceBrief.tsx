@@ -7,6 +7,7 @@ import { Copy, ExternalLink, Loader2, RefreshCcw, Search, Sparkles, TrendingUp, 
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { splitIntelligenceBriefSections } from '@/lib/intelligence-brief-context'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { isPrivilegedRole } from '@/lib/auth/roles'
@@ -22,6 +23,7 @@ export interface IntelligenceBriefAccount {
   name?: string | null
   intelligenceBriefHeadline?: string | null
   intelligenceBriefDetail?: string | null
+  intelligenceBriefOpener?: string | null
   intelligenceBriefTalkTrack?: string | null
   intelligenceBriefSignalDate?: string | null
   intelligenceBriefReportedAt?: string | null
@@ -71,10 +73,12 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 function buildClipboardText(account: IntelligenceBriefAccount) {
+  const sections = splitIntelligenceBriefSections(account.intelligenceBriefOpener, account.intelligenceBriefTalkTrack)
   const parts = [
     account.intelligenceBriefHeadline ? `Signal Headline: ${account.intelligenceBriefHeadline}` : '',
     account.intelligenceBriefDetail ? `Signal Detail: ${account.intelligenceBriefDetail}` : '',
-    account.intelligenceBriefTalkTrack ? `Talk Track: ${account.intelligenceBriefTalkTrack}` : '',
+    sections.opener ? `Opener: ${sections.opener}` : '',
+    sections.talkTrack ? `Talk Track: ${sections.talkTrack}` : '',
   ].filter(Boolean)
 
   return parts.join('\n\n')
@@ -207,7 +211,14 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
   const brief = useMemo(() => ({
     headline: displayAccount?.intelligenceBriefHeadline?.trim() || '',
     detail: displayAccount?.intelligenceBriefDetail?.trim() || '',
-    talkTrack: displayAccount?.intelligenceBriefTalkTrack?.trim() || '',
+    opener: splitIntelligenceBriefSections(
+      displayAccount?.intelligenceBriefOpener || null,
+      displayAccount?.intelligenceBriefTalkTrack || null,
+    ).opener.trim(),
+    talkTrack: splitIntelligenceBriefSections(
+      displayAccount?.intelligenceBriefOpener || null,
+      displayAccount?.intelligenceBriefTalkTrack || null,
+    ).talkTrack.trim(),
     signalDate: displayAccount?.intelligenceBriefSignalDate || null,
     reportedAt: displayAccount?.intelligenceBriefReportedAt || null,
     sourceUrl: displayAccount?.intelligenceBriefSourceUrl?.trim() || '',
@@ -216,7 +227,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     status: displayAccount?.intelligenceBriefStatus || 'idle',
   }), [displayAccount])
 
-  const hasBrief = Boolean(brief.headline || brief.detail || brief.talkTrack)
+  const hasBrief = Boolean(brief.headline || brief.detail || brief.opener || brief.talkTrack)
   const isCooldownActive = Boolean(
     !isPrivilegedUser &&
     brief.lastRefreshedAt &&
@@ -372,9 +383,26 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                 Talk Track
               </div>
             </div>
-            <blockquote className="text-sm leading-7 text-white italic border-l-2 border-[#002FA7]/40 pl-4">
-              "{brief.talkTrack}"
-            </blockquote>
+            <div className="space-y-4">
+              {brief.opener ? (
+                <div>
+                  <div className="mb-2 text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                    Opener
+                  </div>
+                  <blockquote className="text-sm leading-7 text-white italic border-l-2 border-white/20 pl-4">
+                    "{brief.opener}"
+                  </blockquote>
+                </div>
+              ) : null}
+              <div>
+                <div className="mb-2 text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                  Talk Track
+                </div>
+                <blockquote className="text-sm leading-7 text-white italic border-l-2 border-[#002FA7]/40 pl-4">
+                  "{brief.talkTrack || 'No separate talk track was generated for this brief.'}"
+                </blockquote>
+              </div>
+            </div>
           </section>
 
           {/* Metadata Grid */}
