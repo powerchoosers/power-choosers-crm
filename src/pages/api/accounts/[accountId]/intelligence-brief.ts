@@ -1025,9 +1025,62 @@ function getSourceTrustRank(account: AccountRow, item: ResearchHit) {
   return 15
 }
 
+/**
+ * Domains that produce results unrelated to a commercial business signal.
+ * Movie trailer sites, entertainment news, review aggregators, etc. return
+ * false positives when the company name overlaps with common words (e.g.
+ * "Happy Trailers" matching IGN's game/movie trailer reviews).
+ */
+const ENTERTAINMENT_NOISE_DOMAINS = new Set([
+  'ign.com', 'imdb.com', 'rottentomatoes.com', 'metacritic.com',
+  'fandango.com', 'boxofficemojo.com', 'filmafinity.com',
+  'screendaily.com', 'deadline.com', 'variety.com', 'thewrap.com',
+  'hollywoodreporter.com', 'indiewire.com', 'cinemablend.com',
+  'comingsoon.net', 'joblo.com', 'collider.com', 'screenrant.com',
+  'empireonline.com', 'slashfilm.com', 'avclub.com',
+  'entertainment.ie', 'entertainmentweekly.com', 'ew.com',
+  'people.com', 'usmagazine.com', 'tmz.com', 'pagesix.com',
+  'gamespot.com', 'polygon.com', 'kotaku.com', 'ign.com',
+  'techradar.com', 'theverge.com', 'engadget.com', 'gizmodo.com',
+  'wired.com', 'pcgamer.com', 'eurogamer.net',
+])
+
+/** Returns true for domains that are purely entertainment/gaming/media noise. */
+function isEntertainmentNoiseDomain(url: string): boolean {
+  const host = getHostname(url)
+  if (!host) return false
+  const base = host.replace(/^www\./, '')
+  return ENTERTAINMENT_NOISE_DOMAINS.has(base)
+}
+
+/** Returns true if this research hit title looks like an entertainment result
+ * (e.g. movie trailer reviews) rather than a business news signal. */
+function looksLikeEntertainmentResult(title: string, url: string): boolean {
+  if (isEntertainmentNoiseDomain(url)) return true
+  const t = cleanText(title).toLowerCase()
+  // Patterns like "Movie Name [Trailers] - Site" or "Best of 2024 [Trailers]"
+  if (/\[trailers?\]\s*[-|]/i.test(title)) return true
+  if (/\b(movie|film|episode|season \d|tv show|video game|review|trailer|teaser|gameplay|walkthrough|spoiler)\b/i.test(t) &&
+      /\b(ign|imdb|rotten|gamespot|polygon|verge|collider|screenrant)\b/i.test(t)) return true
+  return false
+}
+
+/** Max age (ms) for a signal to count as "current news" — 18 months. */
+const MAX_SIGNAL_AGE_MS = 18 * 30 * 24 * 60 * 60 * 1000
+
+/** Penalise research hits that are older than 18 months by bumping their effective
+ * priority down so they lose to fresher signals even if Bing ranked them higher. */
+function getAgeAdjustedPriority(item: ResearchHit): number {
+  if (!item.publishedAt) return item.priority + 3 // no date → treat as low-quality
+  const age = Date.now() - new Date(item.publishedAt).getTime()
+  if (age > MAX_SIGNAL_AGE_MS) return item.priority + 4 // too old → deprioritise heavily
+  return item.priority
+}
+
 function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
   const seen = new Set<string>()
   return items
+    .filter((item) => !looksLikeEntertainmentResult(item.title, item.url))
     .filter((item) => item.sourceKind === 'sec' || !looksLikeCommercialListingPage(item.title, item.snippet, item.snippet, item.url))
     .filter((item) => !account || isAccountRelevantCandidate(account, item))
     .slice()
@@ -1035,9 +1088,10 @@ function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
       ...item,
       __index: index,
       __sourceTrust: account ? getSourceTrustRank(account, item) : 0,
+      __ageAdjustedPriority: getAgeAdjustedPriority(item),
     } as RankedResearchHit))
     .sort((a, b) => {
-      if (a.priority !== b.priority) return a.priority - b.priority
+      if (a.__ageAdjustedPriority !== b.__ageAdjustedPriority) return a.__ageAdjustedPriority - b.__ageAdjustedPriority
       if (a.__sourceTrust !== b.__sourceTrust) return b.__sourceTrust - a.__sourceTrust
       const left = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
       const right = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
@@ -1050,7 +1104,7 @@ function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
       seen.add(key)
       return true
     })
-    .map(({ __index, __sourceTrust, ...item }) => item)
+    .map(({ __index, __sourceTrust, __ageAdjustedPriority, ...item }) => item)
 }
 
 function toTitleCase(value: string) {
@@ -2161,8 +2215,15 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /what most operators need to know is/i,
   /what most operators want to know is/i,
   /the useful thing to understand about/i,
-  /there(?:'|’)s a useful update about/i,
+  /there(?:'|')s a useful update about/i,
   /the update about .* is the part that matters here/i,
+  // Additional banned patterns found in audit
+  /\bcoincident peaks?\b/i,                          // jargon — say "peak charges" instead
+  /\bwhen a business is growing.*changes the bill/i, // generic growth opener
+  /\bwhen a site carries heavy load\b/i,             // too vague
+  /\bfor most operators\b/i,                         // generic
+  /\bmost operators care about\b/i,                  // too generic — should be industry-specific
+  /\bthe useful check is whether the bill still lines up\b/i, // weakest fallback phrase
 ]
 
 const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
@@ -2401,13 +2462,55 @@ function isUsefulSignalAnchor(value: string) {
   return true
 }
 
+/**
+ * Returns true if this account is a competing energy broker, energy consultant,
+ * or energy management firm. Calling them about their electricity bill is
+ * embarrassing — they do this for a living.
+ */
+function isCompetitorEnergyBroker(account: AccountRow): boolean {
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''}`).toLowerCase()
+  return /\b(energy broker|energy consultant|energy consulting|energy management|energy procurement|energy advisor|energy partner|retail electric provider|rep (?:agency|firm)|electricity broker|power broker|deregulated energy|energy reseller|load aggregator|demand response provider|energy analytics|utility management|utility consulting|meter data management)\b/.test(text)
+}
+
+/**
+ * Returns true if this account is headquartered outside Texas and outside any
+ * other US deregulated electricity state (IL, OH, PA, NJ, NY, CT, MD, MA, MI, etc.).
+ * Accounts in non-deregulated markets should not receive Texas-specific ERCOT openers.
+ */
+const DEREGULATED_US_STATES = new Set([
+  'texas', 'tx',
+  'illinois', 'il',
+  'ohio', 'oh',
+  'pennsylvania', 'pa',
+  'new jersey', 'nj',
+  'new york', 'ny',
+  'connecticut', 'ct',
+  'maryland', 'md',
+  'massachusetts', 'ma',
+  'michigan', 'mi',
+  'delaware', 'de',
+  'rhode island', 'ri',
+  'new hampshire', 'nh',
+  'maine', 'me',
+  'montana', 'mt',
+  'oregon', 'or',
+  'washington', 'wa',
+])
+
+function isInDeregulatedMarket(account: AccountRow): boolean {
+  const state = cleanText(account.state).toLowerCase()
+  if (!state) return true // unknown — assume eligible, do not block
+  return DEREGULATED_US_STATES.has(state)
+}
+
 function inferIndustryClusterFromSignals(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const notes = getAccountNotes(account)
   const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
+  // Energy brokers and consultants — do not classify as any operational cluster
+  if (isCompetitorEnergyBroker(account)) return 'office_services'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
-  // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
@@ -2419,6 +2522,8 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
+  // Lighting/electrical rep firms — NOT logistics, NOT manufacturing
+  if (/(manufacturers?\s*rep|rep\s*firm|lighting rep|electrical rep|sales rep agency|agent for|represents manufacturers?)/.test(text)) return 'office_services'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
@@ -4118,6 +4223,12 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountOfficeIndustrialJargon = accountIsOfficeServices &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
+  // Catch jargon terms that regularly slip through and confuse prospects
+  const bannedJargonTerms = /\b(coincident peaks?|4cp exposure|4-cp|four coincident peak|scarcity adder|ercot real-time|ancillary services charge|nodal price)\b/i.test(lower)
+  // Catch the redundant "footprint...footprint" pattern
+  const redundantFootprint = (/\bfootprint\b/i.test(lower) && lower.indexOf('footprint') !== lower.lastIndexOf('footprint'))
+  // Catch when the account is a competitor (energy broker) — any talk track for them is wrong
+  const isCompetitor = account ? isCompetitorEnergyBroker(account) : false
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 2
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -4126,7 +4237,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
@@ -5186,6 +5297,8 @@ async function runOpenRouterResearch(
       revenue: account.revenue || '',
       description: account.description || '',
       annual_usage: account.annual_usage || '',
+      is_in_deregulated_market: isInDeregulatedMarket(account),
+      is_competitor_energy_broker: isCompetitorEnergyBroker(account),
     },
     audience_profile: audienceProfile ? {
       source: audienceProfile.source,
@@ -5280,6 +5393,10 @@ VOICE & TONE (For both "opener" and "talk_track"):
 - Sounds exactly like Lewis Patterson calling out of the blue.
 - Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
+
+MARKET ELIGIBILITY RULES:
+- If the account field "is_competitor_energy_broker" is true, this company is a competing energy broker or energy management consultant. Do NOT generate a normal brief. Set "usable_signal" to false and set "signal_detail" to "[COMPETITOR: This account is an energy broker or energy management firm. Do not call with a standard brief.]". Skip all other fields.
+- If the account field "is_in_deregulated_market" is false, this company's headquarters is outside Texas and all other US deregulated electricity markets. Do NOT use Texas-specific ERCOT language, summer peak windows, or deregulated-market openers. If generating a brief, frame the talk track around general commercial energy cost drivers (demand, usage, HVAC, equipment), and note in signal_detail that the account may not be a Texas ERCOT account.
 
 CONFIDENCE LEVEL RULES:
 - The "confidence_level" must be exactly High, Medium, or Low:
