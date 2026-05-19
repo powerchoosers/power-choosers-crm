@@ -1,0 +1,40 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo.fast"
+  },
+  "include": [
+    "next-env.d.ts",
+    "middleware.ts",
+    "*.ts",
+    "*.tsx",
+    "*.mts",
+    "*.cts",
+    "src/app/**/*.ts",
+    "src/app/**/*.tsx",
+    "src/components/**/*.ts",
+    "src/components/**/*.tsx",
+    "src/hooks/**/*.ts",
+    "src/hooks/**/*.tsx",
+    "src/lib/**/*.ts",
+    "src/lib/**/*.tsx",
+    "src/store/**/*.ts",
+    "src/store/**/*.tsx",
+    "src/types/**/*.ts",
+    "src/types/**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "supabase",
+    "extension",
+    "desktop",
+    "scripts",
+    "src/app/api/**",
+    "src/pages/api/**",
+    "src/edge-functions/**",
+    "src/mcp-server/**",
+    ".next/dev/types/**/*.ts"
+  ]
+}
