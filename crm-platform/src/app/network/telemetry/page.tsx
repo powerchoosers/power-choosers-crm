@@ -1,7 +1,8 @@
 'use client'
 
 import { AnimatedCount } from '@/components/ui/AnimatedCount'
-import { useMemo } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -91,6 +92,15 @@ const ZONES = [
   { id: 'south', label: 'LZ_SOUTH', color: '#ef4444' },
 ] as const
 
+const TIMEFRAME_FILTERS = [
+  { id: '7D', label: '7D', days: 7, hint: 'Last 7 days' },
+  { id: '30D', label: '30D', days: 30, hint: 'Last 30 days' },
+  { id: '90D', label: '90D', days: 90, hint: 'Last 90 days' },
+  { id: 'ALL', label: 'ALL', days: null, hint: 'Full history' },
+] as const
+
+type TimeframeId = (typeof TIMEFRAME_FILTERS)[number]['id']
+
 function priceColor(price: number) {
   if (price >= 1000) return 'text-rose-500'
   if (price > 100) return 'text-amber-500'
@@ -101,6 +111,7 @@ export default function TelemetryPage() {
   const { data: marketData, isLoading: marketLoading, isError: marketError } = useMarketPulse()
   const { chartData: ercotHistoryChart, isLoading: ercotHistoryLoading, isError: ercotHistoryError } = useMarketTelemetryHistory()
   const { data: eiaData, isLoading: eiaLoading, isError: eiaError } = useEIARetailTexas()
+  const [timeframe, setTimeframe] = useState<TimeframeId>('30D')
 
   const prices: MarketPulseData['prices'] = marketData?.prices ?? ({} as MarketPulseData['prices'])
   const grid: MarketPulseData['grid'] = marketData?.grid ?? ({} as MarketPulseData['grid'])
@@ -137,6 +148,25 @@ export default function TelemetryPage() {
       }))
       .reverse()
   }, [eiaRows])
+
+  const filteredErcotHistoryChart = useMemo(() => {
+    const filter = TIMEFRAME_FILTERS.find((item) => item.id === timeframe) ?? TIMEFRAME_FILTERS[1]
+    if (filter.days == null) return ercotHistoryChart
+
+    const latest = ercotHistoryChart.at(-1)
+    if (!latest) return ercotHistoryChart
+
+    const latestDate = new Date(latest.date)
+    if (Number.isNaN(latestDate.getTime())) return ercotHistoryChart
+
+    const cutoff = latestDate.getTime() - filter.days * 24 * 60 * 60 * 1000
+    return ercotHistoryChart.filter((point) => {
+      const pointDate = new Date(point.date)
+      return !Number.isNaN(pointDate.getTime()) && pointDate.getTime() >= cutoff
+    })
+  }, [ercotHistoryChart, timeframe])
+
+  const selectedTimeframe = TIMEFRAME_FILTERS.find((item) => item.id === timeframe) ?? TIMEFRAME_FILTERS[1]
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-8rem)] space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -202,48 +232,89 @@ export default function TelemetryPage() {
 
       {/* ERCOT Price History (stored snapshots from market_telemetry) */}
       <section className="space-y-3">
-        <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-          ERCOT Price History
-        </h2>
-        <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
-          Historic settlement prices from the scheduled ERCOT snapshot job (7am, 12pm, 5pm, 10pm CT), plus archived daily backfill rows already stored in Supabase. The graph excludes the one-off manual trigger row.
-        </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+              ERCOT Price History
+            </h2>
+            <p className="mt-1 text-[9px] font-mono text-zinc-600 max-w-xl">
+              Historic settlement prices from the scheduled ERCOT snapshot job (7am, 12pm, 5pm, 10pm CT), plus archived daily backfill rows already stored in Supabase. The graph excludes the one-off manual trigger row.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">
+            <span className="text-[9px] font-mono uppercase tracking-[0.25em] text-zinc-600">Range</span>
+            <div className="inline-flex rounded-full border border-white/8 bg-white/[0.03] p-1 backdrop-blur-sm">
+              {TIMEFRAME_FILTERS.map((item) => {
+                const active = timeframe === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setTimeframe(item.id)}
+                    className={cn(
+                      'relative rounded-full px-3 py-1 text-[10px] font-mono uppercase tracking-wider transition-all duration-300',
+                      active
+                        ? 'bg-[#002FA7] text-white shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_8px_18px_rgba(0,47,167,0.22)]'
+                        : 'text-zinc-500 hover:text-zinc-200 hover:bg-white/[0.04]'
+                    )}
+                    aria-pressed={active}
+                    title={item.hint}
+                  >
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+            <span className="text-[9px] font-mono text-zinc-600 tabular-nums">
+              {filteredErcotHistoryChart.length.toString().padStart(3, '0')} pts
+            </span>
+          </div>
+        </div>
         <div className="nodal-void-card overflow-hidden">
           {ercotHistoryError ? (
             <div className="p-6 text-center font-mono text-amber-500 text-sm">CONNECTION_LOST</div>
           ) : ercotHistoryLoading ? (
             <div className="h-64 rounded-2xl animate-pulse bg-black/40" />
-          ) : ercotHistoryChart.length === 0 ? (
+          ) : filteredErcotHistoryChart.length === 0 ? (
             <div className="p-6 text-center font-mono text-zinc-500 text-sm">
               No history yet. Data is logged when market snapshots are saved (e.g. via Gemini).
             </div>
           ) : (
-            <div className="p-4 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={ercotHistoryChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: 'rgb(113 113 122)', fontSize: 9, fontFamily: 'monospace' }}
-                    tickLine={false}
-                    axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
-                    interval="preserveStartEnd"
-                  />
-                  <YAxis
-                    tick={{ fill: 'rgb(113 113 122)', fontSize: 10, fontFamily: 'monospace' }}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => `$${v}`}
-                  />
-                  <Tooltip content={<ERCOTHistoryTooltip />} />
-                  <Line type="monotone" dataKey="hub_avg" stroke="#64748b" strokeWidth={2} dot={false} connectNulls name="HUB_AVG" />
-                  <Line type="monotone" dataKey="north" stroke="#e4e4e7" strokeWidth={1.5} dot={false} connectNulls name="LZ_NORTH" />
-                  <Line type="monotone" dataKey="houston" stroke="#22c55e" strokeWidth={1.5} dot={false} connectNulls name="LZ_HOUSTON" />
-                  <Line type="monotone" dataKey="west" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls name="LZ_WEST" />
-                  <Line type="monotone" dataKey="south" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls name="LZ_SOUTH" />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedTimeframe.id}
+                className="p-4 h-64"
+                initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: -8, filter: 'blur(6px)' }}
+                transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={filteredErcotHistoryChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: 'rgb(113 113 122)', fontSize: 9, fontFamily: 'monospace' }}
+                      tickLine={false}
+                      axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tick={{ fill: 'rgb(113 113 122)', fontSize: 10, fontFamily: 'monospace' }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `$${v}`}
+                    />
+                    <Tooltip content={<ERCOTHistoryTooltip />} />
+                    <Line key={`hub-${selectedTimeframe.id}`} type="monotone" dataKey="hub_avg" stroke="#64748b" strokeWidth={2} dot={false} connectNulls name="HUB_AVG" isAnimationActive animationDuration={650} />
+                    <Line key={`north-${selectedTimeframe.id}`} type="monotone" dataKey="north" stroke="#e4e4e7" strokeWidth={1.5} dot={false} connectNulls name="LZ_NORTH" isAnimationActive animationDuration={650} />
+                    <Line key={`houston-${selectedTimeframe.id}`} type="monotone" dataKey="houston" stroke="#22c55e" strokeWidth={1.5} dot={false} connectNulls name="LZ_HOUSTON" isAnimationActive animationDuration={650} />
+                    <Line key={`west-${selectedTimeframe.id}`} type="monotone" dataKey="west" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls name="LZ_WEST" isAnimationActive animationDuration={650} />
+                    <Line key={`south-${selectedTimeframe.id}`} type="monotone" dataKey="south" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls name="LZ_SOUTH" isAnimationActive animationDuration={650} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </motion.div>
+            </AnimatePresence>
           )}
         </div>
       </section>
