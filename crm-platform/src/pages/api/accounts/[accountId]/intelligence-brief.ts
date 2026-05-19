@@ -511,15 +511,19 @@ function resolvePreferredIndustryCluster(baseCluster: IndustryCluster, derivedCl
   return baseCluster !== 'unknown' ? baseCluster : derivedCluster
 }
 
-function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | null {
+function getAccountIdentityProfile(account: AccountRow, candidate: ResearchHit | null = null): IntelligenceProfile | null {
   const raw = getAccountMetadata(account).intelligenceProfile
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
 
   const record = raw as Record<string, unknown>
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
-  const accountText = getIdentityProfileSeedText(account)
-  const stableCluster = inferIndustryClusterFromSignals(account, null)
+  const accountText = cleanText([
+    getIdentityProfileSeedText(account),
+    candidate?.title || '',
+    candidate?.snippet || '',
+  ].filter(Boolean).join(' ')).toLowerCase()
+  const stableCluster = inferIndustryClusterFromSignals(account, candidate)
   const savedProfile = {
     version: IDENTITY_PROFILE_VERSION,
     industryCluster: cluster,
@@ -563,8 +567,8 @@ function getAccountIdentityProfile(account: AccountRow): IntelligenceProfile | n
   }
 }
 
-function buildIdentityProfileText(account: AccountRow) {
-  const profile = getAccountIdentityProfile(account)
+function buildIdentityProfileText(account: AccountRow, candidate: ResearchHit | null = null) {
+  const profile = getAccountIdentityProfile(account, candidate)
   if (!profile) return ''
 
   return cleanText([
@@ -1461,7 +1465,7 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
 function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
-  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const businessSpecificLine = buildBusinessSpecificFallbackLine(account, candidate)
 
   if (businessSpecificLine) {
@@ -1716,7 +1720,7 @@ function buildStructuredIdentityProfile(
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
   const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account)}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account, primaryCandidate)}`).toLowerCase()
 
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
@@ -2364,7 +2368,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 }
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
-  const savedProfile = getAccountIdentityProfile(account)
+  const savedProfile = getAccountIdentityProfile(account, candidate)
   if (savedProfile?.industryCluster) {
     return savedProfile.industryCluster
   }
@@ -2620,7 +2624,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
 function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
 
   switch (industryCluster) {
@@ -3730,7 +3734,7 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const city = cleanText(account.city) || ''
   const state = cleanText(account.state) || ''
   const location = [city, state].filter(Boolean).join(', ') || 'Texas'
-  const identityProfile = getAccountIdentityProfile(account)
+  const identityProfile = getAccountIdentityProfile(account, candidate)
   
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const multiSiteContext = multiSiteInfo.isMultiSite && multiSiteInfo.locationCount
@@ -3899,14 +3903,14 @@ Generate a plain-English, peer-to-peer opener for ${companyName}:`
   }
 }
 
-function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, account?: AccountRow) {
+function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, account?: AccountRow, candidate: ResearchHit | null = null) {
   const text = cleanText(talkTrack)
   if (!text) return true
   if (isLikelyNonEnglishText(text)) return true
 
   const lower = text.toLowerCase()
   const accountText = account
-    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)}`).toLowerCase()
+    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
     : ''
   const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
@@ -3995,7 +3999,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const openingIndustryLine = buildOpeningIndustryLine(
     context.industryCluster,
     alreadyOpen,
-    cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase(),
+    cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase(),
   )
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
@@ -4791,7 +4795,7 @@ async function runOpenRouterResearch(
   const primaryCandidate = selectedCandidates[0] || null
   const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode, audienceProfile)
   const talkTrackContextJson = JSON.stringify(talkTrackContext, null, 2)
-  const identityProfile = getAccountIdentityProfile(account)
+  const identityProfile = getAccountIdentityProfile(account, primaryCandidate)
   const researchPayload = {
     current_date: new Date().toISOString().slice(0, 10),
     account: {
@@ -5475,7 +5479,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const talkTrackRewriteContext = buildTalkTrackContext(briefingAccount, talkTrackCandidate, false, audienceProfile)
     const previousTalkTrack = cleanText(briefingAccount.intelligence_brief_talk_track || '')
     if (validated) {
-      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, briefingAccount) ||
+      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, briefingAccount, talkTrackCandidate) ||
         (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack)) ||
         talkTrackCache.isTooSimilar(validated.talk_track || '')
 
@@ -5487,7 +5491,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Validate AI-generated talk track
         if (rewrittenTalkTrack) {
-          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, briefingAccount) ||
+          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, briefingAccount, talkTrackCandidate) ||
               (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
             console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
