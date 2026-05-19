@@ -390,15 +390,15 @@ export default function TargetDetailPage() {
     {
       accessorKey: 'name',
       header: () => (
-        <span className="flex items-center gap-2 text-sm font-medium">
+        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500">
           Name
           <span
-            className="flex items-center gap-0.5"
+            className="flex items-center gap-0.5 shrink-0"
             title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-rose-500 opacity-60" />
           </span>
         </span>
       ),
@@ -702,15 +702,15 @@ export default function TargetDetailPage() {
     {
       accessorKey: 'name',
       header: () => (
-        <span className="flex items-center gap-2 text-sm font-medium">
+        <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500">
           Account Name
           <span
-            className="flex items-center gap-0.5"
+            className="flex items-center gap-0.5 shrink-0"
             title="Relationship health: green <30d · amber 30–90d · rose >90d since last call or email"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
-            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1 h-1 rounded-full bg-rose-500 opacity-60" />
           </span>
         </span>
       ),
@@ -1026,7 +1026,7 @@ export default function TargetDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
+    <div className="flex h-[calc(100vh-8rem)] min-h-0 flex-col overflow-hidden space-y-4">
 
       <div className="sticky top-0 z-30 -mx-1 bg-zinc-950/95 px-1 pt-4 pb-3 backdrop-blur-md">
         <CollapsiblePageHeader
@@ -1077,16 +1077,16 @@ export default function TargetDetailPage() {
       />
 
       {/* DATA CONTAINER */}
-      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
+      <div className="flex-1 min-h-0 nodal-void-card overflow-hidden flex flex-col relative">
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
               onDragEnd={handleDragEnd}
             >
-              <TableHeader className="sticky top-0 z-20">
+              <TableHeader className="sticky top-0 z-50">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     <SortableContext
