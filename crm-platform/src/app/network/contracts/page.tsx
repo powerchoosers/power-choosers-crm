@@ -73,12 +73,10 @@ import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { useUIStore } from '@/store/uiStore'
 import {
-  getDealPriorityMeta,
-  matchesPriorityFocus,
   sortDealsByPriority,
-  type PriorityFocus,
 } from '@/lib/deal-priority'
 import { DEALS_QUERY_BUSTER } from '@/hooks/useDeals'
+import { FrozenHoverText, getFrozenNameHeaderClass, getFrozenSelectHeaderClass } from '@/components/network/frozenTable'
 
 const PAGE_SIZE = 50
 
@@ -146,65 +144,6 @@ function fmtUsage(val?: number) {
 function fmtMills(val?: number) {
   if (val === undefined || val === null) return '—'
   return val.toFixed(2)
-}
-
-const PRIORITY_FOCUS_OPTIONS: Array<{
-  id: PriorityFocus
-  label: string
-  description: string
-}> = [
-  { id: 'all', label: 'All Contracts', description: 'Full pipeline, sorted by urgency' },
-  { id: 'urgent', label: 'Needs Attention', description: 'Overdue, closing soon, signature, stale' },
-  { id: 'overdue', label: 'Overdue', description: 'Close date already passed' },
-  { id: 'closing_soon', label: 'Closing Soon', description: 'Close date in the next 30 days' },
-  { id: 'signature_pending', label: 'Signature Pending', description: 'Requests waiting on execution' },
-  { id: 'stale', label: 'Stale', description: 'No recent updates' },
-  { id: 'secured', label: 'Secured', description: 'Won contracts' },
-  { id: 'terminated', label: 'Terminated', description: 'Exited contracts' },
-]
-
-function PriorityRailButton({
-  label,
-  description,
-  count,
-  active,
-  onClick,
-}: {
-  label: string
-  description: string
-  count: number
-  active: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'w-full rounded-2xl border p-3 text-left transition-all',
-        active
-          ? 'border-[#002FA7] bg-[#002FA7]/10 text-white shadow-[0_0_20px_-12px_rgba(0,47,167,0.55)]'
-          : 'border-white/5 bg-white/[0.02] text-zinc-400 hover:border-white/10 hover:text-zinc-200'
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm">{label}</div>
-          <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-            {description}
-          </div>
-        </div>
-        <div className={cn(
-          'rounded-lg border px-2 py-1 font-mono text-[10px] tabular-nums',
-          active
-            ? 'border-[#002FA7]/40 bg-[#002FA7]/20 text-white'
-            : 'border-white/10 bg-black/20 text-zinc-300'
-        )}>
-          {String(count).padStart(2, '0')}
-        </div>
-      </div>
-    </button>
-  )
 }
 
 // ---------------------------------------------------------------------------
@@ -516,7 +455,6 @@ export default function ContractsPage() {
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
-  const [priorityFocus, setPriorityFocus] = useState<PriorityFocus>('all')
   const selectedDealId = searchParams?.get('contractId') ?? null
   const [editDeal, setEditDeal] = useState<Deal | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -528,10 +466,7 @@ export default function ContractsPage() {
 
   const queryDeals = useMemo(() => data?.pages.flatMap(page => page.deals) || [], [data])
   const sortedDeals = useMemo(() => sortDealsByPriority(queryDeals), [queryDeals])
-  const visibleDeals = useMemo(
-    () => sortedDeals.filter((deal) => matchesPriorityFocus(deal, priorityFocus)),
-    [priorityFocus, sortedDeals]
-  )
+  const visibleDeals = sortedDeals
   const isLoading = queryLoading || !isMounted
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
   const openContractPreview = useCallback((deal: Deal) => {
@@ -540,30 +475,6 @@ export default function ContractsPage() {
     queryClient.setQueryData(['deal', DEALS_QUERY_BUSTER, deal.id], deal)
     router.replace(`${pathname ?? '/network/contracts'}?${paramsCopy.toString()}`, { scroll: false })
   }, [pathname, queryClient, router, searchParams])
-
-  const priorityCounts = useMemo(() => {
-    const counts = {
-      all: queryDeals.length,
-      urgent: 0,
-      overdue: 0,
-      closing_soon: 0,
-      signature_pending: 0,
-      stale: 0,
-      active: 0,
-      secured: 0,
-      terminated: 0,
-    }
-
-    queryDeals.forEach((deal) => {
-      const meta = getDealPriorityMeta(deal)
-      counts[meta.bucket] += 1
-      if (['overdue', 'signature_pending', 'closing_soon', 'stale'].includes(meta.bucket)) {
-        counts.urgent += 1
-      }
-    })
-
-    return counts
-  }, [queryDeals])
 
   const effectiveTotalRecords = visibleDeals.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
@@ -673,8 +584,8 @@ export default function ContractsPage() {
             <button
               onClick={table.getToggleAllPageRowsSelectedHandler()}
               className={cn(
-                "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
-                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
+                "w-4 h-4 rounded border transition-all flex items-center justify-center backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]",
+                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-white/[0.03] border-white/10 opacity-70 hover:opacity-100"
               )}
             >
               {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
@@ -713,23 +624,41 @@ export default function ContractsPage() {
         }
       },
       {
-        accessorKey: 'title',
-        header: 'Account / Contract',
+        id: 'name',
+        accessorFn: (row) => row.title,
+        header: ({ column }) => (
+          <button
+            type="button"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 cursor-pointer"
+          >
+            <span>Account / Contract</span>
+            <ArrowUpDown
+              className={cn(
+                "h-2.5 w-2.5 transition-transform",
+                column.getIsSorted() === 'desc' && "rotate-180",
+                column.getIsSorted() ? "text-[#002FA7]" : "text-zinc-500"
+              )}
+            />
+          </button>
+        ),
         cell: ({ row }) => {
           const deal = row.original
+          const accountName = deal.account?.name || deal.accountId
           return (
             <div className="flex items-center gap-3 min-w-0">
               <CompanyIcon
                 logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
                 domain={deal.account?.domain}
-                name={deal.account?.name || deal.accountId}
-                size={32}
-                className="w-8 h-8 flex-none"
+                name={accountName}
+                size={36}
+                className="w-9 h-9 flex-none"
               />
               <div className="min-w-0">
-                <div className="font-sans text-sm text-zinc-200 truncate group-hover:text-white transition-colors">
-                  {deal.account?.name || deal.accountId}
-                </div>
+                <FrozenHoverText
+                  text={accountName}
+                  className="font-medium text-zinc-200 group-hover:text-white transition-colors"
+                />
                 <div className="font-mono text-[10px] text-zinc-600 truncate uppercase tracking-tight">
                   {deal.title}
                 </div>
@@ -935,72 +864,27 @@ export default function ContractsPage() {
         onFilterChange={handleFilterChange}
       />
 
-      <div className="grid flex-1 min-h-0 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <motion.aside
-          initial={{ opacity: 0, x: -16, filter: 'blur(8px)' }}
-          animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
-          className="rounded-2xl nodal-module-glass border border-white/5 p-4 flex flex-col gap-4 min-h-0 overflow-hidden"
-        >
-          <div className="space-y-1">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
-              Work Queue
-            </div>
-            <h3 className="text-sm text-zinc-100">Sort by urgency, not age.</h3>
-            <p className="text-xs leading-5 text-zinc-500">
-              Use these lanes to move quickly between contracts that need action and contracts that can wait.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
-              <div className="font-mono text-lg text-zinc-100 tabular-nums">{String(priorityCounts.urgent).padStart(2, '0')}</div>
-              <div className="mt-1 text-[9px] font-mono uppercase tracking-widest text-zinc-600">Urgent</div>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
-              <div className="font-mono text-lg text-emerald-400 tabular-nums">{String(priorityCounts.secured).padStart(2, '0')}</div>
-              <div className="mt-1 text-[9px] font-mono uppercase tracking-widest text-zinc-600">Secured</div>
-            </div>
-          </div>
-
-          <div className="space-y-2 overflow-y-auto pr-1 custom-scrollbar min-h-0">
-            {PRIORITY_FOCUS_OPTIONS.map((option) => (
-              <PriorityRailButton
-                key={option.id}
-                label={option.label}
-                description={option.description}
-                count={priorityCounts[option.id] ?? 0}
-                active={priorityFocus === option.id}
-                onClick={() => {
-                  setPriorityFocus(option.id)
-                  setPage(0)
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-black/20 p-3">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
-              Queue Rules
-            </div>
-            <p className="mt-2 text-xs leading-5 text-zinc-500">
-              Sorted by urgency, then close date, then value. Click a row to load the dossier in the right panel.
-            </p>
-          </div>
-        </motion.aside>
-
+      <div className="flex flex-1 min-h-0">
         <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative min-h-0">
           <div
             ref={scrollContainerRef}
             data-contracts-scroll-container="true"
-            className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll"
+            className="flex-1 min-h-0 overflow-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll"
           >
             <Table>
               <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                      <TableHead
+                        key={header.id}
+                        className={cn(
+                          "text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3",
+                          header.column.id === 'select' && getFrozenSelectHeaderClass(),
+                          header.column.id === 'name' && getFrozenNameHeaderClass(),
+                          header.column.id === 'stage' && "pl-5"
+                        )}
+                      >
                         {header.isPlaceholder
                           ? null
                           : flexRender(

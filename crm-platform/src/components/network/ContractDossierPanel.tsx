@@ -17,6 +17,7 @@ import { Deal, DealStage, DEAL_STAGES } from '@/types/deals'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
 import { ForensicClose } from '@/components/ui/ForensicClose'
+import { AccountHolderCard } from '@/components/dossier/account-dossier/AccountHolderCard'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 import {
   getDealPriorityMeta,
@@ -65,6 +66,28 @@ interface ContractDossierPanelProps {
   deal: Deal | null
   isLoading?: boolean
   isError?: boolean
+  accountName?: string | null
+  accountId?: string | null
+  contacts?: Array<{
+    id: string
+    name: string
+    title?: string
+    email?: string
+    mobile?: string
+    workDirectPhone?: string
+    otherPhone?: string
+    companyPhone?: string
+    phone?: string
+    avatarUrl?: string
+    linkedinUrl?: string | null
+    notes?: string | null
+    metadata?: Record<string, unknown> | null
+    primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
+    communicationSignals?: any
+  }>
+  primaryContactId?: string | null
+  isLoadingContacts?: boolean
+  onSetHolder?: (contactId: string | null) => void
   onClose: () => void
   onOpenFullDossier: (deal: Deal) => void
   onEditContract: (deal: Deal) => void
@@ -77,6 +100,12 @@ export function ContractDossierPanel({
   deal,
   isLoading = false,
   isError = false,
+  accountName,
+  accountId,
+  contacts = [],
+  primaryContactId,
+  isLoadingContacts = false,
+  onSetHolder,
   onClose,
   onOpenFullDossier,
   onEditContract,
@@ -171,7 +200,7 @@ export function ContractDossierPanel({
               transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
               className="space-y-4"
             >
-              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+              <div className="rounded-2xl border border-white/5 bg-transparent p-4">
                 <div className="flex items-start gap-3">
                   <CompanyIcon
                     logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
@@ -209,9 +238,22 @@ export function ContractDossierPanel({
                     </span>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenFullDossier(deal)}
+                  className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#002FA7]/30 bg-[#002FA7]/10 px-3 py-2 text-left transition-colors hover:border-[#002FA7] hover:bg-[#002FA7]/15"
+                >
+                  <span>
+                    <span className="block text-xs text-zinc-100">Open full dossier</span>
+                    <span className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                      Navigate to the detail page
+                    </span>
+                  </span>
+                  <ArrowUpRight className="h-4 w-4 text-[#002FA7]" />
+                </button>
               </div>
 
-              <div className="rounded-2xl border border-white/5 bg-black/20 p-4 space-y-3">
+              <div className="rounded-2xl border border-white/5 bg-transparent p-4 space-y-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
                     Pipeline position
@@ -244,11 +286,11 @@ export function ContractDossierPanel({
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                  <div className="rounded-xl border border-white/5 bg-transparent p-3">
                     <div className="font-mono text-[9px] uppercase tracking-widest text-zinc-600">Close date</div>
                     <div className="mt-1 text-sm text-zinc-200">{formatCloseDate(deal.closeDate)}</div>
                   </div>
-                  <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3">
+                  <div className="rounded-xl border border-white/5 bg-transparent p-3">
                     <div className="font-mono text-[9px] uppercase tracking-widest text-zinc-600">Updated</div>
                     <div className="mt-1 text-sm text-zinc-200">
                       {deal.updatedAt ? (
@@ -264,7 +306,7 @@ export function ContractDossierPanel({
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+                <div className="rounded-2xl border border-white/5 bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                     <TrendingUp className="h-3.5 w-3.5" />
                     Value / yr
@@ -273,7 +315,7 @@ export function ContractDossierPanel({
                     {formatCurrencyShort(deal.amount ?? null)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+                <div className="rounded-2xl border border-white/5 bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                     <Sparkles className="h-3.5 w-3.5" />
                     kWh / yr
@@ -282,7 +324,7 @@ export function ContractDossierPanel({
                     {formatUsageShort(deal.annualUsage ?? null)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+                <div className="rounded-2xl border border-white/5 bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                     <ShieldCheck className="h-3.5 w-3.5" />
                     Mills
@@ -291,7 +333,7 @@ export function ContractDossierPanel({
                     {formatMillsShort(deal.mills ?? null)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+              <div className="rounded-2xl border border-white/5 bg-zinc-950 p-3">
                   <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
                     <Clock3 className="h-3.5 w-3.5" />
                     Term
@@ -302,7 +344,18 @@ export function ContractDossierPanel({
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-white/5 bg-black/20 p-4 space-y-2">
+              {accountId && accountName && onSetHolder && (
+                <AccountHolderCard
+                  accountId={accountId}
+                  accountName={accountName}
+                  contacts={contacts}
+                  primaryContactId={primaryContactId}
+                  onSetHolder={onSetHolder}
+                  isLoadingContacts={isLoadingContacts}
+                />
+              )}
+
+              <div className="rounded-2xl border border-white/5 bg-transparent p-4 space-y-2">
                 <div className="flex items-center justify-between gap-4">
                   <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
                     Signature state
@@ -331,29 +384,16 @@ export function ContractDossierPanel({
                 )}
               </div>
 
-              <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4 space-y-3">
+              <div className="rounded-2xl border border-white/5 bg-zinc-950 p-4 space-y-3">
                 <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
                   Action Deck
                 </div>
                 <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onOpenFullDossier(deal)}
-                    className="flex items-center justify-between rounded-xl border border-[#002FA7]/30 bg-[#002FA7]/10 px-3 py-2 text-left transition-colors hover:border-[#002FA7] hover:bg-[#002FA7]/15"
-                  >
-                    <span>
-                      <span className="block text-xs text-zinc-100">Open full dossier</span>
-                      <span className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                        Navigate to the detail page
-                      </span>
-                    </span>
-                    <ArrowUpRight className="h-4 w-4 text-[#002FA7]" />
-                  </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => onEditContract(deal)}
-                      className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
+                      className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 text-xs text-zinc-100">
                         <Pencil className="h-3.5 w-3.5 text-zinc-400" />
@@ -366,7 +406,7 @@ export function ContractDossierPanel({
                     <button
                       type="button"
                       onClick={() => onCreateSignatureRequest(deal)}
-                      className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
+                      className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 text-xs text-zinc-100">
                         <FileSignature className="h-3.5 w-3.5 text-zinc-400" />
@@ -379,7 +419,7 @@ export function ContractDossierPanel({
                     <button
                       type="button"
                       onClick={() => onSendPortalAccess(deal)}
-                      className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
+                      className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 text-xs text-zinc-100">
                         <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" />
@@ -392,7 +432,7 @@ export function ContractDossierPanel({
                     <button
                       type="button"
                       onClick={() => onViewAccount(deal.accountId)}
-                      className="rounded-xl border border-white/10 bg-black/20 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
+                      className="rounded-xl border border-white/10 bg-zinc-950 px-3 py-2 text-left transition-colors hover:border-white/20 hover:bg-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 text-xs text-zinc-100">
                         <MapPin className="h-3.5 w-3.5 text-zinc-400" />

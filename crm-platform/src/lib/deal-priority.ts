@@ -87,19 +87,19 @@ export function getDealSignatureMeta(deal: Deal): DealSignatureMeta {
     }
   }
 
-  if (isExpired) {
-    return {
-      label: 'Expired',
-      detail: 'The signature link expired',
-      tone: 'rose',
-    }
-  }
-
   if (['signed', 'completed'].includes(status)) {
     return {
       label: 'Signed',
       detail: 'Execution is complete',
       tone: 'emerald',
+    }
+  }
+
+  if (isExpired) {
+    return {
+      label: 'Expired',
+      detail: 'The signature link expired',
+      tone: 'rose',
     }
   }
 
