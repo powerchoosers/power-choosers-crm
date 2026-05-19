@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
-import { buildAudienceLead, buildAudienceProfile, buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
+import { buildAudienceProfile, buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
 import { splitIntelligenceBriefSections } from '@/lib/intelligence-brief-context'
 
 // Simple LRU Cache for talk track deduplication
@@ -4108,14 +4108,24 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   if (context.signalFamily === 'industry_context') {
     // Lead with a company fact or operating detail, then the observation, then the question.
     // Do not fall back to generic "what most operators" phrasing here.
-    const companyLeadOptions = [
-      multiSiteInfo.isMultiSite
-        ? `${companyName} has a multi-site footprint, so the location-by-location differences matter more than a generic roll-up.`
-        : `${companyName} is the kind of operation where the location-level detail matters more than a broad summary.`,
-      sourceLead,
-      fallbackIndustryLine,
-      openingIndustryLine,
-    ]
+    const companyLeadOptions = context.industryCluster === 'school_district'
+      ? [
+          sourceLead,
+          multiSiteInfo.isMultiSite
+            ? `${companyName} runs a multi-campus school network, so each campus can carry its own summer cooling and classroom-technology load.`
+            : `${companyName} is a school district, so the campus calendar and summer HVAC are the parts to watch.`,
+          fallbackIndustryLine,
+          openingIndustryLine,
+        ]
+      : [
+          sourceLead,
+          multiSiteInfo.isMultiSite
+            ? `${companyName} has a multi-site footprint, so the location-by-location differences matter more than a broad summary.`
+            : `${companyName} is the kind of operation where the location-level detail matters more than a broad summary.`,
+          fallbackIndustryLine,
+          openingIndustryLine,
+        ]
+    
     const companyLead = pickVariant(companyLeadOptions.filter((line) => cleanText(line)), variantSeed) || fallbackIndustryLine || openingIndustryLine || sourceLead
 
     fullTrack = `${companyLead} ${forensicObservation} ${question}`
