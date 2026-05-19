@@ -60,6 +60,26 @@ If the answer is no, simplify.
 - `/network/infrastructure`
 - `/network/protocols/[id]/builder`
 
+## Browser Access
+
+When using the in-app browser, use the right URL for the job:
+
+- CRM app work: `http://localhost:3000/network`
+- Regular local app work: `http://localhost:3000`
+- Public customer home page: `https://nodalpoint.io`
+
+If the user asks to inspect the CRM, start with `/network`. If they ask to inspect the public site or customer-facing home page, use `nodalpoint.io` instead of the CRM route.
+
+Use the in-app browser directly, not shell workarounds. The browser should be driven through the Node REPL `js` tool with the browser runtime, then the `iab` browser:
+
+- initialize the browser runtime
+- get `agent.browsers.get('iab')`
+- name the browser session
+- open or reuse a tab
+- navigate to the target URL
+
+Do not use `Start-Process`, `open`, or any other shell command just to launch a browser page when the in-app browser is available. Do not fall back to generic web browsing for local CRM pages unless the browser runtime is actually unavailable.
+
 ## Local Commands
 
 Run from repo root:
