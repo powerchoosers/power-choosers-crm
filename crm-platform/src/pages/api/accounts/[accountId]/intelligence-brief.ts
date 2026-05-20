@@ -2616,12 +2616,17 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasStrongBakeryCafeSignals(text)) return 'restaurant'
   if (hasStrongRetailStoreSignals(text)) return 'retail'
   if (hasStrongManufacturersRepSignals(text)) return 'office_services'
-  if (/(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice|co[-\s]?manufacturing|production facilities)/.test(text)) return 'manufacturing'
+  // Food production — require primary food/beverage production signals, NOT just 'food service' (e.g. a manufacturer making food service equipment is not a food producer)
+  if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b)/.test(text) &&
+      !/(manufactur|fabricat|weld|metal|steel|machine|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
+  // Core manufacturing signals — must come before logistics to prevent metal fabricators / crane makers from being classed as logistics
   if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
   if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
-  if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
+  // Logistics check — exclude accounts that are primarily manufacturers (have fabrication/welding/industrial signals)
+  if (/(building materials|lumber|wholesale distribution|specialty building materials|\bdistributor\b|distribution center|distribution centers|distribution network|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|\bfreight\b|nvo?cc|\btrucking\b|supply chain|\btransport\b|\bshipping\b|\bcargo\b|auto logistics|freight forwarder)/.test(text) &&
+      !/(manufactur|fabricat|weld|foundry|machine shop|precision metal|metal fabricat|industrial compressor|compressed air)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
@@ -2830,8 +2835,8 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         question: 'Has anyone checked what part of the operation is driving the extra usage as it grows?',
         openers: [
           sourceLead,
-          `When headcount or capex starts moving, the electricity side usually changes before anyone notices it in the budget.`,
-          `The useful question is what part of the operation is driving the extra usage.`,
+          `When a business is growing, the load pattern usually shifts before the bill catches up.`,
+          `That kind of growth usually surfaces questions about whether the existing setup was sized right.`,
         ],
         focus: ['load growth', 'equipment additions', 'budget creep'],
       }
@@ -4482,9 +4487,9 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   })()
 
   return [
-    `${greeting} — I was looking into ${companyName} and had a quick question about how y'all manage the power side of the business, do you have a quick second?`,
     `${greeting} — I've been researching ${operationDescriptor} and wanted to ask one quick question, do you have a quick second?`,
     `${greeting} — I came across ${companyName} while looking at ${cluster === 'manufacturing' ? 'industrial' : cluster === 'restaurant' ? 'restaurant' : cluster === 'retail' ? 'retail' : 'commercial'} accounts in Texas and had a quick question, do you have a quick second?`,
+    `${greeting} — I've been doing some research on ${operationDescriptor} and had one quick question, do you have a quick second?`,
   ]
 }
 
@@ -4503,8 +4508,16 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
       `${greeting} — I saw y'all took over the ${openerLead} locations, and wanted to ask one quick question, do you have a quick second?`,
     ],
     new_location: [
-      `${greeting} — I saw y'all are opening a new location at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
-      `${greeting} — I saw y'all just added the new site at ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+      // Use openerLead only when it is a clean location name (≤6 words), not an article title
+      ...(openerLead !== companyName && openerLead.split(/\s+/).length <= 6
+        ? [
+            `${greeting} — I saw y'all are opening a new location in ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+            `${greeting} — I saw y'all just added the new site in ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
+          ]
+        : [
+            `${greeting} — I saw y'all are adding a new location, and wanted to ask one quick question, do you have a quick second?`,
+            `${greeting} — I saw the announcement about the new site, and wanted to ask one quick question, do you have a quick second?`,
+          ]),
     ],
     leadership_change: [
       `${greeting} — I saw y'all recently brought on a new team member to help manage ${openerLead}, and wanted to ask one quick question, do you have a quick second?`,
@@ -4582,7 +4595,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
     growth: [
       `When a business is growing, that usually changes the bill before anyone notices it in operations.`,
-      `Usually when headcount or capex starts moving, the bill moves with it.`,
+      `Growth like this tends to move the load pattern before the electricity setup has caught up with it.`,
     ],
     restructuring: [
       `During a footprint change, stranded power costs often show up if nobody cleans them up.`,
@@ -4670,6 +4683,8 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/^welcome to\b/i.test(t)) return true
   if (/^about\s*[-|–]\s*/i.test(t)) return true
   if (/^(home|about|contact|services|products|solutions|default)$/i.test(t.trim())) return true
+  if (/^homepage\s*[-|–]/i.test(t)) return true
+  if (/\bhomepage\b/i.test(t) && t.split(/\s+/).length <= 5) return true
 
   // Title is just the company name (with optional site name separator)
   const strippedCompanyChars = companyLower.replace(/[^a-z0-9]/g, '')
@@ -4679,6 +4694,22 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   // Title starts/ends with the domain-separator pattern and contains only company info
   if (/^[^|–-]{3,80}\s*[|–-]\s*(home|homepage|official site|official website|welcome)$/i.test(t)) return true
   if (/^(home|homepage|official site|official website|welcome)\s*[|–-]\s*[^|–-]{3,80}$/i.test(t)) return true
+
+  // SEO title tags: company name followed by a marketing tagline — not a news signal
+  // e.g. 'My Pharmacy USA - Find your Daily Medications Need Here'
+  //      'Team Worldwide - Large Enough to Serve You'
+  //      'Danmar Industries | Compressed Air Solutions | Houston TX'
+  if (companyLower.length > 3 && lower.startsWith(companyLower)) {
+    const afterName = lower.slice(companyLower.length).trim()
+    // Title is just the name plus a short tagline
+    if (/^[-|–|,]/.test(afterName) && afterName.split(/\s+/).length <= 12) return true
+  }
+  // Title that is just the company name with location appended (directory style)
+  if (companyLower.length > 3) {
+    const nameVariant = lower.replace(/[-|–|,|\s]+/g, '')
+    const titleVariant = lower.replace(/[-|–|,|\s]+/g, '')
+    if (titleVariant.startsWith(nameVariant) && titleVariant.length - nameVariant.length < 30) return true
+  }
 
   return false
 }
@@ -5255,11 +5286,22 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
   const normalizedHeadline = normalizeEntityToken(headline)
   const normalizedCandidateTitle = normalizeEntityToken(candidate?.title || '')
   const wordCount = cleaned.split(/\s+/).filter(Boolean).length
+
+  // Detect raw scraped boilerplate: cookie banners, nav menus, homepage marketing copy
+  const isScrapedBoilerplate =
+    /\bcookies?\b.*\bexperience\b/i.test(cleaned) ||
+    /\bI agree\b/i.test(cleaned) ||
+    /\bskip to content\b/i.test(cleaned) ||
+    /\blearn more\b.*\blearn more\b/i.test(cleaned) ||
+    /\bphone:\s*\d/i.test(cleaned) ||
+    (cleaned.endsWith('...') && wordCount < 40 && /^(welcome to|we are|we provide|we offer|our mission|about us)/i.test(cleaned))
+
   const weakDetail =
     wordCount < 12 ||
     (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
     (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
-    /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned)
+    /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned) ||
+    isScrapedBoilerplate
 
   if (!weakDetail) return cleaned
 
@@ -5283,6 +5325,22 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   const confidence = toTitleCase(cleanText(result?.confidence_level))
 
   if (!usable || !headline || !detail || !talkTrack || !sourceUrl || !signalDate) {
+    return null
+  }
+
+  // Reject briefs where the headline is a raw page/browser title or directory stub
+  // e.g. 'Home', 'Homepage - Team Worldwide', 'Spicy Pickle profile', 'My Pharmacy USA - Find your Daily Medications Here'
+  if (isBoilerplatePageTitle(headline, cleanText(account.name) || '')) {
+    return null
+  }
+  // Reject directory profile stubs like '[Company] profile' or '[Company] - [City], [State]'
+  const headlineLower = headline.toLowerCase()
+  const nameLower = (cleanText(account.name) || '').toLowerCase()
+  if (
+    headlineLower === `${nameLower} profile` ||
+    /^.{3,60}\s+profile$/i.test(headline) ||
+    /^.{3,60}\s*[-|]\s*(company overview|company profile|linkedin|yelp|yellowpages|manta|dnb|dun & bradstreet)$/i.test(headline)
+  ) {
     return null
   }
 
@@ -5357,9 +5415,13 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const signalDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || new Date().toISOString().slice(0, 10)
   const sourceDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || signalDate
   const snippet = isLikelyNonEnglishText(candidate?.snippet || '') ? '' : cleanText(candidate?.snippet || '')
-  const headline = (isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')) || `${companyName} update`
+  const rawTitle = isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')
+  // Sanitize: if the title is just a browser tab / directory stub, use the snippet preview or a descriptive fallback
+  const headline = sanitizeResearchTitle(rawTitle, companyName, snippet) || `${companyName} — Company Overview`
   const detailParts = [
-    snippet || `I saw an update about ${companyName}.`,
+    snippet && !isBoilerplatePageTitle(snippet.split(/[.!?]/)[0]?.trim() || '', companyName)
+      ? snippet
+      : cleanText(account.description) || `${companyName} is a commercial account in Texas.`,
   ]
   const talkTrack = buildManualTalkTrack(account, candidate, context, 0)
 
