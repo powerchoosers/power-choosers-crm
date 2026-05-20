@@ -1485,6 +1485,9 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
       if (hasStrongDentalSignals(accountText)) {
         return `${prefix}, the main factor is usually how operatories, imaging, sterilization, patient flow, and HVAC are landing on that dental office meter.`
       }
+      if (/\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(accountText)) {
+        return `${prefix}, the main factor is usually how cleanroom HVAC, product refrigeration, and retail flow are landing on that pharmacy meter.`
+      }
       return `${prefix}, the critical detail is how clinical equipment, HVAC, and daily timing are showing up as peak charges on that meter.`
     case 'restaurant':
       return `${prefix}, the biggest risk is usually kitchen load and HVAC hitting during peak hours and driving up transmission fees.`
@@ -1517,73 +1520,87 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
-  const company = cleanText(account.name) || 'the dealership'
+  const company = cleanText(account.name) || 'the company'
 
-  if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
+  // Infer industry cluster to prevent cross-industry regex false matches
+  const cluster = inferIndustryClusterFromSignals(account, candidate)
+
+  if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
     return 'For a residential care nonprofit like this, the useful check is whether the homes, counseling spaces, and support services are what is actually driving the bill.'
   }
 
-  if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
+  // Food production check - restrict to manufacturing cluster and avoid refrigeration-only false positives for industrial/commercial accounts
+  if (cluster === 'manufacturing' && (/(food production|food manufacturing|food manufacturer|food processing|bakehouse|baking line|production kitchen)/.test(text) ||
+      (/(refrigerat|freezer|cold chain)/.test(text) && /\b(food|beverage|bakery|processing|poultry|meat|dairy|grocery|fruit|vegetable|snack|cookie|confectionery|brewery|distillery|winery|kitchen|meals)\b/.test(text)))) {
     return 'For a food production plant like this, the useful check is whether refrigeration, ovens, and bake-line start-ups are what is actually driving the bill.'
   }
 
-  if (/(spill control|sorbent|sorbents|spill kits|secondary containment|spill response|environmental response|drums|granulars|containment)/.test(text)) {
+  if (cluster === 'manufacturing' && /(spill control|sorbent|sorbents|spill kits|secondary containment|spill response|environmental response|drums|granulars|containment)/.test(text)) {
     return 'For a spill-control manufacturer like this, the useful check is whether mixing, packaging, warehouse climate control, and distribution activity are what is really driving the bill.'
   }
 
-  if (/(freight forwarder|nvocc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics)/.test(text)) {
+  // Logistics check - use word boundaries and restrict to logistics cluster
+  if (cluster === 'logistics' && /(freight forwarder|nvocc|\bcargo\b|\bshipping\b|\btrucking\b|\btransport\b|\btransportation\b|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|auto logistics)/.test(text)) {
     return 'For a logistics business like this, the useful check is whether dock activity, office load, warehouse support space, and any terminal-adjacent facilities are what is really driving the bill.'
   }
 
-  if (/\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
+  if (cluster === 'school_district' && /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
     return 'For a school district like this, the useful check is whether the campus calendar, HVAC, athletics, and classroom technology are all showing up on the bill the way they should.'
   }
 
   if (/\b(cooling|coolers?|heating|heaters?|hvac|evaporative|portable ac|air conditioning)\b/.test(text)) {
-    return 'For a cooling and heating business like this, the useful check is whether seasonal demand and equipment usage are creating a predictable summer spike or just a choppy bill.'
+    if (cluster === 'office_services' || cluster === 'manufacturing' || cluster === 'unknown') {
+      return 'For a cooling and heating business like this, the useful check is whether seasonal demand and equipment usage are creating a predictable summer spike or just a choppy bill.'
+    }
   }
 
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
-    return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
+    if (cluster === 'manufacturing' || cluster === 'retail' || cluster === 'unknown') {
+      return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
+    }
   }
 
-  if (hasStrongDmeSignals(text)) {
+  if (cluster === 'logistics' && hasStrongDmeSignals(text)) {
     return `For ${company}, the useful check is whether equipment deliveries, inventory, service turnaround, and storage are what is actually driving the bill.`
   }
 
-  if (hasStrongAutomotiveSignals(text)) {
+  if (cluster === 'retail' && hasStrongAutomotiveSignals(text)) {
     return `For ${company}, the useful check is whether showroom traffic, service bays, parts, and lot lighting are what is actually driving the bill.`
   }
 
-  if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
+  if (cluster === 'logistics' && /\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
     return 'For a wholesale distributor like this, the useful check is whether branch traffic, inventory turns, shop equipment, and any climate-controlled space are what is really pushing the bill.'
   }
 
-  if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
+  if (cluster === 'manufacturing' && /\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
     return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
   }
 
-  if (/(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/.test(text)) {
+  if (cluster === 'healthcare' && /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/.test(text)) {
     return 'For a dental partnership organization like this, the useful check is whether the practices, operatories, imaging, sterilization, and patient flow are what is actually driving the bill.'
   }
 
-  if (/\b(healthcare|hospital|medical center|health system|acute care|behavioral health|clinic|surgery center|ambulatory|medical practice)\b/.test(text)) {
+  if (cluster === 'healthcare' && /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text)) {
+    return 'For a compounding pharmacy like this, the useful check is whether cleanroom HVAC, refrigeration, and retail space are what is actually driving the bill.'
+  }
+
+  if (cluster === 'healthcare' && /\b(healthcare|hospital|medical center|health system|acute care|behavioral health|clinic|surgery center|ambulatory|medical practice)\b/.test(text)) {
     return 'For a healthcare network like this, the useful check is whether the hospitals, emergency rooms, imaging, labs, and clinics are each carrying their own peak history.'
   }
 
-  if (/\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
+  if (cluster === 'hotel_owner' && /\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
     return 'For a hotel property like this, the useful check is whether guest rooms, laundry, kitchen service, and HVAC are what is actually driving the bill.'
   }
 
-  if (/\b(mental health|behavioral health|behavioral healthcare|idd|intellectual and developmental disabilities|developmental disabilities|community mental health|community center|crisis center|crisis hotline|outpatient adult|outpatient youth|substance use|early childhood intervention|care coordination|peer support)\b/.test(text)) {
+  if (cluster === 'healthcare' && /\b(mental health|behavioral health|behavioral healthcare|idd|intellectual and developmental disabilities|developmental disabilities|community mental health|community center|crisis center|crisis hotline|outpatient adult|outpatient youth|substance use|early childhood intervention|care coordination|peer support)\b/.test(text)) {
     return 'For a behavioral health network like this, the useful check is whether the clinics, crisis services, counseling space, and administrative sites are carrying very different peak histories on their own meters.'
   }
 
-  if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
+  if (cluster === 'education_nonprofit' && /\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
     return 'For a program-based nonprofit or education organization like this, the useful check is whether classrooms, offices, events, and support spaces are what is actually driving the bill.'
   }
 
-  if (/\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
+  if (cluster === 'office_services' && /\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
     return 'For an office-style business, the useful check is usually whether occupancy, HVAC, and lease timing are really the main cost drivers.'
   }
 
@@ -2949,7 +2966,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
-      if (/(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
+      if (/(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|bakery|dessert|cake|cheesecake|pie|frozen food|bakehouse|baking line|production kitchen)/.test(text) ||
+          (/(refrigerat|freezer|cold chain)/.test(text) && /\b(food|beverage|bakery|processing|poultry|meat|dairy|grocery|fruit|vegetable|snack|cookie|confectionery|brewery|distillery|winery|kitchen|meals)\b/.test(text))) {
         const foodMultiSite = detectMultiSiteScale(account, candidate)
 
         if (foodMultiSite.isMultiSite && foodMultiSite.locationCount && foodMultiSite.locationCount >= 3) {
@@ -3315,7 +3333,22 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
       const isDentalPractice = /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/i.test(text)
       const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
-      const isHospitalOperator = hasHospitalSignals && !isBehavioralHealth && !isSeniorLiving && !isBloodCenter
+      const isPharmacy = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text)
+      const isHospitalOperator = hasHospitalSignals && !isBehavioralHealth && !isSeniorLiving && !isBloodCenter && !isPharmacy
+
+      if (isPharmacy) {
+        return {
+          label: 'Compounding pharmacy',
+          angle: 'Cleanroom HVAC, refrigeration, and retail flow shaping the electricity bill at a pharmacy site.',
+          question: 'Have you looked at whether cleanroom HVAC or product refrigeration are what create the biggest spikes on that meter?',
+          openers: [
+            `For a compounding pharmacy, cleanroom HVAC and refrigeration are usually what drive the meter's highest moments.`,
+            `The pharmacy's refrigeration and cleanroom HVAC can set a peak charge that sticks on the bill.`,
+            `For a pharmacy operator, the useful question is how cleanroom and refrigeration needs affect the peak billing demand.`,
+          ],
+          focus: ['cleanroom HVAC', 'refrigeration', 'retail flow', 'pharmacy meter', 'peak demand'],
+        }
+      }
 
       if (isDentalPractice) {
         const locationDesc = healthcareMultiSite.locationCount
@@ -4127,6 +4160,10 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? '- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.\n'
     : ''
 
+  const pharmacyContext = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+    ? '- For compounding pharmacies, use pharmacy and cleanroom language: cleanroom HVAC, product refrigeration, compounding setups, and retail flow. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital setting.\n'
+    : ''
+
   const prompt = `You are a plainspoken energy analyst and strategist. You are writing BOTH a permission-based OPENER and a TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
 VOICE & TONE:
@@ -4138,7 +4175,10 @@ VOICE & TONE:
 OPENER RULES (Exactly one sentence):
 - Must start with a greeting using the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
 - Must introduce himself: 'it's Lewis with Nodal Point'.
-- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website'). It must mention the specific news signal or operational fact (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
+- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website').
+- CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the opener around researching their facility/industry type in their location. For example: 'I've been researching a manufacturing operation in ${city || 'Texas'}' or 'I've been researching a logistics network in ${city || 'Texas'}' or 'I've been researching an office-style footprint in ${city || 'Texas'}'.
+- If a specific news signal is present, mention it directly (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
 - Must end with a permission question: 'and wanted to ask one quick question, do you have a quick second?' or 'do you have a quick second?'.
 
 TALK TRACK RULES (Exactly two sentences):
@@ -4147,7 +4187,7 @@ TALK TRACK RULES (Exactly two sentences):
 - Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
 - Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
-
+${dentalContext}${behavioralHealthContext}${pharmacyContext}
 COMPANY CONTEXT:
 - Company: ${companyName}
 - Industry: ${industry}
@@ -5542,7 +5582,10 @@ CONFIDENCE LEVEL RULES:
 OPENER RULES (Exactly one sentence):
 - Must start with a greeting using the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - Must introduce himself: 'it's Lewis with Nodal Point'.
-- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website'). It must mention the specific news signal or operational fact (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
+- Must state a specific, research-backed fact or company context (never say generic things like 'I found your business' or 'I saw your website').
+- CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the opener around researching their facility/industry type in their location. For example: 'I've been researching a manufacturing operation in [Location]' or 'I've been researching a logistics network in [Location]' or 'I've been researching an office-style footprint in [Location]'.
+- If a specific news signal is present, mention it directly (e.g. 'I saw y'all are opening a new location in Shenandoah', 'I saw the news about the Bread Zeppelin acquisition', 'I noticed y'all are operating a multi-site network in Houston').
 - Must end with a permission question: 'and wanted to ask one quick question, do you have a quick second?' or 'do you have a quick second?'.
 - Do NOT repeat words or phrases redundantly (e.g., do NOT say "expanding the footprint of Remington College's 13-location footprint"). Keep it clean and natural.
 
@@ -5595,6 +5638,7 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
+- For compounding pharmacies, use pharmacy and cleanroom language: cleanroom HVAC, product refrigeration, compounding setups, and retail flow. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital setting.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
 - For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Start with the concrete event, company fact, or facility detail, then end with one direct question.
@@ -5702,6 +5746,7 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.
 - For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.
+- For compounding pharmacies, use pharmacy and cleanroom language: cleanroom HVAC, product refrigeration, compounding setups, and retail flow. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital setting.
 - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup, and do not use dental or medical practice language like practices, operatories, clinics, or patient flow unless the source explicitly says that.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
 - For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
