@@ -2392,8 +2392,17 @@ function hashString(value: string) {
   return Math.abs(hash)
 }
 
+function capitalizeSentenceStarts(value: string) {
+  const text = cleanText(value)
+  if (!text) return ''
+
+  return text.replace(/(^|[.!?]\s+)(["'([{]*)([a-z])/g, (_match, boundary: string, prefix: string, letter: string) => {
+    return `${boundary}${prefix}${letter.toUpperCase()}`
+  })
+}
+
 function simplifyTalkTrackLanguage(value: string) {
-  return cleanText(value)
+  const result = cleanText(value)
     .replace(/\bthe useful check is whether\b/gi, 'the question is whether')
     .replace(/\bthe useful check is how\b/gi, 'the question is how')
     .replace(/\bthe useful check is\b/gi, 'the question is')
@@ -2431,6 +2440,8 @@ function simplifyTalkTrackLanguage(value: string) {
     .replace(/\ba peak charges\b/gi, 'a peak charge')
     .replace(/\ba stealth peak charges\b/gi, 'a hidden peak charge')
     .replace(/\btriggering a peak charges\b/gi, 'triggering a peak charge')
+
+  return capitalizeSentenceStarts(result)
 }
 
 function pickVariant<T>(items: T[], seed: string) {
@@ -4557,14 +4568,20 @@ function splitTalkTrackSentences(value: string) {
 }
 
 function ensureSentence(value: string) {
-  const text = cleanText(value)
+  const text = capitalizeSentenceStarts(value)
   if (!text) return ''
   return /[.!?]$/.test(text) ? text : `${text}.`
 }
 
+function ensureQuestionSentence(value: string) {
+  const text = capitalizeSentenceStarts(value).replace(/[.!]+$/g, '')
+  if (!text) return ''
+  return /\?$/.test(text) ? text : `${text}?`
+}
+
 function buildTwoSentenceTalkTrack(problemSentence: string, questionSentence: string) {
   return simplifyTalkTrackLanguage(
-    [ensureSentence(problemSentence), ensureSentence(questionSentence)]
+    [ensureSentence(problemSentence), ensureQuestionSentence(questionSentence)]
       .filter(Boolean)
       .join(' ')
       .replace(/\s+/g, ' ')
@@ -5262,7 +5279,7 @@ function normalizeBriefSections(result: StoredBriefResult): StoredBriefResult {
   return {
     ...result,
     opener: cleanText(sections.opener) || null,
-    talk_track: cleanText(sections.talkTrack) || '',
+    talk_track: simplifyTalkTrackLanguage(sections.talkTrack) || '',
   }
 }
 
