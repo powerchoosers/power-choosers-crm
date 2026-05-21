@@ -212,6 +212,12 @@ export default function AccountsPage() {
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
 
+  useEffect(() => {
+    const requiredRows = (pageIndex + 1) * PAGE_SIZE
+    if (pageIndex <= 0 || !hasNextPage || isFetchingNextPage || accounts.length >= requiredRows) return
+    void fetchNextPage()
+  }, [pageIndex, accounts.length, fetchNextPage, hasNextPage, isFetchingNextPage])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -720,7 +726,10 @@ export default function AccountsPage() {
     },
   })
 
-  const filteredRowCount = accounts.length
+  const filteredRowCount = effectiveTotalRecords
+  const currentPageRowCount = Math.max(0, Math.min(accounts.length - pagination.pageIndex * PAGE_SIZE, PAGE_SIZE))
+  const needsMoreDataForPage = accounts.length < (pagination.pageIndex + 1) * PAGE_SIZE
+  const showTableLoading = isLoading || (currentPageRowCount === 0 && needsMoreDataForPage && hasNextPage)
   const showingStart = filteredRowCount === 0
     ? 0
     : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
@@ -779,7 +788,7 @@ export default function AccountsPage() {
               </TableHeader>
             </DndContext>
             <TableBody>
-              {isLoading ? (
+              {showTableLoading ? (
                 <ForensicTableSkeleton columns={columns.length} rows={12} type="account" />
               ) : table.getRowModel().rows?.length ? (
                 <AnimatePresence mode="popLayout">
