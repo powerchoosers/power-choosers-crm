@@ -1526,87 +1526,87 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   const cluster = inferIndustryClusterFromSignals(account, candidate)
 
   if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
-    return 'For a residential care nonprofit like this, the useful check is whether the homes, counseling spaces, and support services are what is actually driving the bill.'
+    return 'For a residential care nonprofit, it is often hard to separate what the homes, counseling spaces, and support services are each adding to the bill.'
   }
 
   // Food production check - restrict to manufacturing cluster and avoid refrigeration-only false positives for industrial/commercial accounts
   if (cluster === 'manufacturing' && (/(food production|food manufacturing|food manufacturer|food processing|bakehouse|baking line|production kitchen)/.test(text) ||
       (/(refrigerat|freezer|cold chain)/.test(text) && /\b(food|beverage|bakery|processing|poultry|meat|dairy|grocery|fruit|vegetable|snack|cookie|confectionery|brewery|distillery|winery|kitchen|meals)\b/.test(text)))) {
-    return 'For a food production plant like this, the useful check is whether refrigeration, ovens, and bake-line start-ups are what is actually driving the bill.'
+    return 'In a food production facility like this, refrigeration, ovens, and bake-line start-ups can hit the meter at the same time and it is often difficult to tell which one is actually setting the peak.'
   }
 
   if (cluster === 'manufacturing' && /(spill control|sorbent|sorbents|spill kits|secondary containment|spill response|environmental response|drums|granulars|containment)/.test(text)) {
-    return 'For a spill-control manufacturer like this, the useful check is whether mixing, packaging, warehouse climate control, and distribution activity are what is really driving the bill.'
+    return 'For a spill-control manufacturer, mixing, packaging, warehouse climate control, and distribution activity can each hit the meter differently and it is hard to see which one is pushing the bill.'
   }
 
   // Logistics check - use word boundaries and restrict to logistics cluster
   if (cluster === 'logistics' && /(freight forwarder|nvocc|\bcargo\b|\bshipping\b|\btrucking\b|\btransport\b|\btransportation\b|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|auto logistics)/.test(text)) {
-    return 'For a logistics business like this, the useful check is whether dock activity, office load, warehouse support space, and any terminal-adjacent facilities are what is really driving the bill.'
+    return 'In a logistics operation like this, dock activity, office load, and warehouse support space tend to hit the meter at different times and it is usually hard to tell which one is setting the peak.'
   }
 
   if (cluster === 'school_district' && /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
-    return 'For a school district like this, the useful check is whether the campus calendar, HVAC, athletics, and classroom technology are all showing up on the bill the way they should.'
+    return 'For a school district, the campus calendar, HVAC, athletics, and classroom technology can all move the bill in ways that are hard to catch until a peak charge has already locked in.'
   }
 
   if (/\b(cooling|coolers?|heating|heaters?|hvac|evaporative|portable ac|air conditioning)\b/.test(text)) {
     if (cluster === 'office_services' || cluster === 'manufacturing' || cluster === 'unknown') {
-      return 'For a cooling and heating business like this, the useful check is whether seasonal demand and equipment usage are creating a predictable summer spike or just a choppy bill.'
+      return 'For a cooling and heating business, seasonal demand and equipment usage can create a summer spike that is hard to see coming until the charge has already set.'
     }
   }
 
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
     if (cluster === 'manufacturing' || cluster === 'retail' || cluster === 'unknown') {
-      return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
+      return 'In a shop and showroom operation, showroom climate control and fabrication equipment tend to overlap in ways that are hard to separate on the bill.'
     }
   }
 
   if (cluster === 'logistics' && hasStrongDmeSignals(text)) {
-    return `For ${company}, the useful check is whether equipment deliveries, inventory, service turnaround, and storage are what is actually driving the bill.`
+    return `For ${company}, equipment deliveries, inventory storage, and service turnaround tend to create usage patterns that are difficult to track until a peak charge has already stuck.`
   }
 
   if (cluster === 'retail' && hasStrongAutomotiveSignals(text)) {
-    return `For ${company}, the useful check is whether showroom traffic, service bays, parts, and lot lighting are what is actually driving the bill.`
+    return `For ${company}, showroom traffic, service bays, parts, and lot lighting tend to overlap in ways that make it hard to pinpoint what is actually setting the peak on the bill.`
   }
 
   if (cluster === 'logistics' && /\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
-    return 'For a wholesale distributor like this, the useful check is whether branch traffic, inventory turns, shop equipment, and any climate-controlled space are what is really pushing the bill.'
+    return 'For a wholesale distributor, branch traffic, inventory handling, shop equipment, and climate-controlled space tend to hit the meter at the same time and it is usually hard to separate which one is pushing the bill.'
   }
 
   if (cluster === 'manufacturing' && /\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
-    return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
+    return 'In a trailer manufacturing operation, production, welding, assembly, and paint work tend to hit the meter at the same time and it is difficult to see which stage is setting the biggest peak.'
   }
 
   if (cluster === 'healthcare' && /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/.test(text)) {
-    return 'For a dental partnership organization like this, the useful check is whether the practices, operatories, imaging, sterilization, and patient flow are what is actually driving the bill.'
+    return 'In a dental practice, operatories, imaging, sterilization, and HVAC all tend to overlap during patient hours and it is hard to tell which one is creating the biggest spike on the meter.'
   }
 
   if (cluster === 'healthcare' && /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text)) {
-    return 'For a compounding pharmacy like this, the useful check is whether cleanroom HVAC, refrigeration, and retail space are what is actually driving the bill.'
+    return 'For a compounding pharmacy, cleanroom HVAC and refrigeration tend to run together and it is often hard to separate which one is setting the peak on that meter.'
   }
 
   // Single senior-living campus — never use hospital/network framing
   if (cluster === 'healthcare' && /\b(senior living|assisted living|memory care|skilled nursing|retirement living|nursing home|alzheimer'?s?)\b/i.test(text)) {
-    return 'For a senior living community like this, the question is whether HVAC, dining, laundry, and overnight monitoring are what is actually driving the bill on that meter.'
+    return 'For a senior living community, HVAC, dining, laundry, and overnight monitoring tend to create steady baseline usage with peaks that are hard to catch because the building never fully powers down.'
   }
 
   if (cluster === 'healthcare' && /\b(healthcare|hospital|medical center|health system|acute care|behavioral health|clinic|surgery center|ambulatory|medical practice)\b/.test(text)) {
-    return 'For a healthcare facility like this, the question is whether patient-care systems, HVAC, imaging, or labs are what is actually creating the biggest spikes on the meter.'
+    return 'For a healthcare facility, patient-care systems, HVAC, imaging, and labs can all create peaks at different times and it is often difficult to pinpoint which one is driving the biggest charge.'
   }
 
   if (cluster === 'hotel_owner' && /\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
-    return 'For a hotel property like this, the useful check is whether guest rooms, laundry, kitchen service, and HVAC are what is actually driving the bill.'
+    return 'For a hotel property, guest rooms, laundry, kitchen service, and HVAC tend to overlap during peak occupancy and it is often hard to know which part of the operation is setting the bill.'
   }
 
   if (cluster === 'healthcare' && /\b(mental health|behavioral health|behavioral healthcare|idd|intellectual and developmental disabilities|developmental disabilities|community mental health|community center|crisis center|crisis hotline|outpatient adult|outpatient youth|substance use|early childhood intervention|care coordination|peer support)\b/.test(text)) {
-    return 'For a behavioral health network like this, the useful check is whether the clinics, crisis services, counseling space, and administrative sites are carrying very different peak histories on their own meters.'
+    return 'For a behavioral health operation, clinics, crisis services, counseling spaces, and admin sites tend to carry very different load patterns and it is hard to see where the peaks are actually sitting until you compare meters.'
   }
 
   if (cluster === 'education_nonprofit' && /\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
-    return 'For a program-based nonprofit or education organization like this, the useful check is whether classrooms, offices, events, and support spaces are what is actually driving the bill.'
+    return 'For a program-based nonprofit or education organization, classrooms, events, and support spaces tend to hit the meter at different times and it is hard to know which one is actually setting the bill.'
   }
 
   if (cluster === 'office_services' && /\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
-    return 'For an office-style business, the useful check is usually whether occupancy, HVAC, and lease timing are really the main cost drivers.'
+    return 'For an office-style business, occupancy, HVAC, and lease timing tend to change the bill in ways that are hard to notice until a peak has already locked in.'
   }
 
   return ''
@@ -2412,7 +2412,6 @@ function simplifyTalkTrackLanguage(value: string) {
     .replace(/\bthe useful check is how\b/gi, 'the question is how')
     .replace(/\bthe useful check is\b/gi, 'the question is')
     .replace(/\bthe useful question is\b/gi, 'the question is')
-    .replace(/\bfor ([^,.!?]{2,80}), the question is\b/gi, 'for $1, most operators care about')
     .replace(/\bforensic signal\b/gi, 'thing to watch')
     .replace(/\bforensic driver\b/gi, 'thing to watch')
     .replace(/\bforensic check\b/gi, 'check')
@@ -4213,7 +4212,7 @@ TALK TRACK RULES (Exactly two sentences):
 - Sentence 2: A simple, open-ended operational question.
 - Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
-- Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
+- Avoid forbidden phrases: "the useful check", "the useful check is whether", "most operators care about", "most leaders care about", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 ${dentalContext}${behavioralHealthContext}${pharmacyContext}
 COMPANY CONTEXT:
 - Company: ${companyName}
@@ -4704,6 +4703,11 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (!t) return true
   const lower = t.toLowerCase()
   const companyLower = cleanText(accountName).toLowerCase()
+
+  // HTTP error and server response strings that leak into titles
+  if (/^(the request could not be satisfied|access denied|403 forbidden|404 not found|error 403|error 404|service unavailable|bad gateway|gateway timeout|too many requests|you are using an outdated browser)/i.test(t)) return true
+  if (/\byou are using an outdated browser\b/i.test(t)) return true
+  if (/\bdefend your assets\b.*\boutdated browser\b/i.test(t)) return true
 
   // Pure homepage title patterns
   if (/^home\s*[-|–]\s*/i.test(t)) return true
@@ -5749,7 +5753,7 @@ TALK TRACK RULES (Exactly two sentences):
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at."
 - The Talk Track MUST connect the specific operational details of the signal (e.g., "culinary program kitchen equipment", "trailer fabrication machinery", "flight simulator electricity draw", "commercial freight warehousing") directly to how that specific activity consumes power. Be forensic and concrete about the actual machinery, equipment, or facility type involved in the news.
 - Never use generic placeholders or vague phrases like "the extra usage as it grows" or "changes the bill before anyone notices."
-- Avoid forbidden phrases: "the useful check", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".`
+- Avoid forbidden phrases: "the useful check", "the useful check is whether", "most operators care about", "most leaders care about", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".`
 
   const newsSignalPrompt = `${basePrompt}
 
