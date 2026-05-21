@@ -167,6 +167,12 @@ export default function PeoplePage() {
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
 
+  useEffect(() => {
+    const requiredRows = (pageIndex + 1) * PAGE_SIZE
+    if (pageIndex <= 0 || !hasNextPage || isFetchingNextPage || contacts.length >= requiredRows) return
+    void fetchNextPage()
+  }, [pageIndex, contacts.length, fetchNextPage, hasNextPage, isFetchingNextPage])
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -661,7 +667,10 @@ export default function PeoplePage() {
   }), [])
 
   const rows = table.getRowModel().rows
-  const filteredRowCount = contacts.length
+  const filteredRowCount = effectiveTotalRecords
+  const currentPageRowCount = Math.max(0, Math.min(contacts.length - pagination.pageIndex * PAGE_SIZE, PAGE_SIZE))
+  const needsMoreDataForPage = contacts.length < (pagination.pageIndex + 1) * PAGE_SIZE
+  const showTableLoading = isLoading || (currentPageRowCount === 0 && needsMoreDataForPage && hasNextPage)
   const showingStart = filteredRowCount === 0
     ? 0
     : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
@@ -712,7 +721,7 @@ export default function PeoplePage() {
                 ))}
               </TableHeader>
               <TableBody>
-              {isLoading ? (
+              {showTableLoading ? (
                 <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
               ) : isError ? (
                 <TableRow>
