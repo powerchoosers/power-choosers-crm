@@ -1584,8 +1584,13 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return 'For a compounding pharmacy like this, the useful check is whether cleanroom HVAC, refrigeration, and retail space are what is actually driving the bill.'
   }
 
+  // Single senior-living campus — never use hospital/network framing
+  if (cluster === 'healthcare' && /\b(senior living|assisted living|memory care|skilled nursing|retirement living|nursing home|alzheimer'?s?)\b/i.test(text)) {
+    return 'For a senior living community like this, the question is whether HVAC, dining, laundry, and overnight monitoring are what is actually driving the bill on that meter.'
+  }
+
   if (cluster === 'healthcare' && /\b(healthcare|hospital|medical center|health system|acute care|behavioral health|clinic|surgery center|ambulatory|medical practice)\b/.test(text)) {
-    return 'For a healthcare network like this, the useful check is whether the hospitals, emergency rooms, imaging, labs, and clinics are each carrying their own peak history.'
+    return 'For a healthcare facility like this, the question is whether patient-care systems, HVAC, imaging, or labs are what is actually creating the biggest spikes on the meter.'
   }
 
   if (cluster === 'hotel_owner' && /\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
@@ -2625,6 +2630,8 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
   if (hasStrongBakeryCafeSignals(text)) return 'restaurant'
+  // Brewery / taproom — must come before retail to prevent craft breweries landing as 'shop and showroom'
+  if (/(\bbrewery\b|\bbreweries\b|\bbrewing company\b|\bbrewing co\.?\b|\btaproom\b|\btap room\b|\bcraft beer\b|\bcraft brewery\b|\bmicrobrewery\b|\bnanobrewery\b|\bdistillery\b|\bdistilled spirits\b|\bwinery\b|\bwine maker\b|\bwinemaker\b|\bvineyard\b|\balemaker\b|\bale house\b)/.test(text)) return 'food_storage'
   if (hasStrongRetailStoreSignals(text)) return 'retail'
   if (hasStrongManufacturersRepSignals(text)) return 'office_services'
   // Food production — require primary food/beverage production signals, NOT just 'food service' (e.g. a manufacturer making food service equipment is not a food producer)
@@ -2635,6 +2642,10 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
   if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
+  // Tile / flooring / surface distributors — showroom + distribution, NOT manufacturing
+  if (/(\btile\b|\bflooring\b|\bfloor solutions\b|\bporcelain tile\b|\bceramic tile\b|\bsurface solutions\b|\bfloor covering\b|\bfloor coverings\b)/.test(text) &&
+      /(showroom|distributor|supplier|surface|\barchitect\b|\bdesigner\b|\bcommercial flooring\b)/.test(text) &&
+      !/(manufactur|fabricat|weld|extrusion)/.test(text)) return 'logistics'
   // Logistics check — exclude accounts that are primarily manufacturers (have fabrication/welding/industrial signals)
   if (/(building materials|lumber|wholesale distribution|specialty building materials|\bdistributor\b|distribution center|distribution centers|distribution network|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|\bfreight\b|nvo?cc|\btrucking\b|supply chain|\btransport\b|\bshipping\b|\bcargo\b|auto logistics|freight forwarder)/.test(text) &&
       !/(manufactur|fabricat|weld|foundry|machine shop|precision metal|metal fabricat|industrial compressor|compressed air)/.test(text)) return 'logistics'
@@ -5457,20 +5468,83 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   }
 }
 
+/**
+ * Fetches a URL via Jina AI Reader (r.jina.ai), which returns clean markdown
+ * stripped of nav, cookie banners, JS warnings, and boilerplate HTML.
+ * Falls back to raw HTML extraction if Jina is unavailable or times out.
+ */
+async function fetchJinaPage(
+  url: string,
+  bucket: { priority: number; label: string; query: string },
+  sourceKind: ResearchSourceKind,
+  titleFallback: string,
+): Promise<ResearchHit | null> {
+  const jinaUrl = `https://r.jina.ai/${url.replace(/^https?:\/\//i, '')}`
+  try {
+    const { response, text } = await fetchTextWithTimeout(
+      jinaUrl,
+      {
+        headers: {
+          'Accept': 'text/plain',
+          'User-Agent': WEB_USER_AGENT,
+          // Jina returns a JSON envelope when X-Return-Format is set; plain text is cleaner
+          'X-Return-Format': 'text',
+        },
+      },
+      14000,
+    )
+    if (!response.ok || !text || text.length < 80) {
+      throw new Error(`Jina returned ${response.status}`)
+    }
+
+    // Jina plain-text output: first line is often the page title, rest is body
+    const lines = text.split('\n').map((l) => l.trim()).filter(Boolean)
+    const rawTitle = lines[0] || titleFallback
+    const bodyLines = lines.slice(1)
+    const bodyText = bodyLines.join(' ').slice(0, 2000)
+
+    const companyName = cleanText(titleFallback)
+    // Use the raw title only if it looks meaningful; otherwise fall back to snippet
+    const title = isBoilerplatePageTitle(rawTitle, companyName)
+      ? sanitizeResearchTitle(rawTitle, companyName, bodyText)
+      : rawTitle
+
+    const snippet = bodyText.slice(0, 520) || title
+
+    if (!title && !snippet) return null
+
+    console.info('[Intelligence Brief] Jina fetch succeeded for:', url)
+    return {
+      priority: bucket.priority,
+      label: bucket.label,
+      query: bucket.query,
+      title,
+      url,
+      snippet,
+      publishedAt: null,
+      source: getHostname(url) || 'web',
+      sourceKind,
+    }
+  } catch (error) {
+    console.warn('[Intelligence Brief] Jina fetch failed, falling back to raw HTML:', url, error)
+    return fetchPageHit(url, bucket, sourceKind, titleFallback)
+  }
+}
+
 async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit | null> {
   const domain = cleanText(account.domain)
   if (!domain) return null
 
+  const url = domain.startsWith('http') ? domain : `https://${domain}`
+  const bucket = {
+    priority: 8,
+    label: 'Company Website',
+    query: `${account.name} company information`,
+  }
+
   try {
-    const url = domain.startsWith('http') ? domain : `https://${domain}`
-    const bucket = {
-      priority: 8,
-      label: 'Company Website',
-      query: `${account.name} company information`,
-    }
-    
-    const hit = await fetchPageHit(url, bucket, 'web', `${account.name} website`)
-    return hit
+    // Jina returns clean markdown — no cookie banners, no JS warnings, no nav boilerplate
+    return await fetchJinaPage(url, bucket, 'web', `${account.name} website`)
   } catch (error) {
     console.warn('[Intelligence Brief] Company website fetch failed:', error)
     return null
@@ -5698,7 +5772,8 @@ Decision rules:
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - A "usable news signal" is a specific event, announcement, press release, SEC filing, or news story that has occurred recently (e.g. facility openings, new programs, acquisitions, hires, financial reports).
 - Do NOT treat root homepages, generic landing pages, or basic directory listings (such as Yelp, YellowPages, or main corporate homepages) as news signals.
-- If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage (e.g. "Home - Brazos Trailers", "Welcome to [Company]", "[Company] | Home"), you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
+- Do NOT use any source with a URL from news.google.com or Google News RSS. If all candidates are Google News RSS, set usable_signal to false.
+- If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage, you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
 - Signal Headline must be a meaningful, human-readable summary of the actual event or company context — NEVER a raw page title, browser tab title, domain name, or the company name alone. Do NOT output anything like "Home - Lincoln Manufacturing, Inc." or "Welcome to Acme Corp" as the headline. Write it as a real intelligence insight: e.g. "Lincoln Manufacturing Expands Oil Field Threading Operations in Texas" or "Avalanche Food Group Opens Bread Zeppelin Location in Shenandoah."
 - Signal Detail must be a synthesized, coherent, and useful summary of the event (who, what, where, and when) in 2 to 4 complete sentences. Explain what happened clearly to give the reader real value. Do NOT copy/paste raw product category lists, cookie consent banners, nav menu text, boilerplate homepage copy, or unstructured website snippets. If the only available data is homepage boilerplate, set usable_signal to false instead.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
