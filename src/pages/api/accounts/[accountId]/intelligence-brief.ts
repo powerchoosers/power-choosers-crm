@@ -650,7 +650,7 @@ function hasPublicTransitSignals(text: string) {
 }
 
 function hasMovingStorageSignals(text: string) {
-  return /(moving (?:and|&) storage|moving company|relocation services?|commercial moving|residential moving|household goods|storage company|warehousing and moving|supply chain solutions|van line|movers?\b)/i.test(text)
+  return /(moving (?:and|&) storage|moving storage|moving company|relocation services?|commercial moving|residential moving|household goods|storage company|warehousing and moving|supply chain solutions|van line|movers?\b)/i.test(text)
 }
 
 function hasStrongDmeSignals(text: string) {
@@ -2805,6 +2805,75 @@ function lowercaseFirst(value: string) {
   return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
+function humanizeDriverList(items: string[], limit = 4) {
+  const cleaned = uniqueStrings(items.map((item) => cleanText(item).toLowerCase()).filter(Boolean), limit)
+    .map((item) => item
+      .replace(/\bhvac\b/gi, 'HVAC')
+      .replace(/\bit\b/gi, 'IT')
+    )
+  if (cleaned.length <= 1) return cleaned[0] || 'day-to-day usage'
+  if (cleaned.length === 2) return `${cleaned[0]} and ${cleaned[1]}`
+  return `${cleaned.slice(0, -1).join(', ')}, and ${cleaned[cleaned.length - 1]}`
+}
+
+function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
+  const driverText = humanizeDriverList(drivers)
+  switch (cluster) {
+    case 'print_fulfillment':
+      return `In print and fulfillment, the bill can move for a few different reasons: ${driverText}.`
+    case 'public_transit':
+      return `For a transit operation, the power side is usually tied to maintenance, lighting, support buildings, and schedule reliability.`
+    case 'moving_storage':
+      return `For a moving and storage company, the bill is usually more about storage space, dispatch, loading activity, lighting, and HVAC than production.`
+    case 'retail':
+      return `For a retail operation, seasonal traffic, lighting, comfort, and back-room support can make certain months look heavier than expected.`
+    case 'restaurant':
+      return `For a restaurant operation, kitchen equipment, refrigeration, and AC can all hit during the same busy windows.`
+    case 'healthcare':
+      return `For a healthcare facility, reliability, patient comfort, imaging or clinical equipment, and HVAC can all move the bill in different ways.`
+    case 'residential_care':
+      return `For a residential-care operation, resident spaces, counseling areas, common areas, and HVAC can all show up differently on the bill.`
+    case 'logistics':
+      return `For a distribution operation, dock activity, storage, office load, and HVAC can each move the bill for different reasons.`
+    case 'manufacturing':
+      return `For a manufacturing operation, equipment timing, compressed air, process load, and HVAC can create the highest usage moments.`
+    default:
+      return `For ${companyIdentity.toLowerCase()}, the bill can move for a few different reasons: ${driverText}.`
+  }
+}
+
+function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], audienceProfile: AudienceProfile | null | undefined) {
+  const personaQuestion = audienceProfile?.questionHint
+    ? audienceProfile.questionHint.replace(/\?+$/, '')
+    : ''
+  if (personaQuestion) {
+    return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that usually handled after the bill comes in?`
+  }
+
+  switch (cluster) {
+    case 'print_fulfillment':
+      return `How do y'all tell whether the print side, mailing side, or office side is driving the bill that month?`
+    case 'public_transit':
+      return `How do y'all separate the maintenance shop and support-building usage from the regular office load?`
+    case 'moving_storage':
+      return `How do y'all tell whether storage, dispatch, or loading activity is what moved the bill that month?`
+    case 'retail':
+      return `How do y'all tell which stores or areas are actually moving the bill when the seasons change?`
+    case 'restaurant':
+      return `How do y'all tell whether kitchen timing, refrigeration, or AC is creating the bigger spike?`
+    case 'healthcare':
+      return `How do y'all tell which part of the facility is creating the bigger spikes without digging through the meter data?`
+    case 'residential_care':
+      return `How do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month?`
+    case 'logistics':
+      return `How do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month?`
+    case 'manufacturing':
+      return `How do y'all tell which equipment or schedule is creating the highest usage moment?`
+    default:
+      return `How do y'all tell which part of the operation is actually moving the bill?`
+  }
+}
+
 function stripTrailingQuestionMark(value: string) {
   return cleanText(value).replace(/\?+$/, '').trim()
 }
@@ -2963,8 +3032,8 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (isCompetitorEnergyBroker(account)) return 'office_services'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
-  if (/(oil|gas|\benergy\b|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) {
-    if (!/(energy drink|high-energy|low-energy)/i.test(text)) {
+  if (/(oil and gas|oilfield|natural gas|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream|pipeline|petroleum)/.test(text)) {
+    if (!/(energy drink|high-energy|low-energy|clean energy distributor|renewable energy products|solar distributor)/i.test(text)) {
       return 'energy_intensive'
     }
   }
@@ -3745,7 +3814,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
       const isDentalPractice = /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/i.test(text)
       const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
-      const isPharmacy = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text)
+      const isPharmacy = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text) && !hasHospitalSignals
       const isHospitalOperator = hasHospitalSignals && !isBehavioralHealth && !isSeniorLiving && !isBloodCenter && !isPharmacy
 
       if (isPharmacy) {
@@ -4429,18 +4498,8 @@ function buildTalkTrackContext(
     'Do not mention scraping, LinkedIn, Google, RSS, or internal CRM notes.',
     'Do not sound like a commodity broker or say you can save money.',
   ], 10)
-  const driversText = operationalDrivers.slice(0, 4).join(', ') || 'the parts of the operation that move the bill'
-  const problemFrame = simplifyTalkTrackLanguage(
-    `One thing ${companyIdentity} can run into is ${driversText} making the bill move in ways that are hard to see from the monthly total.`,
-  )
-  const personaQuestion = audienceProfile?.questionHint
-    ? audienceProfile.questionHint.replace(/\?+$/, '')
-    : ''
-  const questionFrame = simplifyTalkTrackLanguage(
-    personaQuestion
-      ? `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side usually just handled after the bill comes in?`
-      : `I'm curious, how do y'all separate ${driversText} on the bill, or is that side usually just handled after the bill comes in?`,
-  )
+  const problemFrame = simplifyTalkTrackLanguage(buildPlainProblemFrame(industryCluster, companyIdentity, operationalDrivers))
+  const questionFrame = simplifyTalkTrackLanguage(buildPlainQuestionFrame(industryCluster, operationalDrivers, audienceProfile))
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Open with a short permission-based cold-call opener, then move into a concrete company fact or operating detail.',
