@@ -373,6 +373,9 @@ const IDENTITY_PROFILE_VERSION = 1 as const
 const INDUSTRY_CLUSTER_VALUES: IndustryCluster[] = [
   'manufacturing',
   'logistics',
+  'print_fulfillment',
+  'public_transit',
+  'moving_storage',
   'food_storage',
   'healthcare',
   'banking',
@@ -400,7 +403,7 @@ const BROAD_IDENTITY_CLUSTERS = new Set<IndustryCluster>([
 ])
 
 function cleanText(value: unknown): string {
-  return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
+  return typeof value === 'string' ? value.replace(/\\+/g, ' ').replace(/\s+/g, ' ').trim() : ''
 }
 
 function uniqueStrings(values: unknown[], limit = 12) {
@@ -2818,6 +2821,19 @@ function humanizeDriverList(items: string[], limit = 4) {
 
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
   const driverText = humanizeDriverList(drivers)
+  const identity = cleanText(companyIdentity).toLowerCase()
+  if (/food production|food processing|food manufacturer/.test(identity)) {
+    return `For a food production operation, refrigeration, cooking, packaging, and sanitation can all hit the bill in different ways.`
+  }
+  if (/convenience store/.test(identity)) {
+    return `For a convenience-store chain, coolers, lighting, fuel-canopy load, and summer AC can make certain stores run heavier than the rest.`
+  }
+  if (/game and hobby|specialty game/.test(identity)) {
+    return `For a game and hobby retailer, store lighting, customer comfort, online orders, and back-room support can all move the bill.`
+  }
+  if (/hospital/.test(identity)) {
+    return `For a hospital, emergency care, imaging, patient areas, lab work, and HVAC can all create different spikes on the bill.`
+  }
   switch (cluster) {
     case 'print_fulfillment':
       return `In print and fulfillment, the bill can move for a few different reasons: ${driverText}.`
@@ -2843,6 +2859,7 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
 }
 
 function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], audienceProfile: AudienceProfile | null | undefined) {
+  const driverText = humanizeDriverList(drivers)
   const personaQuestion = audienceProfile?.questionHint
     ? audienceProfile.questionHint.replace(/\?+$/, '')
     : ''
@@ -2868,6 +2885,9 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     case 'logistics':
       return `How do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month?`
     case 'manufacturing':
+      if (/\brefrigeration\b|\bsanitation\b|\bpackaging\b|\bcooking\b/i.test(driverText)) {
+        return `How do y'all tell whether refrigeration, cooking, packaging, or sanitation is creating the bigger spike?`
+      }
       return `How do y'all tell which equipment or schedule is creating the highest usage moment?`
     default:
       return `How do y'all tell which part of the operation is actually moving the bill?`
@@ -3088,6 +3108,14 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 }
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
+  const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
+  if (/(hospital|medical center|regional hospital|health system|emergency room|acute care)/i.test(coreText)) return 'healthcare'
+  if (hasPublicTransitSignals(coreText)) return 'public_transit'
+  if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
+  if (hasMovingStorageSignals(coreText)) return 'moving_storage'
+  if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
+  if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
+
   const savedProfile = getAccountIdentityProfile(account, candidate)
   if (savedProfile?.industryCluster) {
     return savedProfile.industryCluster
@@ -5876,6 +5904,7 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
   const weakDetail =
     wordCount < 12 ||
     repeatsShortDescription ||
+    /^.{0,80}\bis a commercial account\b/i.test(cleaned) ||
     (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
     (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
     /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned) ||
@@ -7023,6 +7052,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       validated = {
         ...validated,
+        signal_detail: normalizeSignalDetail(validated.signal_detail || '', validated.signal_headline || '', briefingAccount, talkTrackCandidate),
         talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
       }
 
