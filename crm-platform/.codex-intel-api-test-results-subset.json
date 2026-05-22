@@ -1,0 +1,46 @@
+[
+  {
+    "category": "moving/storage",
+    "name": "Armstrong Moving & Storage Company",
+    "ok": true,
+    "seconds": 8.4,
+    "headline": "Armstrong Moving & Storage Company Facility and Billing Intel",
+    "detail": "Armstrong Moving & Storage Company is tied to Memphis, Tennessee. The Armstrong Company is a full-service global moving, relocation, and logistics provider, established in 1957 in Memphis, Tennessee. With a nationwide presence across 33 markets and international capabilities, the company offers a wide range of services for household, commercial, and supply chain needs. Armstrong emphasizes customer-centered support and personalized attention, backed by decades of experience and a commitment to high-touch service.…",
+    "opener": "Hey there, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I've been researching a moving and storage operation in Memphis, and had a curious question about y'alls electricity agreements and contracts.",
+    "talk_track": "For a moving and storage company, the bill is usually more about storage space, dispatch, loading activity, lighting, and HVAC than production. How do y'all tell whether storage, dispatch, or loading activity is what moved the bill that month?",
+    "source": "https://www.goarmstrong.com/"
+  },
+  {
+    "category": "convenience retail",
+    "name": "Kim's Convenience Stores",
+    "ok": true,
+    "seconds": 15.4,
+    "headline": "Kim's Convenience Stores Facility and Billing Intel",
+    "detail": "Kim's Convenience Stores is a commercial account in Texas.",
+    "opener": "Hey there, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I came across Kim's Convenience Stores while looking at retail accounts in Texas, and had a curious question about y'alls electricity agreements and contracts.",
+    "talk_track": "For a convenience-store chain, coolers, lighting, fuel-canopy load, and summer AC can make certain stores run heavier than the rest. How do y'all tell which stores or areas are actually moving the bill when the seasons change?",
+    "source": "http://www.kimscstores.com"
+  },
+  {
+    "category": "hospital",
+    "name": "Navarro Regional Hospital",
+    "ok": true,
+    "seconds": 7.5,
+    "headline": "Navarro Regional Hospital Facility and Billing Intel",
+    "detail": "Navarro Regional Hospital is a commercial account in Corsicana, Texas within the hospital & health care industry.",
+    "opener": "Hey Scott, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I've been doing some research on a healthcare operation in Corsicana, and had a curious question about y'alls electricity agreements and contracts.",
+    "talk_track": "For a hospital, emergency care, imaging, patient areas, lab work, and HVAC can all create different spikes on the bill. I'm curious, have you been able to separate which sites are carrying the biggest peaks, or is that usually handled after the bill comes in?",
+    "source": "https://navarrohospital.com"
+  },
+  {
+    "category": "residential care nonprofit",
+    "name": "Genesis Women's Shelter & Support",
+    "ok": true,
+    "seconds": 10.3,
+    "headline": "Genesis Women's Shelter & Support Facility and Billing Intel",
+    "detail": "Benefit Thrift Genesis Services Giving Back to Genesis Get Involved Auxiliaries Genesis Events What is Domestic Violence? Locations + More DONATE Since opening our doors in 1985, Genesis Women's Shelter & Support has provided safety, shelter and support to th… Genesis Women's Shelter & Support is based in Dallas, Texas and operates as a residential-care organization. The operating context points to residential care, counseling, support services. The likely electricity angle is separating hvac, common areas, counse…",
+    "opener": "Hey there, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I've been doing some research on a residential-care organization in Dallas, and had a curious question about y'alls electricity agreements and contracts.",
+    "talk_track": "For a residential-care operation, resident spaces, counseling areas, common areas, and HVAC can all show up differently on the bill. How do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month?",
+    "source": "http://www.genesisshelter.org"
+  }
+]
