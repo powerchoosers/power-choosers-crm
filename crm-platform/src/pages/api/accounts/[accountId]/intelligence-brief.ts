@@ -168,6 +168,19 @@ type StoredBriefResult = Partial<BriefResult> & {
   opener?: string | null
 }
 
+type ContactAudienceRow = {
+  id: string
+  firstName?: string | null
+  lastName?: string | null
+  name?: string | null
+  title?: string | null
+  email?: string | null
+  linkedinUrl?: string | null
+  notes?: string | null
+  metadata?: Record<string, unknown> | null
+  accountId?: string | null
+}
+
 type ResearchDiagnostics = {
   total: number
   bySourceKind: Record<ResearchSourceKind, number>
@@ -284,6 +297,18 @@ type TalkTrackContext = {
   avoidPhrases: string[]
   seed: string
   audienceProfile?: AudienceProfile | null
+  briefingContext: BriefingContext
+}
+
+type BriefingContext = {
+  companyIdentity: string
+  signalReason: string
+  operationalDrivers: string[]
+  forbiddenLanguage: string[]
+  personaLens: string
+  confidence: IdentityConfidence
+  problemFrame: string
+  questionFrame: string
 }
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
@@ -401,11 +426,176 @@ function getIdentityProfileSeedText(account: AccountRow) {
   return cleanText([
     account.name,
     account.industry,
-    account.description,
+    getPublicAccountDescription(account),
     getAccountNotes(account),
     account.website,
     account.domain,
   ].filter(Boolean).join(' ')).toLowerCase()
+}
+
+function stripCrmNoteLines(value: string) {
+  return cleanText(value)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (!line) return false
+      if (/^\[\d{4}-\d{2}-\d{2}\s+\d{1,2}:\d{2}\]/.test(line)) return false
+      if (/\b(?:main point of contact|point of contact|poc|call back|called|voicemail|left message|spoke with|do not call|dnc)\b/i.test(line)) return false
+      return true
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getPublicAccountDescription(account: AccountRow) {
+  return stripCrmNoteLines(cleanText(account.description))
+}
+
+function buildAudienceProfileForContact(
+  contact: ContactAudienceRow | null,
+  account: AccountRow,
+  source: AudienceProfile['source'],
+  sourceLabel?: string,
+) {
+  return buildAudienceProfile(
+    contact ? {
+      id: contact.id,
+      contactId: contact.id,
+      name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '),
+      firstName: contact.firstName,
+      lastName: contact.lastName,
+      title: contact.title,
+      email: contact.email,
+      linkedinUrl: contact.linkedinUrl,
+      notes: contact.notes,
+      metadata: contact.metadata,
+      accountId: contact.accountId,
+    } : null,
+    {
+      name: account.name,
+      industry: account.industry,
+      description: getPublicAccountDescription(account),
+    },
+    source,
+    sourceLabel,
+  )
+}
+
+function isOpenTaskStatus(value: unknown) {
+  const status = cleanText(value).toLowerCase()
+  return !['completed', 'complete', 'done', 'cancelled', 'canceled', 'closed'].includes(status)
+}
+
+function isActiveSequenceStatus(value: unknown) {
+  const status = cleanText(value).toLowerCase()
+  return !['completed', 'complete', 'done', 'cancelled', 'canceled', 'unsubscribed', 'bounced', 'failed'].includes(status)
+}
+
+async function loadContactRowsByIds(ids: string[]) {
+  const contactIds = uniqueStrings(ids.filter(Boolean), 20)
+  if (!contactIds.length) return new Map<string, ContactAudienceRow>()
+
+  const { data, error } = await supabaseAdmin
+    .from('contacts')
+    .select('id, firstName, lastName, name, title, email, linkedinUrl, notes, metadata, accountId')
+    .in('id', contactIds)
+
+  if (error) {
+    console.warn('[Intelligence Brief] Contact audience lookup failed:', error)
+    return new Map<string, ContactAudienceRow>()
+  }
+
+  return new Map((data || []).map((row: any) => [String(row.id), row as ContactAudienceRow]))
+}
+
+async function resolveAudienceProfileForBrief(account: AccountRow): Promise<AudienceProfile | null> {
+  const { data: taskRows, error: taskError } = await supabaseAdmin
+    .from('tasks')
+    .select('id, title, status, dueDate, contactId, accountId, metadata, createdAt')
+    .eq('accountId', account.id)
+    .not('contactId', 'is', null)
+    .order('dueDate', { ascending: true, nullsFirst: false })
+    .order('createdAt', { ascending: false })
+    .limit(20)
+
+  if (taskError) {
+    console.warn('[Intelligence Brief] Task audience lookup failed:', taskError)
+  }
+
+  const openTask = (taskRows || [])
+    .filter((task: any) => isOpenTaskStatus(task.status))
+    .find((task: any) => cleanText(task.contactId))
+  const taskContactId = cleanText(openTask?.contactId)
+
+  const { data: accountContacts, error: accountContactsError } = await supabaseAdmin
+    .from('contacts')
+    .select('id')
+    .eq('accountId', account.id)
+    .limit(200)
+
+  if (accountContactsError) {
+    console.warn('[Intelligence Brief] Account contacts lookup failed:', accountContactsError)
+  }
+
+  const accountContactIds = uniqueStrings((accountContacts || []).map((row: any) => cleanText(row.id)), 200)
+  const { data: sequenceRows, error: sequenceError } = accountContactIds.length
+    ? await supabaseAdmin
+      .from('sequence_members')
+      .select('id, targetId, targetType, status, updatedAt, createdAt')
+      .eq('targetType', 'contact')
+      .in('targetId', accountContactIds)
+      .order('updatedAt', { ascending: false, nullsFirst: false })
+      .limit(50)
+    : { data: [], error: null }
+
+  if (sequenceError) {
+    console.warn('[Intelligence Brief] Sequence audience lookup failed:', sequenceError)
+  }
+
+  const sequenceContactIds = uniqueStrings((sequenceRows || [])
+    .filter((row: any) => isActiveSequenceStatus(row.status))
+    .map((row: any) => cleanText(row.targetId)), 50)
+  const candidateIds = uniqueStrings([
+    taskContactId,
+    cleanText(account.primaryContactId),
+    ...sequenceContactIds,
+  ], 60)
+  const contactMap = await loadContactRowsByIds(candidateIds)
+
+  const taskContact = taskContactId ? contactMap.get(taskContactId) || null : null
+  if (taskContact?.accountId === account.id) {
+    return buildAudienceProfileForContact(taskContact, account, 'protocol_task', 'Active or pending task contact')
+  }
+
+  const decisionMakerId = cleanText(account.primaryContactId)
+  const decisionMaker = decisionMakerId ? contactMap.get(decisionMakerId) || null : null
+  if (decisionMaker?.accountId === account.id) {
+    return buildAudienceProfileForContact(decisionMaker, account, 'decision_maker_card')
+  }
+
+  const sequenceContact = sequenceContactIds
+    .map((id) => contactMap.get(id))
+    .find((contact) => contact?.accountId === account.id) || null
+  if (sequenceContact) {
+    return buildAudienceProfileForContact(sequenceContact, account, 'sequence')
+  }
+
+  return null
+}
+
+function normalizeBriefComparable(value: string) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isSameAsAccountDescription(value: string, account: AccountRow) {
+  const left = normalizeBriefComparable(value)
+  const right = normalizeBriefComparable(getPublicAccountDescription(account))
+  return Boolean(left && right && (left === right || left.includes(right) || right.includes(left)))
 }
 
 function hasStrongHealthcareSignals(text: string) {
@@ -425,7 +615,15 @@ function hasStrongAutomotiveSignals(text: string) {
 }
 
 function hasStrongRetailStoreSignals(text: string) {
-  return /(lifestyle (?:and )?design store|department store|luxury retail|retail store|showroom space|showrooms?|home goods|tabletop|bedding|bath|furniture|garden|fashion|apothecary|shopping|customer-facing retail)/i.test(text)
+  return /(convenience stores?|c[-\s]?stores?|gas station|fuel stations?|travel centers?|board games?|card games?|collectibles?|gaming accessories|game store|game retailer|hobby store|tabletop games?|lifestyle (?:and )?design store|department store|luxury retail|retail store|showroom space|showrooms?|home goods|tabletop|bedding|bath|furniture|garden|fashion|apothecary|shopping|customer-facing retail)/i.test(text)
+}
+
+function hasConvenienceStoreSignals(text: string) {
+  return /(convenience stores?|c[-\s]?stores?|gas station|fuel stations?|travel centers?|fuel pumps?|coffee service|walk[-\s]?in coolers?|beer caves?|ice machines?)/i.test(text)
+}
+
+function hasGameRetailSignals(text: string) {
+  return /(board games?|card games?|collectibles?|gaming accessories|game store|game retailer|hobby store|tabletop games?|trading cards?|tcg\b|miniatures?|pokemon|magic:?\s*the gathering|warhammer)/i.test(text)
 }
 
 function hasStrongManufacturersRepSignals(text: string) {
@@ -608,12 +806,8 @@ function getAccountIdentityProfile(account: AccountRow, candidate: ResearchHit |
   const record = raw as Record<string, unknown>
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
-  const accountText = cleanText([
-    getIdentityProfileSeedText(account),
-    candidate?.title || '',
-    candidate?.snippet || '',
-  ].filter(Boolean).join(' ')).toLowerCase()
-  const stableCluster = inferIndustryClusterFromSignals(account, candidate)
+  const accountText = getIdentityProfileSeedText(account)
+  const stableCluster = inferIndustryClusterFromSignals(account, null)
   const savedProfile = {
     version: IDENTITY_PROFILE_VERSION,
     industryCluster: cluster,
@@ -679,7 +873,7 @@ function selectIdentityKeywords(text: string, preferred: string[], fallback: str
 
 function buildIdentityEvidence(account: AccountRow, candidates: ResearchHit[], emphasisKeywords: string[]) {
   const evidence: string[] = []
-  const description = cleanText(account.description)
+  const description = getPublicAccountDescription(account)
   const lowerKeywords = emphasisKeywords.map((keyword) => keyword.toLowerCase())
 
   if (description) {
@@ -1380,7 +1574,7 @@ function isCompanyWebsiteHit(account: AccountRow, candidate: ResearchHit | null)
 
 function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
-  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   if (!candidate) {
     const businessSpecificLine = buildBusinessSpecificFallbackLine(account, candidate)
     if (businessSpecificLine) return businessSpecificLine
@@ -1541,7 +1735,7 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'energy_intensive':
       return `${prefix}, the primary driver is usually which processes or equipment start-ups are creating peak transmission exposure.`
     default:
-      return `${prefix}, the useful check is how the billing load actually matches the way the business is running now.`
+      return `${prefix}, the question is whether the bill still matches how the business is actually using power.`
   }
 }
 
@@ -1551,11 +1745,11 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 }
 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const company = cleanText(account.name) || 'the company'
 
   // Infer industry cluster to prevent cross-industry regex false matches
-  const cluster = inferIndustryClusterFromSignals(account, candidate)
+  const cluster = inferIndustryCluster(account, candidate)
 
   if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
     return 'Often times for a residential care nonprofit, it\'s hard to separate what the homes, counseling spaces, and support services are each adding to the bill because of how multiple meters roll up.'
@@ -1573,7 +1767,7 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   // Logistics check - use word boundaries and restrict to logistics cluster
   if (cluster === 'logistics' && /(freight forwarder|nvocc|\bcargo\b|\bshipping\b|\btrucking\b|\btransport\b|\btransportation\b|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|auto logistics)/.test(text)) {
-    return 'Often times in a logistics operation, it\'s hard to tell whether dock activity, office load, or warehouse support is what\'s actually setting that monthly peak because of constant daily throughput.'
+    return 'Often times in a logistics operation, it\'s hard to tell whether dock activity, office load, or warehouse support is what\'s actually setting that monthly peak because the busy parts of the day overlap.'
   }
 
   if (cluster === 'school_district' && /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
@@ -1598,6 +1792,14 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (cluster === 'retail' && hasStrongAutomotiveSignals(text)) {
     return `Often times for a dealership, it's hard to prevent the service bays and showroom AC from running wide open at the exact same time because of constant customer and vehicle traffic.`
+  }
+
+  if (cluster === 'retail' && hasConvenienceStoreSignals(text)) {
+    return `Often times for a convenience-store chain, it's hard to tell whether refrigeration, store lighting, or summer HVAC is what is really pushing the bill because every store runs a little differently.`
+  }
+
+  if (cluster === 'retail' && hasGameRetailSignals(text)) {
+    return `Often times for a game and hobby retailer, it's hard to separate retail floor usage from online order and warehouse support because both can show up on the same monthly bill.`
   }
 
   if (cluster === 'logistics' && /\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
@@ -1646,7 +1848,7 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
 function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
-  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const businessSpecificLine = buildBusinessSpecificFallbackLine(account, candidate)
 
   if (businessSpecificLine) {
@@ -1655,16 +1857,16 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
 
   if (multiLocation) {
     if (hasStrongDmeSignals(accountText)) {
-      return `For a multi-location equipment network, the useful check is whether each direct-service location is being reviewed on its own meter, because deliveries, inventory, storage, and service turnaround can hide different cost patterns by branch.`
+      return `For a multi-location equipment network, each direct-service location can behave differently on its own meter because deliveries, inventory, storage, and service turnaround do not hit every branch the same way.`
     }
     if (context.industryCluster === 'restaurant') {
-      return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
+      return `For a multi-location restaurant group, kitchen equipment, HVAC, refrigeration, and hours can make one store look fine while another one is carrying the heavier bill.`
     }
     if (context.industryCluster === 'retail') {
       if (hasStrongAutomotiveSignals(accountText)) {
-        return `For a multi-location dealership group, the useful check is whether each dealership is being reviewed on its own meter, because showroom traffic, service bays, parts, and lot lighting can hide different cost patterns by location.`
+        return `For a multi-location dealership group, showroom traffic, service bays, parts, and lot lighting can make each dealership behave differently on its own meter.`
       }
-      return `For a multi-location retail group, the useful check is whether the stores are being reviewed together, because hours, traffic, lighting, and HVAC can hide different cost patterns by location.`
+      return `For a multi-location retail group, store hours, traffic, lighting, and HVAC can hide very different cost patterns by location.`
     }
   }
 
@@ -1672,7 +1874,7 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
     return context.industryOpeners[0]
   }
 
-  return `The useful check is whether the bill still lines up with how the business is actually being run.`
+  return `The question is whether the bill still lines up with how the business is actually using power.`
 }
 
 function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
@@ -1853,7 +2055,7 @@ function hasLeadershipChangeEvidence(text: string) {
 
 function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null): { isMultiSite: boolean; locationCount: number | null; regions: string[] } {
   const notes = getAccountNotes(account)
-  const text = `${account.name || ''} ${account.industry || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const text = `${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`
   const lower = text.toLowerCase()
   
   // Extract location count if mentioned
@@ -1894,14 +2096,14 @@ function buildStructuredIdentityProfile(
   ].join(' '))
   const synthesizedAccount: AccountRow = {
     ...account,
-    description: cleanText(`${account.description || ''} ${researchText} ${hierarchyText}`),
+    description: cleanText(`${getPublicAccountDescription(account)} ${researchText} ${hierarchyText}`),
   }
   const primaryCandidate = candidates[0] || null
   const baseCluster = inferIndustryClusterFromSignals(account, null)
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
   const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account, primaryCandidate)}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account, primaryCandidate)}`).toLowerCase()
 
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
@@ -1917,6 +2119,8 @@ function buildStructuredIdentityProfile(
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
+  const isConvenienceStore = hasConvenienceStoreSignals(text)
+  const isGameRetailer = hasGameRetailSignals(text)
   const isManufacturersRepAgency = hasStrongManufacturersRepSignals(text)
   const isBakeryCafe = hasStrongBakeryCafeSignals(text)
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
@@ -2087,6 +2291,26 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['dealership', 'auto group', 'showroom', 'service bays', 'vehicle inventory'], ['auto dealership', 'showroom', 'service bays'])
         powerKeywords = selectIdentityKeywords(text, ['lot lighting', 'showroom', 'service bays', 'hvac'], ['lot lighting', 'showroom HVAC', 'service bays'])
         talkTrackGuardrails = ['No hotel language', 'No hospitality language']
+        break
+      }
+
+      if (isConvenienceStore) {
+        companyType = multiSiteInfo.isMultiSite ? 'convenience store chain' : 'convenience store operator'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-store convenience retail footprint' : 'customer-facing convenience store'
+        facilityType = 'convenience store / fuel retail site'
+        identityKeywords = selectIdentityKeywords(text, ['convenience store', 'store chain', 'fuel', 'coolers', 'coffee service', 'walk-in coolers', 'Texas', 'Oklahoma'], ['convenience store', 'store chain', 'fuel retail'])
+        powerKeywords = selectIdentityKeywords(text, ['walk-in coolers', 'refrigeration', 'lighting', 'HVAC', 'fuel canopy lighting', 'ice machines'], ['refrigeration', 'lighting', 'HVAC'])
+        talkTrackGuardrails = ['No industrial language', 'No process equipment language', 'No manufacturing language']
+        break
+      }
+
+      if (isGameRetailer) {
+        companyType = multiSiteInfo.isMultiSite ? 'game and hobby retail network' : 'game and hobby retailer'
+        operatingModel = multiSiteInfo.isMultiSite ? 'retail and online order footprint' : 'retail store with online order support'
+        facilityType = 'retail store / warehouse support'
+        identityKeywords = selectIdentityKeywords(text, ['board games', 'card games', 'collectibles', 'gaming accessories', 'retail', 'online orders', 'warehouse'], ['board games', 'card games', 'collectibles'])
+        powerKeywords = selectIdentityKeywords(text, ['store lighting', 'HVAC', 'warehouse support', 'packing area', 'office load'], ['store lighting', 'HVAC', 'warehouse support'])
+        talkTrackGuardrails = ['No logistics label', 'No industrial language', 'No manufacturing language', 'Do not use throughput']
         break
       }
 
@@ -2261,7 +2485,7 @@ function buildStructuredIdentityProfile(
     ? 'low'
     : confidenceSignals >= 5
       ? 'high'
-      : (candidates.length > 0 || cleanText(account.description))
+      : (candidates.length > 0 || getPublicAccountDescription(account))
         ? 'medium'
         : 'low'
 
@@ -2375,7 +2599,7 @@ const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
 
 const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   manufacturing: ['process', 'equipment', 'shift', 'peak', 'load', 'production', 'startup'],
-  logistics: ['dock', 'automation', 'hvac', 'throughput', 'occupancy', 'warehouse', '24/7'],
+  logistics: ['dock', 'automation', 'hvac', 'activity', 'occupancy', 'warehouse', '24/7'],
   food_storage: ['refrigeration', 'freezer', 'defrost', 'cooler', 'temperature', 'compressor'],
   healthcare: ['occupancy', 'hvac', 'backup', 'reliability', '24/7', 'clinical', 'lab', 'blood', 'donor', 'storage'],
   banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
@@ -2473,6 +2697,8 @@ function simplifyTalkTrackLanguage(value: string) {
     .replace(/\bcorrelation\b/gi, 'connection')
     .replace(/\bbranch operations\b/gi, 'multi-site operations')
     .replace(/\bbranch IT loads\b/gi, 'site-level office and equipment usage')
+    .replace(/\bconstant daily throughput\b/gi, 'busy parts of the day')
+    .replace(/\bthroughput\b/gi, 'activity')
     .replace(/\ba peak charges\b/gi, 'a peak charge')
     .replace(/\ba stealth peak charges\b/gi, 'a hidden peak charge')
     .replace(/\btriggering a peak charges\b/gi, 'triggering a peak charge')
@@ -2615,7 +2841,7 @@ function isUsefulSignalAnchor(value: string) {
  * embarrassing — they do this for a living.
  */
 function isCompetitorEnergyBroker(account: AccountRow): boolean {
-  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''}`).toLowerCase()
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)}`).toLowerCase()
   return /\b(energy broker|energy consultant|energy consulting|energy management|energy procurement|energy advisor|energy partner|retail electric provider|rep (?:agency|firm)|electricity broker|power broker|deregulated energy|energy reseller|load aggregator|demand response provider|energy analytics|utility management|utility consulting|meter data management)\b/.test(text)
 }
 
@@ -2652,7 +2878,7 @@ function isInDeregulatedMarket(account: AccountRow): boolean {
 
 function inferIndustryClusterFromSignals(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const notes = getAccountNotes(account)
-  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
   // Energy brokers and consultants — do not classify as any operational cluster
@@ -2777,14 +3003,14 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const sourceLead = buildSourceLead(account, candidate)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const text = `${candidate?.title || ''} ${candidate?.snippet || ''}`.toLowerCase()
-  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)}`).toLowerCase()
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const futureOpen = isFutureOpenLocationSignal(candidateText)
   const accountLooksLikeOperatingHospital = /(acute care hospital|medical\/surgical beds|intensive care unit|women[’']?s center|emergency room|operating rooms?|medical imaging|hospital district|owned by|operated by)/i.test(accountText)
   const openingIndustryLine = buildOpeningIndustryLine(
     inferIndustryCluster(account, candidate),
     alreadyOpen,
-    cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase(),
+    cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase(),
   )
 
   switch (signalFamily) {
@@ -2968,7 +3194,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
 function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
 
   switch (industryCluster) {
@@ -3196,7 +3422,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           angle: 'Equipment deliveries, inventory, service turnaround, and storage creating the highest usage moments at the support location.',
           question: `I'm curious, how do y'all manage the processing and handling load on the meter, or is that side of things pretty much on autopilot?`,
           openers: [
-            `Often times in an equipment support facility, it's hard to tell whether dock activity, office load, or equipment processing is what's setting that monthly peak because of constant daily throughput.`,
+            `Often times in an equipment support facility, it's hard to tell whether dock activity, office load, or equipment processing is what's setting that monthly peak because the busy parts of the day overlap.`,
             `Often times for an equipment provider, it's difficult to manage the demand spikes from testing or refurbishing bays without triggering a demand ratchet on the meter.`,
             `Often times in support operations, it's hard to separate the baseline warehouse lighting from the actual equipment processing load because they share the same service.`,
           ],
@@ -3242,7 +3468,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Dock doors, automation, and HVAC creating expensive usage spikes during busy windows.',
         question: `I'm curious, how do y'all coordinate dock activity and climate control schedules, or is that side of things pretty much on autopilot?`,
         openers: [
-          `Often times in a logistics operation, it's hard to tell whether dock activity, office load, or warehouse support is what's actually setting that monthly peak because of constant daily throughput.`,
+          `Often times in a logistics operation, it's hard to tell whether dock activity, office load, or warehouse support is what's actually setting that monthly peak because the busy parts of the day overlap.`,
           `Often times for a warehouse facility, it's difficult to prevent open dock doors and climate control from spiking the meter at the same time during hot summer afternoons.`,
           `Often times in distribution centers, it's hard to manage the demand spikes from sorting automation or conveyors without triggering a permanent demand ratchet floor.`,
         ],
@@ -3663,6 +3889,38 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
+      if (hasConvenienceStoreSignals(text)) {
+        const locationDesc = retailMultiSite.locationCount
+          ? `${retailMultiSite.locationCount}+ stores`
+          : 'the store network'
+
+        return {
+          label: 'Convenience store chain',
+          angle: `Store-by-store comparison of refrigeration, lighting, HVAC, and fuel canopy usage across ${locationDesc}.`,
+          question: `I'm curious, how do y'all compare the store bills to see whether coolers, lighting, or HVAC are driving the spikes, or is that side of things pretty much on autopilot?`,
+          openers: [
+            `Often times for convenience-store chains, it's hard to tell whether walk-in coolers, store lighting, or HVAC are driving the higher bills because each store runs a little differently.`,
+            `Often times across multiple convenience stores, it's difficult to catch which locations have refrigeration or lighting patterns that are making their bills stand out.`,
+            `Often times for c-store operators, it's hard to separate steady cooler usage from summer HVAC spikes because the bill rolls all of that into one monthly number.`,
+          ],
+          focus: ['walk-in coolers', 'refrigeration', 'store lighting', 'HVAC', 'fuel canopy lighting', 'store comparison'],
+        }
+      }
+
+      if (hasGameRetailSignals(text)) {
+        return {
+          label: 'Game and hobby retailer',
+          angle: 'Store lighting, customer comfort, online order packing, and warehouse support shaping the bill.',
+          question: `I'm curious, how do y'all tell whether the store side or the warehouse support side is creating the bigger spikes, or is that side of things pretty much on autopilot?`,
+          openers: [
+            `Often times for game and hobby retailers, it's hard to tell whether store lighting, customer comfort, or online order packing is what is really moving the bill.`,
+            `Often times in a retail business with online orders, it's difficult to separate the store load from warehouse support because both sides run through the same monthly bill.`,
+            `Often times for specialty retailers, it's hard to see whether the retail floor or back-of-house order work is creating the bigger usage spikes.`,
+          ],
+          focus: ['store lighting', 'customer comfort', 'online order packing', 'warehouse support', 'office load'],
+        }
+      }
+
       if (retailMultiSite.isMultiSite && retailMultiSite.locationCount && retailMultiSite.locationCount >= 3) {
         const locationDesc = retailMultiSite.locationCount >= 10
           ? `${retailMultiSite.locationCount}+ showrooms`
@@ -3689,7 +3947,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Large open floor plans, showroom lighting, and comfort cooling creating high daily usage.',
         question: `I'm curious, how do y'all manage the showroom lighting and HVAC spikes, or is that side of things pretty much on autopilot?`,
         openers: [
-          `Often times in a shop and showroom, it's hard to separate fabrication and machinery start-ups from normal AC usage because of shared electrical service.`,
+          `Often times in retail stores, it's hard to tell whether lighting, customer traffic, or summer HVAC is what is really moving the bill.`,
           `Often times for a retail store, it's difficult to maintain customer comfort and high-end lighting without letting summer cooling load drive up the peak charge.`,
           `Often times in commercial retail spaces, it's hard to tell whether the main showroom lighting or the back-office HVAC is setting the monthly peak because they run on a single meter.`,
         ],
@@ -4033,6 +4291,39 @@ function buildTalkTrackContext(
   const industryGuidance = buildIndustryGuidance(industryCluster, account, candidate)
   const marketGuidance = buildMarketGuidance(industryCluster)
   const simplifyList = (items: string[]) => items.map(simplifyTalkTrackLanguage).filter(Boolean)
+  const identity = getAccountIdentityProfile(account, candidate)
+  const operationalDrivers = uniqueStrings([
+    ...(identity?.powerKeywords || []),
+    ...industryGuidance.focus,
+    ...signalGuidance.focus,
+  ], 7)
+  const companyIdentity = cleanText(identity?.companyType || industryGuidance.label || account.industry || 'commercial account')
+  const personaLens = audienceProfile
+    ? `${audienceProfile.contactFirstName || audienceProfile.contactName || 'The contact'} is ${audienceProfile.contactTitle || 'the contact'}; frame the question for ${audienceProfile.roleFamily}. ${audienceProfile.questionHint || ''}`
+    : 'No specific contact selected; use owner/controller/facilities-friendly language.'
+  const signalReason = isFallbackMode || signalFamily === 'industry_context'
+    ? 'company context from website, CRM account facts, and industry pattern'
+    : `${signalGuidance.label}: ${signalGuidance.angle}`
+  const forbiddenLanguage = uniqueStrings([
+    ...(identity?.talkTrackGuardrails || []),
+    ...industryGuidance.focus
+      .filter((item) => /billing floors?|demand ratchets?|locked-in peak/i.test(item))
+      .map(() => 'Do not use jargon like demand ratchet, billing floor, load factor, base load, or throughput.'),
+    'Do not mention scraping, LinkedIn, Google, RSS, or internal CRM notes.',
+    'Do not sound like a commodity broker or say you can save money.',
+  ], 10)
+  const driversText = operationalDrivers.slice(0, 4).join(', ') || 'the parts of the operation that move the bill'
+  const problemFrame = simplifyTalkTrackLanguage(
+    `One thing ${companyIdentity} can run into is ${driversText} making the bill move in ways that are hard to see from the monthly total.`,
+  )
+  const personaQuestion = audienceProfile?.questionHint
+    ? audienceProfile.questionHint.replace(/\?+$/, '')
+    : ''
+  const questionFrame = simplifyTalkTrackLanguage(
+    personaQuestion
+      ? `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side usually just handled after the bill comes in?`
+      : `I'm curious, how do y'all separate ${driversText} on the bill, or is that side usually just handled after the bill comes in?`,
+  )
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Open with a short permission-based cold-call opener, then move into a concrete company fact or operating detail.',
@@ -4089,6 +4380,16 @@ function buildTalkTrackContext(
     ],
     seed,
     audienceProfile,
+    briefingContext: {
+      companyIdentity,
+      signalReason: simplifyTalkTrackLanguage(signalReason),
+      operationalDrivers,
+      forbiddenLanguage,
+      personaLens,
+      confidence: identity?.confidence || (industryCluster === 'unknown' ? 'low' : 'medium'),
+      problemFrame,
+      questionFrame,
+    },
   }
 }
 
@@ -4101,7 +4402,8 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
 
   const employeesContext = account.employees ? `- Employees: ${account.employees}` : ''
   const revenueContext = account.revenue ? `- Revenue: ${account.revenue}` : ''
-  const descriptionContext = account.description ? `- Description: ${account.description}` : ''
+  const publicDescription = getPublicAccountDescription(account)
+  const descriptionContext = publicDescription ? `- Description: ${publicDescription}` : ''
   const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage}` : ''
   
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
@@ -4121,18 +4423,19 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const audienceProfileBlock = buildAudienceProfileBlock(context.audienceProfile)
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const audienceRule = context.audienceProfile
-    ? `- AUDIENCE PROFILE: ${context.audienceProfile.contactName || context.audienceProfile.contactFirstName || 'the contact'} is the person you are writing to. Use their first name once if it helps the opener and use their title to frame what they care about. If the audience profile came from a sequence contact, that person wins over a decision-maker card.\n`
+    ? `- AUDIENCE PROFILE: ${context.audienceProfile.contactName || context.audienceProfile.contactFirstName || 'the contact'} is the person you are writing to. Use their first name once if it helps the opener and use their title to frame what they care about. Audience selection priority is active/pending task contact, decision-maker card, active sequence contact, then fallback.\n`
     : ''
-  const sequencePriorityRule = '- If the account has both a sequence contact and a decision-maker card, the sequence contact wins. Do not blend two different people into one talk track.'
-  const dentalContext = /(dental|dentist|dentistry|dental partnership organization|dso\b|dpo\b|operatories?|imaging|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+  const sequencePriorityRule = '- Do not blend multiple people into one talk track. Use only the selected audience profile.'
+  const briefingContextBlock = JSON.stringify(context.briefingContext, null, 2)
+  const dentalContext = /(dental|dentist|dentistry|dental partnership organization|dso\b|dpo\b|operatories?|imaging|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${publicDescription} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.\n'
     : ''
   
-  const behavioralHealthContext = hasStrongBehavioralHealthSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+  const behavioralHealthContext = hasStrongBehavioralHealthSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${publicDescription} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For behavioral health and psychiatric hospitals, use patient safety, patient comfort, inpatient units, residential treatment, partial hospitalization, intensive outpatient programs, counseling space, and 24-hour facility reliability when the source supports it. Do not use emergency-room, imaging, lab, manufacturing, restaurant, or logistics language unless the source explicitly says those settings exist.\n'
     : ''
 
-  const pharmacyContext = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+  const pharmacyContext = /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${publicDescription} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For compounding pharmacies, use pharmacy and cleanroom language: cleanroom HVAC, product refrigeration, compounding setups, and retail flow. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital setting.\n'
     : ''
 
@@ -4141,6 +4444,8 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
 VOICE & TONE:
 - Conversational, peer-to-peer, plainspoken, and expert.
 - Sounds exactly like Lewis Patterson calling out of the blue.
+- Lewis style means short, direct, curious, low-pressure, and spoken out loud. Use "I'm calling you out the blue here, so I'll be brief" in the opener, then keep the talk track to one plain problem and one plain question.
+- Write it like Lewis would actually say it on a call: no polished marketing, no lecture, no long setup, and no technical terms unless they are translated immediately.
 - Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
@@ -4153,17 +4458,19 @@ OPENER RULES (Exactly two sentences):
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
 TALK TRACK RULES (Exactly two sentences):
-- Sentence 1: A specific observation or situational struggle about the industry/company operations, which must be structured exactly as: "Often times for/in [facility type/industry], it's hard/difficult to [manage/control X] because of [Y]." (where X is the operational detail/machinery and Y is the energy billing mechanic).
-- Sentence 2: A disarming curiosity question (safety valve) structured exactly as: "I'm curious, how do y'all [manage utility billing factor], or is that side of things pretty much on autopilot?"
+- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
+- Sentence 2: One short curiosity question that invites them to explain how they handle it. Use "I'm curious..." or "How do y'all..." when it sounds like Lewis, and stop after the question.
+- Use the STRUCTURED BRIEFING CONTEXT as the source of truth. The signal is the reason for the call; the company identity and operational drivers decide the talk track.
+- If the signal and company identity conflict, company identity wins.
+- Use the problemFrame and questionFrame as the preferred shape unless the research gives a more specific but still accurate version.
 - CRITICAL: The talk track MUST consist of exactly these two sentences.
-- CRITICAL: Sentence 2 must end with ", or is that side of things pretty much on autopilot?"
 - CRITICAL: Do NOT use "care about" or "usually care about" statements. Do NOT make assumptions about what the prospect cares about.
 - CRITICAL: The opener and the talk track sentences must start with a capitalized letter.
-- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
+- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "one high-usage month can leave that meter carrying a higher charge longer than people expect."
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at" in the first sentence.
 - The Talk Track MUST connect the specific operational details of the signal (e.g., "culinary program kitchen equipment", "trailer fabrication machinery", "flight simulator electricity draw", "commercial freight warehousing") directly to how that specific activity consumes power. Be forensic and concrete about the actual machinery, equipment, or facility type involved in the news.
 - Never use generic placeholders or vague phrases like "the extra usage as it grows" or "changes the bill before anyone notices."
-- Avoid forbidden phrases: "the useful check", "the useful check is whether", "most operators care about", "most leaders care about", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you". (Note: "autopilot" is NOT forbidden; it is required for the sentence 2 structure).
+- Avoid forbidden phrases: "the useful check", "the useful check is whether", "most operators care about", "most leaders care about", "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "site by site", "what most operators need to know", "what most leaders care about", "I was looking at the operational footprint", "I came across your website", "I came across [company]'s website", "I was curious about", "I would want", "I would watch", "I would ask", "I was reviewing", "headcount or capex", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 ${dentalContext}${behavioralHealthContext}${pharmacyContext}
 
 COMPANY CONTEXT:
@@ -4183,9 +4490,12 @@ ${identityContext}
 
 ${audienceProfileBlock ? `AUDIENCE PROFILE:\n${audienceProfileBlock}\n` : ''}
 
+STRUCTURED BRIEFING CONTEXT:
+${briefingContextBlock}
+
 Return JSON only with this shape:
 {
-  "opener": "The one-sentence opener",
+  "opener": "The two-sentence permission opener",
   "talk_track": "The two-sentence talk track"
 }`
 
@@ -4301,7 +4611,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
 
   const lower = text.toLowerCase()
   const accountText = account
-    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+    ? cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
     : ''
   const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
@@ -4355,6 +4665,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountSchoolRetailJargon = accountIsSchool &&
     /\b(retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group|showroom)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
+  const accountIsRetail = context.industryCluster === 'retail' || hasStrongRetailStoreSignals(accountText) || /\b(retail|store|stores?|showroom|customer-facing)\b/i.test(accountText)
   const accountIsAutoPartsDistribution = hasStrongAutoPartsDistributionSignals(accountText)
   const accountAutoPartsDealershipJargon = accountIsAutoPartsDistribution &&
     /\b(dealership|dealerships|showroom traffic|service bays?|lot lighting|vehicle inventory|auto dealer)\b/i.test(lower)
@@ -4375,6 +4686,10 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|process equipment|assembly)\b/i.test(lower)
   const accountOfficeIndustrialJargon = accountIsOfficeServices &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
+  const accountRetailIndustrialJargon = accountIsRetail &&
+    /\b(energy-intensive facility|process equipment|process startup|startup times|large motors|manufacturing|industrial|production lines?|machine startup|factory|plant)\b/i.test(lower)
+  const accountRetailLogisticsJargon = accountIsRetail &&
+    /\b(logistics operation|logistics and distribution|dock activity|dock doors?|daily throughput|terminal|freight|cargo)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   // Catch jargon terms that regularly slip through and confuse prospects
   const bannedJargonTerms = /\b(coincident peaks?|4cp exposure|4-cp|four coincident peak|scarcity adder|ercot real-time|ancillary services charge|nodal price)\b/i.test(lower)
@@ -4390,7 +4705,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  return genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 }
 
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
@@ -4441,6 +4756,12 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
 
   // Build an operational descriptor from what we actually know
   const operationDescriptor = (() => {
+    if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
+      const typeStr = companyType.toLowerCase()
+      const article = getIndefiniteArticle(typeStr)
+      const articleSpace = article ? `${article} ` : ''
+      return `${articleSpace}${typeStr}${locationClause ? ` ${locationClause}` : ''}`
+    }
     if (cluster === 'manufacturing') return `a manufacturing operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'logistics') return `a logistics and distribution operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'food_storage') return `a food storage and distribution operation${locationClause ? ` ${locationClause}` : ''}`
@@ -4630,12 +4951,15 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     'unknown',
   ].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
-  const problemSentence = context.signalFamily === 'industry_context'
-    ? (shouldUseMarketLine ? marketLine : signalLine)
-    : signalLine
+  const shouldUseStructuredContext = context.briefingContext.confidence !== 'low'
+  const problemSentence = shouldUseStructuredContext
+    ? context.briefingContext.problemFrame
+    : context.signalFamily === 'industry_context'
+      ? (shouldUseMarketLine ? marketLine : signalLine)
+      : signalLine
   const questionSentence = context.signalFamily === 'industry_context'
-    ? fallbackQuestion
-    : context.question
+    ? (shouldUseStructuredContext ? context.briefingContext.questionFrame : fallbackQuestion)
+    : (shouldUseStructuredContext ? context.briefingContext.questionFrame : context.question)
 
   return buildTwoSentenceTalkTrack(problemSentence, questionSentence)
 }
@@ -4726,7 +5050,7 @@ function sanitizeResearchTitle(title: string, accountName: string, snippet: stri
   if (snippetPreview && snippetPreview.length > 20 && snippetPreview.length < 120) {
     return snippetPreview
   }
-  return `${cleanText(accountName)} — Company Overview`
+  return `${cleanText(accountName)} Operational Context`
 }
 
 function extractTimeDatetime(html: string) {
@@ -5267,17 +5591,49 @@ function normalizeBriefSections(result: StoredBriefResult): StoredBriefResult {
 }
 
 function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit | null) {
-  const description = cleanText(account.description)
+  const snippet = cleanText(candidate?.snippet)
+  if (snippet && snippet.split(/\s+/).filter(Boolean).length >= 12 && !isSameAsAccountDescription(snippet, account)) {
+    return shortenText(snippet, 520)
+  }
+
+  const profile = getAccountIdentityProfile(account, candidate)
+  if (profile) {
+    const parts = [
+      profile.companyType,
+      profile.operatingModel,
+      profile.facilityType,
+      profile.identityKeywords.length ? `Known operating details include ${profile.identityKeywords.slice(0, 4).join(', ')}.` : '',
+      profile.powerKeywords.length ? `Likely bill drivers include ${profile.powerKeywords.slice(0, 4).join(', ')}.` : '',
+    ].filter(Boolean)
+    const detail = cleanText(parts.join(' '))
+    if (detail.split(/\s+/).filter(Boolean).length >= 12) return shortenText(detail, 520)
+  }
+
+  const description = getPublicAccountDescription(account)
   if (description && description.split(/\s+/).filter(Boolean).length >= 12) {
     return shortenText(description, 520)
   }
 
-  const snippet = cleanText(candidate?.snippet)
-  if (snippet && snippet.split(/\s+/).filter(Boolean).length >= 12) {
-    return shortenText(snippet, 520)
+  return ''
+}
+
+function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit | null = null) {
+  const companyName = cleanText(account.name) || 'Company'
+  const profile = getAccountIdentityProfile(account, candidate)
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+
+  if (profile?.industryCluster === 'retail') {
+    if (hasConvenienceStoreSignals(text)) return `${companyName} Operates Multi-Store Convenience Retail Footprint`
+    if (hasGameRetailSignals(text)) return `${companyName} Runs Specialty Game Retail and Online Order Operations`
+    if (hasStrongAutomotiveSignals(text)) return `${companyName} Manages Dealership Retail and Service Operations`
+    return `${companyName} Manages Retail Store and Customer-Facing Facility Load`
   }
 
-  return ''
+  if (profile?.companyType) {
+    return `${companyName} ${toTitleCase(profile.companyType)} Operational Context`
+  }
+
+  return `${companyName} Operational Context`
 }
 
 function normalizeSignalDetail(detail: string, headline: string, account: AccountRow, candidate: ResearchHit | null) {
@@ -5296,8 +5652,10 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
     /\bphone:\s*\d/i.test(cleaned) ||
     (cleaned.endsWith('...') && wordCount < 40 && /^(welcome to|we are|we provide|we offer|our mission|about us)/i.test(cleaned))
 
+  const repeatsShortDescription = isSameAsAccountDescription(cleaned, account)
   const weakDetail =
     wordCount < 12 ||
+    repeatsShortDescription ||
     (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
     (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
     /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned) ||
@@ -5339,7 +5697,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   if (
     headlineLower === `${nameLower} profile` ||
     /^.{3,60}\s+profile$/i.test(headline) ||
-    /^.{3,60}\s*[-|]\s*(company overview|company profile|linkedin|yelp|yellowpages|manta|dnb|dun & bradstreet)$/i.test(headline)
+    /^.{3,60}\s*[-|—]\s*(company overview|company profile|linkedin|yelp|yellowpages|manta|dnb|dun & bradstreet)$/i.test(headline)
   ) {
     return null
   }
@@ -5417,11 +5775,11 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const snippet = isLikelyNonEnglishText(candidate?.snippet || '') ? '' : cleanText(candidate?.snippet || '')
   const rawTitle = isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')
   // Sanitize: if the title is just a browser tab / directory stub, use the snippet preview or a descriptive fallback
-  const headline = sanitizeResearchTitle(rawTitle, companyName, snippet) || `${companyName} — Company Overview`
+  const headline = sanitizeResearchTitle(rawTitle, companyName, snippet) || buildCompanyContextHeadline(account, candidate)
   const detailParts = [
-    snippet && !isBoilerplatePageTitle(snippet.split(/[.!?]/)[0]?.trim() || '', companyName)
+    snippet && !isSameAsAccountDescription(snippet, account) && !isBoilerplatePageTitle(snippet.split(/[.!?]/)[0]?.trim() || '', companyName)
       ? snippet
-      : cleanText(account.description) || `${companyName} is a commercial account in Texas.`,
+      : buildFallbackSignalDetail(account, candidate) || getPublicAccountDescription(account) || `${companyName} is a commercial account in Texas.`,
   ]
   let detail = detailParts.join(' ')
   if (detail.length < 20) {
@@ -5435,7 +5793,12 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const talkTrack = buildManualTalkTrack(account, candidate, context, 0)
 
   return {
-    signal_headline: shortenText(headline, 120),
+    signal_headline: shortenText(
+      isBoilerplatePageTitle(headline, companyName) || /\bcompany overview\b/i.test(headline)
+        ? buildCompanyContextHeadline(account, candidate)
+        : headline,
+      120,
+    ),
     signal_detail: detail,
     opener: null,
     talk_track: talkTrack,
@@ -5516,16 +5879,42 @@ async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit
   const domain = cleanText(account.domain)
   if (!domain) return null
 
-  const url = domain.startsWith('http') ? domain : `https://${domain}`
-  const bucket = {
-    priority: 8,
-    label: 'Company Website',
-    query: `${account.name} company information`,
+  const rootUrl = domain.startsWith('http') ? domain : `https://${domain}`
+  const makeUrl = (path: string) => {
+    try {
+      const url = new URL(rootUrl)
+      url.pathname = path
+      url.search = ''
+      url.hash = ''
+      return url.toString()
+    } catch {
+      return ''
+    }
   }
+  const targets = uniqueStrings([
+    rootUrl,
+    makeUrl('/about-us'),
+    makeUrl('/about'),
+    makeUrl('/pages/about-us'),
+    makeUrl('/pages/about'),
+  ].filter(Boolean), 5)
 
   try {
-    // Jina returns clean markdown — no cookie banners, no JS warnings, no nav boilerplate
-    return await fetchJinaPage(url, bucket, 'web', `${account.name} website`)
+    const results = await Promise.allSettled(targets.map((url, index) => fetchJinaPage(
+      url,
+      {
+        priority: 8,
+        label: index === 0 ? 'Company Website' : 'Company About Page',
+        query: `${account.name} company information`,
+      },
+      'web',
+      `${account.name} website`,
+    )))
+    const hits = results
+      .map((result) => result.status === 'fulfilled' ? result.value : null)
+      .filter(Boolean) as ResearchHit[]
+
+    return dedupeAndSort(hits, account)[0] || null
   } catch (error) {
     console.warn('[Intelligence Brief] Company website fetch failed:', error)
     return null
@@ -5534,7 +5923,7 @@ async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit
 
 function buildCompanyProfileFallbackHit(account: AccountRow): ResearchHit | null {
   const domain = cleanText(account.domain)
-  const description = cleanText(account.description)
+  const description = getPublicAccountDescription(account)
 
   if (!domain && !description) return null
 
@@ -5604,7 +5993,7 @@ async function runOpenRouterResearch(
       state: account.state || '',
       employees: account.employees || null,
       revenue: account.revenue || '',
-      description: account.description || '',
+      description: getPublicAccountDescription(account) || '',
       annual_usage: account.annual_usage || '',
       is_in_deregulated_market: isInDeregulatedMarket(account),
       is_competitor_energy_broker: isCompetitorEnergyBroker(account),
@@ -5668,6 +6057,7 @@ async function runOpenRouterResearch(
       '7. Funding rounds or IPO activity for private companies',
     ],
     talk_track_context: talkTrackContext,
+    briefing_context: talkTrackContext.briefingContext,
     research_results: selectedCandidates.map((item) => ({
       priority: item.priority,
       bucket: item.label,
@@ -5700,6 +6090,8 @@ If a research result has "official_source": true, treat it as the source of reco
 VOICE & TONE (For both "opener" and "talk_track"):
 - Conversational, peer-to-peer, plainspoken, and expert.
 - Sounds exactly like Lewis Patterson calling out of the blue.
+- Lewis style means short, direct, curious, low-pressure, and spoken out loud. Use "I'm calling you out the blue here, so I'll be brief" in the opener, then keep the talk track to one plain problem and one plain question.
+- Write it like Lewis would actually say it on a call: no polished marketing, no lecture, no long setup, and no technical terms unless they are translated immediately.
 - Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
@@ -5723,13 +6115,12 @@ OPENER RULES (Exactly two sentences):
 - Do NOT repeat words or phrases redundantly.
 
 TALK_TRACK_RULES (Exactly two sentences):
-- Sentence 1: A specific observation or situational struggle about the industry/company operations, which must be structured exactly as: "Often times for/in [facility type/industry], it's hard/difficult to [manage/control X] because of [Y]." (where X is the operational detail/machinery and Y is the energy billing mechanic).
-- Sentence 2: A disarming curiosity question (safety valve) structured exactly as: "I'm curious, how do y'all [manage utility billing factor], or is that side of things pretty much on autopilot?"
+- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
+- Sentence 2: One short curiosity question that invites them to explain how they handle it. Use "I'm curious..." or "How do y'all..." when it sounds like Lewis, and stop after the question.
 - CRITICAL: The talk track MUST consist of exactly these two sentences.
-- CRITICAL: Sentence 2 must end with ", or is that side of things pretty much on autopilot?"
 - CRITICAL: Do NOT use "care about" or "usually care about" statements. Do NOT make assumptions about what the prospect cares about.
 - CRITICAL: The opener and the talk track sentences must start with a capitalized letter.
-- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "a single high usage spike (like running ovens and AC at the same time during a hot summer service rush) can set a peak charge that sticks on the electric bills for the next 11 months."
+- Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "one high-usage month can leave that meter carrying a higher charge longer than people expect."
 - Do NOT use first-person curiosity language like "I was curious about" or "I was looking at" in the first sentence.
 - The Talk Track MUST connect the specific operational details of the signal (e.g., "culinary program kitchen equipment", "trailer fabrication machinery", "flight simulator electricity draw", "commercial freight warehousing") directly to how that specific activity consumes power. Be forensic and concrete about the actual machinery, equipment, or facility type involved in the news.
 - Never use generic placeholders or vague phrases like "the extra usage as it grows" or "changes the bill before anyone notices."
@@ -5763,7 +6154,7 @@ Decision rules:
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
-- Do not say "the useful check" or state what leaders "usually care about". Instead, state a situational struggle using the "Often times it's hard/difficult to..." pattern, then ask the question in plain English.
+- Do not say "the useful check" or state what leaders "usually care about". State one specific problem in plain English, then ask one plain curiosity question.
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5787,13 +6178,14 @@ Decision rules:
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
-- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, and the question to ask.
+- Use the briefing_context inside the research payload as the source of truth for the sales angle. The signal is the reason for the call; company identity, operational drivers, and audience profile decide the talk track.
+- Use the talk_track_context block below as supporting context. It includes the signal family, market season, guardrails, and suggested question shape.
 - For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Rotate the problem sentence and question wording. Do not always sound the same.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Respect the identity profile keywords and guardrails. If the identity profile says hospital operator, do not drift into hotel or hospitality language. If it says food manufacturer, do not drift into warehouse language.
-- If an audience profile is present, do not blend a decision-maker card and a sequence contact into one voice. The sequence contact wins when there is a mismatch.
+- If an audience profile is present, do not blend multiple people into one voice. The selected audience profile already follows this priority: active/pending task contact, decision-maker card, active sequence contact, then fallback.
 - Respect the hierarchy context. If the account is a subsidiary, write the brief around the subsidiary's actual business and use the parent only to orient the reader. If the account is a parent company, it is fine to mention the portfolio or network, but keep the talk track meter-specific and location-aware.
 - If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
@@ -5869,7 +6261,7 @@ Decision rules:
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
-- Do not say "the useful check" or state what leaders "usually care about". Instead, state a situational struggle using the "Often times it's hard/difficult to..." pattern, then ask the question in plain English.
+- Do not say "the useful check" or state what leaders "usually care about". State one specific problem in plain English, then ask one plain curiosity question.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
@@ -5898,7 +6290,8 @@ Decision rules:
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
-- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
+- Use the briefing_context inside the research payload as the source of truth for the sales angle. If there is no fresh news, lean harder on the company identity, operational drivers, and audience profile.
+- Use the talk_track_context block below as supporting context. It includes the signal family, market season, guardrails, and suggested question shape.
 - If an audience_profile block is present, use it as the human lens. Keep the first name or title tied to the business question instead of generic company language.
 - For the "opener" field, generate the opener following the OPENER RULES. Do not write it into the "talk_track" field.
 - Rotate the problem sentence and question wording. Do not always sound the same.
@@ -6094,34 +6487,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ ok: false, message: 'Account not found' })
     }
 
-    const { data: primaryContact } = account.primaryContactId
-      ? await supabaseAdmin
-        .from('contacts')
-        .select('id, firstName, lastName, name, title, email, linkedinUrl, notes, metadata, accountId')
-        .eq('id', account.primaryContactId)
-        .maybeSingle()
-      : { data: null }
-    const audienceProfile = buildAudienceProfile(
-      primaryContact ? {
-        id: primaryContact.id,
-        contactId: primaryContact.id,
-        name: primaryContact.name || [primaryContact.firstName, primaryContact.lastName].filter(Boolean).join(' '),
-        firstName: primaryContact.firstName,
-        lastName: primaryContact.lastName,
-        title: primaryContact.title,
-        email: primaryContact.email,
-        linkedinUrl: primaryContact.linkedinUrl,
-        notes: primaryContact.notes,
-        metadata: primaryContact.metadata,
-        accountId: primaryContact.accountId,
-      } : null,
-      {
-        name: account.name,
-        industry: account.industry,
-        description: account.description,
-      },
-      'account_primary',
-    )
+    const audienceProfile = await resolveAudienceProfileForBrief(account as AccountRow)
 
     const privileged = auth.isAdmin || auth.role === 'dev'
     const ownerScopeValues = buildOwnerScopeValues(auth.user)
@@ -6461,8 +6827,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       intelligence_brief_last_refreshed_at: new Date().toISOString(),
     }
 
-    if (identityProfile) {
-      updatePayload.metadata = briefingAccount.metadata
+    updatePayload.metadata = {
+      ...getAccountMetadata(briefingAccount),
+      ...(identityProfile ? { intelligenceProfile: identityProfile } : {}),
+      intelligenceBriefingContext: talkTrackRewriteContext.briefingContext,
+      intelligenceAudienceProfile: audienceProfile ? {
+        source: audienceProfile.source,
+        sourceLabel: audienceProfile.sourceLabel,
+        contactId: audienceProfile.contactId,
+        contactName: audienceProfile.contactName,
+        contactFirstName: audienceProfile.contactFirstName,
+        contactTitle: audienceProfile.contactTitle,
+        roleFamily: audienceProfile.roleFamily,
+        roleSummary: audienceProfile.roleSummary,
+      } : null,
     }
 
     if (validated) {
