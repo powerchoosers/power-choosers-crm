@@ -208,6 +208,9 @@ type SignalFamily =
 type IndustryCluster =
   | 'manufacturing'
   | 'logistics'
+  | 'print_fulfillment'
+  | 'public_transit'
+  | 'moving_storage'
   | 'food_storage'
   | 'healthcare'
   | 'banking'
@@ -638,6 +641,18 @@ function hasStrongAutoPartsDistributionSignals(text: string) {
   return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket parts|aftermarket collision parts|parts house|parts stores?|parts supplier|parts distribution|distribution centers?|same[-\s]?day parts|automotive service centers|repair centers|fleet and municipal)/i.test(text)
 }
 
+function hasPrintFulfillmentSignals(text: string) {
+  return /(direct mail|mailing company|commercial mailer|bulk mail|reprographics|document reproduction|digital imaging|print shop|print production|on[-\s]?demand printing|content management|branded storefronts?|training materials|compliance communications?|fulfillment and print|print and fulfillment|ecommerce fulfillment|e-commerce fulfillment)/i.test(text)
+}
+
+function hasPublicTransitSignals(text: string) {
+  return /(public transportation|transit authority|streetcar|street car|trolley|m-line|railway|light rail|fare-free|historic trolley|operate(?:s|d)? .*trolley|restore, maintain, and operate historic trolley cars|vintage trolley)/i.test(text)
+}
+
+function hasMovingStorageSignals(text: string) {
+  return /(moving (?:and|&) storage|moving company|relocation services?|commercial moving|residential moving|household goods|storage company|warehousing and moving|supply chain solutions|van line|movers?\b)/i.test(text)
+}
+
 function hasStrongDmeSignals(text: string) {
   return /(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/i.test(text)
 }
@@ -648,6 +663,7 @@ function hasStrongRestaurantSignals(text: string) {
 
 function hasStrongManufacturingSignals(text: string) {
   if (hasStrongBehavioralHealthSignals(text)) return false
+  if (hasPrintFulfillmentSignals(text) && !/(factory automation|aerospace tooling|machining|fabricat|weld|assembly plant|industrial production)/i.test(text)) return false
   return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
 }
 
@@ -656,6 +672,8 @@ function hasStrongPetrochemicalSignals(text: string) {
 }
 
 function hasStrongLogisticsSignals(text: string) {
+  if (hasPublicTransitSignals(text)) return false
+  if (hasPrintFulfillmentSignals(text)) return false
   return /(freight forwarder|nvo?cc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics|terminal|dock|yard|supply chain)/i.test(text)
 }
 
@@ -699,6 +717,9 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const manufacturersRepSignals = hasStrongManufacturersRepSignals(accountText)
   const bakeryCafeSignals = hasStrongBakeryCafeSignals(accountText)
   const logisticsSignals = hasStrongLogisticsSignals(accountText)
+  const printFulfillmentSignals = hasPrintFulfillmentSignals(accountText)
+  const publicTransitSignals = hasPublicTransitSignals(accountText)
+  const movingStorageSignals = hasMovingStorageSignals(accountText)
   const autoPartsDistributionSignals = hasStrongAutoPartsDistributionSignals(accountText)
   const officeSignals = hasStrongOfficeServicesSignals(accountText)
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
@@ -746,6 +767,18 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (logisticsSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(profileText)) {
+    return true
+  }
+
+  if (printFulfillmentSignals && /(manufacturing|industrial manufacturing|plant|factory|heavy industrial|dock door timing|logistics \/ warehouse|distribution and logistics)/i.test(profileText)) {
+    return true
+  }
+
+  if (publicTransitSignals && /(manufacturing|industrial|warehouse|logistics|distribution|dock activity|production|plant)/i.test(profileText)) {
+    return true
+  }
+
+  if (movingStorageSignals && /(manufacturing|industrial|plant|production|process equipment|machine startup)/i.test(profileText)) {
     return true
   }
 
@@ -1325,6 +1358,7 @@ const MAX_SIGNAL_AGE_MS = 18 * 30 * 24 * 60 * 60 * 1000
 /** Penalise research hits that are older than 18 months by bumping their effective
  * priority down so they lose to fresher signals even if Bing ranked them higher. */
 function getAgeAdjustedPriority(item: ResearchHit): number {
+  if (isLikelyBadSourceUrl(item.url)) return item.priority + 20
   if (!item.publishedAt) return item.priority + 3 // no date → treat as low-quality
   const age = Date.now() - new Date(item.publishedAt).getTime()
   if (age > MAX_SIGNAL_AGE_MS) return item.priority + 4 // too old → deprioritise heavily
@@ -1344,6 +1378,8 @@ function isStaleNewsSignal(item: ResearchHit | null) {
 function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
   const seen = new Set<string>()
   return items
+    .filter((item) => !isLikelyBadSourceUrl(item.url))
+    .filter((item) => !isStaleNewsSignal(item))
     .filter((item) => !looksLikeEntertainmentResult(item.title, item.url))
     .filter((item) => item.sourceKind === 'sec' || !looksLikeCommercialListingPage(item.title, item.snippet, item.snippet, item.url))
     .filter((item) => !account || isAccountRelevantCandidate(account, item))
@@ -1900,6 +1936,10 @@ function isLikelyBadSourceUrl(value: string) {
   if (!hostname) return true
   const lowerUrl = url.toLowerCase()
 
+  if (hostname === 'news.google.com' || hostname.endsWith('.news.google.com')) {
+    return true
+  }
+
   if (
     hostname === 'support.google.com' ||
     hostname === 'accounts.google.com' ||
@@ -2274,6 +2314,33 @@ function buildStructuredIdentityProfile(
       talkTrackGuardrails = isFreightForwarder ? ['No manufacturing language', 'No plant language'] : ['No manufacturing language']
       break
 
+    case 'print_fulfillment':
+      companyType = multiSiteInfo.isMultiSite ? 'print and fulfillment network' : 'print and fulfillment operation'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-site print, mailing, and fulfillment footprint' : 'print, mailing, and fulfillment site'
+      facilityType = 'print shop / mailing / fulfillment facility'
+      identityKeywords = selectIdentityKeywords(text, ['direct mail', 'mailing', 'reprographics', 'document reproduction', 'print production', 'on-demand printing', 'content management', 'fulfillment'], ['print fulfillment', 'direct mail', 'document services'])
+      powerKeywords = selectIdentityKeywords(text, ['printing equipment', 'mailing equipment', 'fulfillment area', 'warehouse support', 'office HVAC', 'IT systems'], ['printing equipment', 'mailing equipment', 'fulfillment area'])
+      talkTrackGuardrails = ['No heavy manufacturing language', 'No plant language', 'No dock-only logistics language']
+      break
+
+    case 'public_transit':
+      companyType = 'public transit operator'
+      operatingModel = 'public-service transit and vehicle-maintenance operation'
+      facilityType = 'transit operations / maintenance facility'
+      identityKeywords = selectIdentityKeywords(text, ['public transportation', 'transit authority', 'trolley', 'streetcar', 'historic trolley', 'car barn', 'fare-free service'], ['public transit', 'trolley service', 'vehicle maintenance'])
+      powerKeywords = selectIdentityKeywords(text, ['vehicle maintenance', 'shop equipment', 'lighting', 'HVAC', 'public-service reliability'], ['vehicle maintenance', 'shop equipment', 'lighting'])
+      talkTrackGuardrails = ['No warehouse language', 'No manufacturing language', 'No dock activity language']
+      break
+
+    case 'moving_storage':
+      companyType = multiSiteInfo.isMultiSite ? 'moving and storage network' : 'moving and storage company'
+      operatingModel = multiSiteInfo.isMultiSite ? 'multi-location moving, storage, and dispatch footprint' : 'moving, storage, and dispatch site'
+      facilityType = 'warehouse / storage / dispatch facility'
+      identityKeywords = selectIdentityKeywords(text, ['commercial moving', 'residential moving', 'storage', 'relocation', 'household goods', 'supply chain solutions'], ['moving and storage', 'relocation', 'storage'])
+      powerKeywords = selectIdentityKeywords(text, ['warehouse lighting', 'dock activity', 'storage HVAC', 'dispatch office', 'equipment charging'], ['warehouse lighting', 'storage HVAC', 'dispatch office'])
+      talkTrackGuardrails = ['No manufacturing language', 'No process equipment language']
+      break
+
     case 'food_storage':
       companyType = multiSiteInfo.isMultiSite ? 'cold-storage network' : 'cold-storage operator'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-site cold-storage footprint' : 'refrigerated storage facility'
@@ -2600,6 +2667,9 @@ const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
 const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   manufacturing: ['process', 'equipment', 'shift', 'peak', 'load', 'production', 'startup'],
   logistics: ['dock', 'automation', 'hvac', 'activity', 'occupancy', 'warehouse', '24/7'],
+  print_fulfillment: ['print', 'mailing', 'fulfillment', 'warehouse support', 'HVAC', 'equipment'],
+  public_transit: ['trolley', 'streetcar', 'maintenance', 'car barn', 'public service', 'reliability'],
+  moving_storage: ['warehouse', 'storage', 'moving', 'loading', 'dispatch', 'HVAC'],
   food_storage: ['refrigeration', 'freezer', 'defrost', 'cooler', 'temperature', 'compressor'],
   healthcare: ['occupancy', 'hvac', 'backup', 'reliability', '24/7', 'clinical', 'lab', 'blood', 'donor', 'storage'],
   banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
@@ -2623,6 +2693,9 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
 const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   manufacturing: ['manufacturing', 'industrial', 'factory', 'plant'],
   logistics: ['logistics', 'warehouse', 'distribution', 'fulfillment'],
+  print_fulfillment: ['printing', 'direct mail', 'document reproduction', 'print fulfillment'],
+  public_transit: ['public transit', 'trolley', 'streetcar', 'transportation authority'],
+  moving_storage: ['moving and storage', 'commercial moving', 'storage', 'relocation'],
   food_storage: ['cold storage', 'refrigeration', 'freezer', 'food storage'],
   healthcare: ['healthcare', 'hospital', 'clinic', 'medical', 'senior living', 'assisted living', 'nursing'],
   banking: ['bank', 'banking', 'credit union', 'financial services'],
@@ -2702,6 +2775,11 @@ function simplifyTalkTrackLanguage(value: string) {
     .replace(/\ba peak charges\b/gi, 'a peak charge')
     .replace(/\ba stealth peak charges\b/gi, 'a hidden peak charge')
     .replace(/\btriggering a peak charges\b/gi, 'triggering a peak charge')
+    .replace(/\bon the bill on the bill\b/gi, 'on the bill')
+    .replace(/\bcharges on the bill making the bill move\b/gi, 'charges that can move the bill')
+    .replace(/\bHVAC load making the bill move\b/gi, 'HVAC making the bill move')
+    .replace(/\bManufacturing \/ industrial\b/g, 'a manufacturing operation')
+    .replace(/\bLogistics \/ warehouse \/ distribution\b/g, 'a distribution operation')
 
   return capitalizeSentenceStarts(result)
 }
@@ -2891,6 +2969,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
     }
   }
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
+  if (hasPublicTransitSignals(text)) return 'public_transit'
+  if (hasPrintFulfillmentSignals(text)) return 'print_fulfillment'
+  if (hasMovingStorageSignals(text)) return 'moving_storage'
   // Residential care & shelter services — must come before general behavioral health/healthcare to prevent shelters from landing as clinics/hospitals
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) return 'residential_care'
   if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
@@ -3360,7 +3441,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
       
       return {
-        label: 'Manufacturing / industrial',
+        label: 'Manufacturing operation',
         angle: 'Machine startup timing and production ramps creating usage spikes that can stay on the bill.',
         question: `I'm curious, how do y'all manage the startup sequence of your heavy machinery, or is that side of things pretty much on autopilot?`,
         openers: [
@@ -3464,7 +3545,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
       
       return {
-        label: 'Logistics / warehouse / distribution',
+        label: 'Distribution operation',
         angle: 'Dock doors, automation, and HVAC creating expensive usage spikes during busy windows.',
         question: `I'm curious, how do y'all coordinate dock activity and climate control schedules, or is that side of things pretty much on autopilot?`,
         openers: [
@@ -3473,6 +3554,42 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           `Often times in distribution centers, it's hard to manage the demand spikes from sorting automation or conveyors without triggering a permanent demand ratchet floor.`,
         ],
         focus: ['thermal liability', 'dock door timing', 'automation peaks', 'HVAC load', 'demand ratchets', 'billing floors'],
+      }
+    case 'print_fulfillment':
+      return {
+        label: 'Print and fulfillment',
+        angle: 'Print equipment, mailing equipment, fulfillment areas, office systems, and HVAC shaping the bill differently than a factory or pure warehouse.',
+        question: `I'm curious, how do y'all separate the print side, mailing side, and office side on the bill, or is that usually handled after the invoice comes in?`,
+        openers: [
+          `A print and fulfillment setup can look simple from the outside, but printing equipment, mailing equipment, fulfillment areas, and office HVAC can all hit the meter differently.`,
+          `Often times in print and fulfillment, the hard part is knowing whether the print floor, mailing equipment, or office HVAC is what actually moved the bill that month.`,
+          `For a document and fulfillment operation, the bill can move for different reasons than a normal office or warehouse.`,
+        ],
+        focus: ['print equipment', 'mailing equipment', 'fulfillment area', 'office HVAC', 'IT systems', 'billing clarity'],
+      }
+    case 'public_transit':
+      return {
+        label: 'Public transit',
+        angle: 'Transit reliability, vehicle maintenance, lighting, shop equipment, and public-service schedules shaping facility usage.',
+        question: `I'm curious, how do y'all separate the maintenance shop, lighting, and office usage on the bill, or is that usually handled after the invoice comes in?`,
+        openers: [
+          `A public transit operation has a different power profile than freight or warehousing because reliability, maintenance, lighting, and public-service schedules all matter.`,
+          `For a trolley or transit operation, the bill is usually tied more to maintenance facilities, lighting, and support buildings than warehouse activity.`,
+          `Public transit facilities can be hard to read from the bill because the public-facing service and the maintenance side do not always move together.`,
+        ],
+        focus: ['vehicle maintenance', 'shop equipment', 'lighting', 'HVAC', 'public-service reliability', 'support buildings'],
+      }
+    case 'moving_storage':
+      return {
+        label: 'Moving and storage',
+        angle: 'Storage space, dispatch offices, loading activity, warehouse lighting, and HVAC shaping usage by site.',
+        question: `I'm curious, how do y'all separate storage, dispatch, and loading activity on the bill, or is that usually handled after the invoice comes in?`,
+        openers: [
+          `A moving and storage operation is usually less about production and more about storage space, dispatch, loading activity, lighting, and HVAC.`,
+          `Often times for moving and storage companies, it is hard to tell whether storage, dispatch, or loading activity is what moved the bill that month.`,
+          `For a moving and storage site, the bill can change even when it is not a manufacturing or heavy equipment operation.`,
+        ],
+        focus: ['storage space', 'dispatch office', 'loading activity', 'warehouse lighting', 'HVAC', 'site-level usage'],
       }
     case 'food_storage':
       return {
@@ -4764,6 +4881,9 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
     }
     if (cluster === 'manufacturing') return `a manufacturing operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'logistics') return `a logistics and distribution operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'print_fulfillment') return `a print and fulfillment operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'public_transit') return `a public transit operation${locationClause ? ` ${locationClause}` : ''}`
+    if (cluster === 'moving_storage') return `a moving and storage operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'food_storage') return `a food storage and distribution operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'healthcare') return `a healthcare operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'banking') return `a banking and branch operation${locationClause ? ` ${locationClause}` : ''}`
@@ -5050,7 +5170,7 @@ function sanitizeResearchTitle(title: string, accountName: string, snippet: stri
   if (snippetPreview && snippetPreview.length > 20 && snippetPreview.length < 120) {
     return snippetPreview
   }
-  return `${cleanText(accountName)} Operational Context`
+  return `${cleanText(accountName)} Facility and Billing Intel`
 }
 
 function extractTimeDatetime(html: string) {
@@ -5091,6 +5211,31 @@ function extractBodyText(html: string) {
       .replace(/<(header|nav|footer|aside|form)\b[\s\S]*?<\/\1>/gi, ' ')
       .replace(/<[^>]+>/g, ' ')
   )
+}
+
+function stripWebsiteNavigationNoise(value: string) {
+  return cleanText(value)
+    .replace(/\b(HOME|ABOUT US|ABOUT|SOLUTIONS|BLOGS?|CONTACT US|CONTACT|NEWS(?:\s*&\s*EVENTS)?|STORE|SHOP|CAREERS|PRIVACY POLICY|TERMS OF USE|READ MORE|LEARN MORE|GET STARTED|SEARCH|SIGN UP FOR UPDATES|FOLLOW)\b/gi, ' ')
+    .replace(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/g, ' ')
+    .replace(/\b(?:pages?|menu|skip to content|subscribe|copyright|all rights reserved)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function looksLikeRawNavigationText(value: string) {
+  const text = cleanText(value)
+  if (!text) return false
+  const upperTokenCount = (text.match(/\b[A-Z]{3,}\b/g) || []).length
+  const navHits = countMatchingPatterns(text, [
+    /\bABOUT US\b/i,
+    /\bCONTACT US\b/i,
+    /\bREAD MORE\b/i,
+    /\bLEARN MORE\b/i,
+    /\bNEWS\s*\+\s*EVENTS\b/i,
+    /\bPRIVACY POLICY\b/i,
+    /\bTERMS OF USE\b/i,
+  ])
+  return navHits >= 2 || upperTokenCount >= 8
 }
 
 const LOW_QUALITY_LISTING_PATTERNS = [
@@ -5209,9 +5354,10 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
     return null
   }
 
+  const cleanedBodyText = stripWebsiteNavigationNoise(bodyText)
   const snippet = sourceKind === 'web' && shouldPreferCompanyDescription(description, bodyText, url)
     ? description
-    : extractKeywordSnippet(bodyText) || description || bodyText.slice(0, 420) || title
+    : extractKeywordSnippet(cleanedBodyText || bodyText) || description || (cleanedBodyText || bodyText).slice(0, 420) || title
 
   let publishedAt: string | null = null
   if (publishedAtRaw) {
@@ -5591,19 +5737,31 @@ function normalizeBriefSections(result: StoredBriefResult): StoredBriefResult {
 }
 
 function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit | null) {
-  const snippet = cleanText(candidate?.snippet)
-  if (snippet && snippet.split(/\s+/).filter(Boolean).length >= 12 && !isSameAsAccountDescription(snippet, account)) {
-    return shortenText(snippet, 520)
-  }
-
   const profile = getAccountIdentityProfile(account, candidate)
+  const companyName = cleanText(account.name) || 'This account'
+  const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
+  const snippet = stripWebsiteNavigationNoise(cleanText(candidate?.snippet))
+
+  const verifiedFact = snippet &&
+    snippet.split(/\s+/).filter(Boolean).length >= 12 &&
+    !isSameAsAccountDescription(snippet, account) &&
+    !looksLikeRawNavigationText(snippet)
+      ? shortenText(snippet, 260)
+      : ''
+
   if (profile) {
+    const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(profile.companyType)} ${profile.companyType}.`
+    const operationDetail = profile.identityKeywords.length
+      ? `The operating context points to ${profile.identityKeywords.slice(0, 4).join(', ')}.`
+      : `${profile.operatingModel || profile.facilityType} is the relevant operating context.`
+    const sellingAngle = profile.powerKeywords.length
+      ? `The likely electricity angle is separating ${profile.powerKeywords.slice(0, 4).join(', ')} from the normal monthly bill, not treating the account as a generic ${cleanText(account.industry) || 'business'}.`
+      : `The likely electricity angle is checking whether the facility setup still matches how the business actually uses power.`
     const parts = [
-      profile.companyType,
-      profile.operatingModel,
-      profile.facilityType,
-      profile.identityKeywords.length ? `Known operating details include ${profile.identityKeywords.slice(0, 4).join(', ')}.` : '',
-      profile.powerKeywords.length ? `Likely bill drivers include ${profile.powerKeywords.slice(0, 4).join(', ')}.` : '',
+      verifiedFact,
+      operatingFact,
+      operationDetail,
+      sellingAngle,
     ].filter(Boolean)
     const detail = cleanText(parts.join(' '))
     if (detail.split(/\s+/).filter(Boolean).length >= 12) return shortenText(detail, 520)
@@ -5611,7 +5769,10 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
 
   const description = getPublicAccountDescription(account)
   if (description && description.split(/\s+/).filter(Boolean).length >= 12) {
-    return shortenText(description, 520)
+    const city = cleanText(account.city)
+    const state = cleanText(account.state)
+    const locationText = [city, state].filter(Boolean).join(', ')
+    return shortenText(`${companyName}${locationText ? ` is tied to ${locationText}` : ''}. ${description}`, 520)
   }
 
   return ''
@@ -5630,10 +5791,10 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
   }
 
   if (profile?.companyType) {
-    return `${companyName} ${toTitleCase(profile.companyType)} Operational Context`
+    return `${companyName} ${toTitleCase(profile.companyType)} Facility and Billing Intel`
   }
 
-  return `${companyName} Operational Context`
+  return `${companyName} Facility and Billing Intel`
 }
 
 function normalizeSignalDetail(detail: string, headline: string, account: AccountRow, candidate: ResearchHit | null) {
@@ -5659,6 +5820,7 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
     (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
     (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
     /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned) ||
+    looksLikeRawNavigationText(cleaned) ||
     isScrapedBoilerplate
 
   if (!weakDetail) return cleaned
@@ -6694,10 +6856,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       if (aiBriefParts) {
         // Create a minimal brief with the AI opener and talk track
-        const industryLabel = cleanText(briefingAccount.industry) || 'this business'
         validated = {
-          signal_headline: 'Industry Context',
-          signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
+          signal_headline: buildCompanyContextHeadline(briefingAccount, null),
+          signal_detail: buildFallbackSignalDetail(briefingAccount, null) || `${cleanText(briefingAccount.name) || 'This account'} needs a company-specific electricity review based on its facility type and operating model.`,
           opener: aiBriefParts.opener,
           talk_track: aiBriefParts.talk_track,
           signal_date: new Date().toISOString().slice(0, 10),
@@ -6722,11 +6883,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         
         const manualTalkTrack = buildManualTalkTrack(briefingAccount, null, fallbackContext, 0)
-        const industryLabel = cleanText(briefingAccount.industry) || 'this business'
         
         validated = {
-          signal_headline: 'Industry Context',
-          signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
+          signal_headline: buildCompanyContextHeadline(briefingAccount, null),
+          signal_detail: buildFallbackSignalDetail(briefingAccount, null) || `${cleanText(briefingAccount.name) || 'This account'} needs a company-specific electricity review based on its facility type and operating model.`,
           talk_track: manualTalkTrack,
           signal_date: new Date().toISOString().slice(0, 10),
           source_date: new Date().toISOString().slice(0, 10),
