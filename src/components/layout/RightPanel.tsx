@@ -45,6 +45,7 @@ import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
 import { useWeather } from '@/hooks/useWeather'
 import { isTodayOrOverdue } from '@/lib/task-date'
+import { resolveTimezone } from '@/lib/timezone'
 
 export function RightPanel() {
   const {
@@ -112,6 +113,24 @@ export function RightPanel() {
   const entityAddress = account?.address || contact?.address || ''
   const entityName = contact?.name || account?.name
   const satelliteUplinkKey = `${isContactPage ? 'contact' : 'account'}-${entityId || 'unknown'}`
+
+  const resolvedTimezone = useMemo(() => {
+    if (isContactPage && contact) {
+      return resolveTimezone({
+        city: contact.city,
+        state: contact.state,
+        phone: contact.mobile || contact.phone || contact.workDirectPhone || contact.otherPhone || contact.companyPhone
+      })
+    }
+    if (account) {
+      return resolveTimezone({
+        city: account.city || account.metadata?.city || account.metadata?.general?.city,
+        state: account.state || account.metadata?.state || account.metadata?.general?.state,
+        phone: account.companyPhone
+      })
+    }
+    return 'America/Chicago'
+  }, [isContactPage, contact, account])
 
   // Weather: always use account location (not contact). On contact dossier we still show weather for the account's city.
   const accountLocationForWeather = useMemo(() => {
@@ -559,7 +578,7 @@ export function RightPanel() {
                             <span className="text-[9px] font-mono uppercase tracking-widest">Live</span>
                           </div>
                         </div>
-                        <TelemetryWidget location={entityZone} weather={weatherData} weatherLocationLabel={weatherLocationLabel} />
+                        <TelemetryWidget location={entityZone} weather={weatherData} weatherLocationLabel={weatherLocationLabel} timezone={resolvedTimezone} />
                       </div>
 
                       {/* 2b. TARGET SIGNAL STREAM (Apollo news/signals for account) */}

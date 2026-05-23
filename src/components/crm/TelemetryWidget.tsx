@@ -11,9 +11,10 @@ type TelemetryWidgetProps = {
   weather?: WeatherData | null
   /** Label for weather location (e.g. "Dallas, TX"). */
   weatherLocationLabel?: string
+  timezone?: string
 }
 
-export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weatherLocationLabel }: TelemetryWidgetProps) {
+export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weatherLocationLabel, timezone = 'America/Chicago' }: TelemetryWidgetProps) {
   const [time, setTime] = useState('');
   const { data: marketData, isLoading, isError } = useMarketPulse();
 
@@ -32,13 +33,13 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
       setTime(new Date().toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: 'America/Chicago'
+        timeZone: timezone
       }));
     };
     updateTime();
     const interval = setInterval(updateTime, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [timezone]);
 
   const volatilityIndex = calculateVolatilityIndex({
     price: metrics.price,
