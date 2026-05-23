@@ -665,6 +665,10 @@ function hasFiberglassConduitSignals(text: string) {
   return /(fiberglass conduit|fiberglass strut|epoxy fiberglass|phenolic conduit|flame shield|haz duct|high[-\s]?speed winding|curing ovens?|electrical and mechanical markets?|conduit system|fiberglass fittings)/i.test(text)
 }
 
+function hasFurnitureManufacturingSignals(text: string) {
+  return /(manufactures?|manufacturer|manufacturing|production|assembly)\b[\s\S]{0,120}\b(educational|commercial)?\s*(furniture|desks?|tables?|chairs?|visual communication tools?|whiteboards?|classroom furniture)|\b(furniture|desks?|tables?|chairs?|visual communication tools?|whiteboards?|classroom furniture)\b[\s\S]{0,120}\b(manufactures?|manufacturer|manufacturing|production|assembly)/i.test(text)
+}
+
 function hasIndustrialSiteLogisticsSignals(text: string) {
   return /(site store management|expendable and consumable materials|petrochemical or energy plant|inventory management|warehouse management|materials and delivery tracking|transportation management|purchase order processing|electronic receiving|third party integrator|low dollar value,? high usage materials)/i.test(text)
 }
@@ -695,6 +699,10 @@ function hasStrongLogisticsSignals(text: string) {
 
 function hasStrongOfficeServicesSignals(text: string) {
   return /(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect|executive office)/i.test(text)
+}
+
+function hasStrongCommercialRealEstateSignals(text: string) {
+  return /(commercial real estate|real estate firm|real estate brokerage|property management|tenant representation|landlord representation|leasing|investment sales|brokerage services|asset management|development services)/i.test(text)
 }
 
 function hasStrongSchoolSignals(text: string) {
@@ -814,6 +822,16 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (manufacturingSignals && /(healthcare|hospital|clinic|medical|restaurant|hotel|hospitality|behavioral health|mental health)/i.test(profileText)) {
+    return true
+  }
+  if (manufacturingSignals && (profile.industryCluster === 'retail' || profile.industryCluster === 'logistics') && !/(retail store|customer-facing retail|dealership|auto dealer|parts distributor|distribution network|warehouse)/i.test(accountText)) {
+    return true
+  }
+  if (hasFurnitureManufacturingSignals(accountText) && (profile.industryCluster === 'retail' || /retail business|retail store|showroom-only/i.test(profileText))) {
+    return true
+  }
+  if (/(manufactures?|manufacturer|manufacturing)\b[\s\S]{0,120}\b(cooling products?|refrigeration|chillers?|air handling units?|industrial package units?)/i.test(accountText) &&
+      (profile.industryCluster === 'retail' || /retail business|retail operation|showroom/i.test(profileText))) {
     return true
   }
 
@@ -2208,6 +2226,7 @@ function buildStructuredIdentityProfile(
   const isCoffeeRoaster = /\b(small-batch|custom)?\s*coffee roasting\b|\bcustom roasting\b|\broasting equipment\b|\bgreen beans\b|\bcoffee roaster\b/i.test(text)
   const isGrainBakeryManufacturer = /\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
+  const isFurnitureManufacturer = hasFurnitureManufacturingSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
@@ -2347,6 +2366,16 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['food production', 'food manufacturing', 'food processing', 'usda-approved', 'custom proteins', 'soups', 'sauces', 'foodservice'], ['food production', 'food processing', 'USDA production'])
         powerKeywords = selectIdentityKeywords(text, ['refrigeration', 'cooking', 'packaging', 'sanitation', 'freezer', 'cold chain'], ['refrigeration', 'packaging', 'sanitation'])
         talkTrackGuardrails = ['No warehouse-group language', 'No dock-only language']
+        break
+      }
+
+      if (isFurnitureManufacturer) {
+        companyType = multiSiteInfo.isMultiSite ? 'commercial furniture manufacturing network' : 'commercial furniture manufacturer'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site furniture production and showroom footprint' : 'furniture production and showroom operation'
+        facilityType = 'furniture manufacturing / showroom facility'
+        identityKeywords = selectIdentityKeywords(text, ['educational furniture', 'commercial furniture', 'visual communication tools', 'classroom furniture', 'desks', 'tables', 'chairs', 'showroom'], ['commercial furniture', 'educational furniture', 'showroom'])
+        powerKeywords = selectIdentityKeywords(text, ['production equipment', 'assembly areas', 'showroom lighting', 'office HVAC', 'shipping areas'], ['production equipment', 'showroom lighting', 'office HVAC'])
+        talkTrackGuardrails = ['No generic retail language', 'No pure showroom language', 'No logistics-only language']
         break
       }
 
@@ -2633,6 +2662,16 @@ function buildStructuredIdentityProfile(
         break
       }
 
+      if (hasStrongCommercialRealEstateSignals(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'commercial real estate services firm' : 'commercial real estate firm'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-office brokerage and property-services footprint' : 'office-based brokerage and property-services operation'
+        facilityType = 'office / brokerage / property-services workspace'
+        identityKeywords = selectIdentityKeywords(text, ['commercial real estate', 'brokerage', 'leasing', 'property management', 'tenant representation', 'investment sales'], ['commercial real estate', 'brokerage', 'property services'])
+        powerKeywords = selectIdentityKeywords(text, ['office HVAC', 'lighting', 'IT equipment', 'conference rooms', 'managed property review'], ['office HVAC', 'lighting', 'IT equipment'])
+        talkTrackGuardrails = ['No manufacturing language', 'No warehouse language', 'No production language', 'No retail-store language']
+        break
+      }
+
       companyType = 'professional services business'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-office footprint' : 'office-based business'
       facilityType = 'office'
@@ -2812,7 +2851,7 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   food_storage: ['cold storage freezer', 'refrigerated warehouse', 'freezer facility', 'food storage depot'],
   healthcare: ['acute care hospital', 'medical clinic facility', 'clinical lab setup', 'outpatient facility'],
   banking: ['bank branch office', 'credit union branch', 'financial services branch'],
-  retail: ['retail showroom', 'customer-facing retail store', 'shopping outlet'],
+  retail: ['retail operation', 'retail showroom', 'customer-facing retail store', 'shopping outlet'],
   restaurant: ['restaurant kitchen', 'dining operations', 'food service venue', 'fast food outlet'],
   hotel_owner: ['hotel flag', 'guest rooms', 'resort property', 'lodging facility'],
   hospitality_group: ['hotel portfolio', 'hospitality management group', 'multi-property hospitality'],
@@ -2878,6 +2917,8 @@ function simplifyTalkTrackLanguage(value: string) {
     .replace(/\bpeak exposure\b/gi, 'peak-charge exposure')
     .replace(/\bdemand peak\b/gi, 'usage spike')
     .replace(/\bartificial liability\b/gi, 'charge that may not match how the site runs now')
+    .replace(/\btransmission fees\b/gi, 'charges tied to when the site uses the most power')
+    .replace(/\btransmission fee\b/gi, 'charge tied to when the site uses the most power')
     .replace(/\btransmission side of the bill\b/gi, 'charges tied to when the site uses the most power')
     .replace(/\btransmission side\b/gi, 'peak-timing side')
     .replace(/\bcorrelation\b/gi, 'connection')
@@ -2918,6 +2959,15 @@ function lowercaseFirst(value: string) {
   return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
+function toSecondPersonOperationDescriptor(value: string) {
+  const text = cleanText(value)
+    .replace(/^(?:an?|the)\s+/i, '')
+    .replace(/\bthe company'?s\b/i, 'your')
+  if (!text) return 'your operation'
+  if (/^(your|y'all'?s|yours)\b/i.test(text)) return text
+  return `your ${text}`
+}
+
 function humanizeDriverList(items: string[], limit = 4) {
   const cleaned = uniqueStrings(items.map((item) => cleanText(item).toLowerCase()).filter(Boolean), limit)
     .map((item) => item
@@ -2932,6 +2982,27 @@ function humanizeDriverList(items: string[], limit = 4) {
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
   const driverText = humanizeDriverList(drivers)
   const identity = cleanText(companyIdentity).toLowerCase()
+  if (/auto dealership|dealership/.test(identity) || /lot lighting|service bays?|vehicle inventory|showroom HVAC/i.test(driverText)) {
+    return `Often times for a dealership, service bays, showroom AC, parts counters, and lot lighting can all push the meter during the same busy window.`
+  }
+  if (/commercial furniture|furniture.*manufacturer|designer and manufacturer/.test(identity)) {
+    return `Often times for a furniture manufacturer, the production floor, showroom lighting, office HVAC, and shipping areas can all move the bill in different ways.`
+  }
+  if (/commercial real estate|real estate|property management|brokerage/.test(identity)) {
+    return `Often times for a commercial real estate firm, the hard part is separating office usage from the larger buildings or tenant spaces being managed.`
+  }
+  if (/medical equipment|medical supply|durable medical equipment|\bdme\b/.test(identity) || /medical supplies|equipment maintenance|inventory storage/i.test(driverText)) {
+    return `Often times for a medical supply operation, warehouse cooling, equipment service, inventory storage, and delivery timing can all push the bill in different ways.`
+  }
+  if (/cooling products|refrigeration and cooling|chiller|industrial refrigeration/.test(identity) || /chillers?|air handling units?|industrial package units/i.test(driverText)) {
+    return `Often times for a cooling-equipment manufacturer, test areas, production equipment, compressors, and plant HVAC can all hit the meter during the same window.`
+  }
+  if (/energy-intensive industrial|oilfield|drilling equipment|heavy industrial/.test(identity)) {
+    return `Often times in heavy industrial operations, large motors, process equipment, maintenance work, and site schedules can all hit the meter during the same window.`
+  }
+  if (/boba|tea shop|smoothie|beverage cafe/.test(identity) || /brewed teas|smoothies|tapioca|display cases/i.test(driverText)) {
+    return `Often times for a beverage cafe, refrigeration, ice machines, drink equipment, display cases, and summer AC can stack up during the same rush.`
+  }
   if (/ready[-\s]?mix|ready[-\s]?mixed concrete|aggregates/.test(identity)) {
     return `Often times in ready-mix concrete, batching equipment, aggregate handling, truck dispatch, and yard lighting can hit the meter at the same time.`
   }
@@ -2997,6 +3068,22 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     : ''
   if (personaQuestion) {
     return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side of things pretty much on autopilot?`
+  }
+
+  if (/lot lighting|service bays?|vehicle inventory|showroom/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether the service bays, showroom AC, parts area, or lot lighting is what pushed the bill, or is that side of things pretty much handled?`
+  }
+  if (/medical supplies|equipment maintenance|inventory storage|delivery turnaround|warehouse climate/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether storage cooling, equipment service, or delivery activity is what moved the bill that month, or is that side of things pretty much handled?`
+  }
+  if (/chillers?|air handling units?|industrial package units|cooling products|test areas/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether testing, compressors, production equipment, or plant HVAC is what created the heavier bill, or is that side of things pretty much handled?`
+  }
+  if (/office occupancy|lease|tenant|conference|managed buildings|property/i.test(driverText)) {
+    return `I'm curious, how do y'all separate normal office usage from the buildings or tenant spaces that are actually moving the bill, or is that side of things pretty much handled?`
+  }
+  if (/brewed teas|smoothies|tapioca|display cases|ice machines|drink equipment/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether refrigeration, ice machines, drink equipment, or AC is what pushed the bill, or is that side of things pretty much handled?`
   }
 
   switch (cluster) {
@@ -3210,6 +3297,8 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/.test(text) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
+  if (hasStrongCommercialRealEstateSignals(text)) return 'office_services'
+  if (hasFurnitureManufacturingSignals(text)) return 'manufacturing'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil and gas|oilfield|natural gas|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream|pipeline|petroleum)/.test(text)) {
@@ -3273,6 +3362,8 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/i.test(coreText)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/i.test(coreText)) return 'education_nonprofit'
+  if (hasStrongCommercialRealEstateSignals(coreText)) return 'office_services'
+  if (hasFurnitureManufacturingSignals(coreText)) return 'manufacturing'
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/i.test(coreText) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/i.test(coreText)) return 'manufacturing'
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
@@ -4581,14 +4672,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'energy_intensive':
       return {
         label: 'Energy-intensive industrial',
-        angle: 'Transmission fee exposure, process load, large motors, and the equipment driving the peaks.',
+        angle: 'Large motors, process load, and equipment timing driving the highest-cost moments on the bill.',
         question: `I'm curious, how do y'all map process startup times against peak demand windows, or is that side of things pretty much on autopilot?`,
         openers: [
-          `Often times for an energy-intensive facility, it's hard to manage heavy load and process equipment startups without triggering permanent demand ratchets on the meter.`,
+          `Often times for a heavy industrial facility, it's hard to keep large motors and process equipment from hitting the meter at the same time.`,
           `Often times in heavy industrial operations, it's difficult to prevent large motors or process timing from setting a high peak charge because of tight production schedules.`,
-          `Often times for high-load sites, it's hard to see how much of the bill is driven by actual energy usage versus peak transmission exposure because of complex utility rates.`,
+          `Often times for high-usage sites, it's hard to tell whether normal usage or one short equipment spike is what made the bill jump.`,
         ],
-        focus: ['transmission fees', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
+        focus: ['process load', 'large motors', 'equipment timing', 'site practices', 'maintenance'],
       }
     case 'office_services':
       if (hasStrongManufacturersRepSignals(text)) {
@@ -4602,6 +4693,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `Often times for a rep firm, it's hard to tell whether the active display areas or the general office cooling is setting the monthly peak because they share a single meter.`,
           ],
           focus: ['showroom lighting', 'controls displays', 'training space', 'office HVAC', 'contractor education'],
+        }
+      }
+
+      if (hasStrongCommercialRealEstateSignals(text)) {
+        return {
+          label: 'Commercial real estate services',
+          angle: 'Office HVAC, conference-room usage, IT equipment, and property-services activity shaping the bill differently than an industrial site.',
+          question: `I'm curious, how do y'all separate normal office usage from the properties or tenant spaces that actually move the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for commercial real estate firms, it's hard to separate the office bill from the properties and tenant spaces everybody is focused on day to day.`,
+            `Often times in real estate services, the office load is simple, but the managed-building details can hide which locations are actually moving the cost.`,
+            `Often times for brokerage and property-services teams, the utility side only gets attention after a building or tenant space starts creating noise on the bill.`,
+          ],
+          focus: ['office HVAC', 'conference rooms', 'IT equipment', 'property services', 'managed buildings'],
         }
       }
 
@@ -4824,7 +4929,6 @@ function buildTalkTrackContext(
       'pre-owned',
       'inventory',
       'cars, trucks, & suvs',
-      'dealership',
     ],
     seed,
     audienceProfile,
@@ -4907,7 +5011,7 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their specific operational focus or business focus (e.g. tire recycling operation, psychiatric facility, print and fulfillment setup, Latin foods production plant) in ${city || 'Texas'}. You MUST name their specific, concrete business type or activity instead of generic words. For example: "I've been researching a tire recycling operation in Fort Worth" or "I've been looking at a compounding pharmacy footprint in Houston" or "I've been researching a school district operation in Fort Worth". Never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
@@ -5179,7 +5283,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountAutomotiveHotelJargon = accountIsAutomotive &&
     /\b(hotel|hotels|hotel's|guest rooms?|room load|laundry|lodging|motel|resort|hotel property|blended property)\b/i.test(lower)
   const accountAutomotiveRetailJargon = accountIsAutomotive &&
-    /\b(retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group)\b/i.test(lower)
+    /\b(retail operation|retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group)\b/i.test(lower)
   const accountIsFoodProduction = /\b(food production|food manufacturing|food manufacturer|food processing|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|restaurant chains?|foodservice)\b/i.test(accountText)
   const accountFoodLogisticsJargon = accountIsFoodProduction &&
     /\b(warehouse groups?|dock activity|dock work|dock doors?|high-volume logistics|logistics groups?|automation and hvac|warehouse's summer peak)\b/i.test(lower)
@@ -5364,11 +5468,12 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
     // Last resort — describe the company by name but phrase it as what they do
     return `${companyName}'s operation`
   })()
+  const yourOperationDescriptor = toSecondPersonOperationDescriptor(operationDescriptor)
 
   return [
-    `${greeting}. I'm calling you out the blue here, so I'll be brief. I've been researching ${operationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
-    `${greeting}. I'm calling you out the blue here, so I'll be brief. I came across ${companyName} while looking at ${specificAccountLane} accounts${nonTexasDescriptor ? '' : ' in Texas'}, and had a curious question about y'alls electricity agreements and contracts.`,
-    `${greeting}. I'm calling you out the blue here, so I'll be brief. I've been doing some research on ${operationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, so I'll be brief. I was looking into ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, so I'll be brief. I was looking at ${companyName} and ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, so I'll be brief. I saw enough about ${yourOperationDescriptor} to have one quick question about y'alls electricity agreements and contracts.`,
   ]
 }
 
@@ -5426,6 +5531,14 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   }
 
   return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
+}
+
+function openerNeedsRewrite(opener: string) {
+  const text = cleanText(opener)
+  if (!text) return true
+  return /\b(?:i'?ve been researching|i'?ve been doing some research on)\s+(?:an?|the)\b/i.test(text) ||
+    /\bi came across\b[\s\S]{0,90}\bwhile looking at\b/i.test(text) ||
+    /\b(?:a|an)\s+(?:manufacturing operation|retail operation|logistics network|office-style footprint|commercial account)\b/i.test(text)
 }
 
 function splitTalkTrackSentences(value: string) {
@@ -6401,9 +6514,13 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
 function normalizeFinalSignalHeadline(headline: string, account: AccountRow, candidate: ResearchHit | null = null) {
   const cleaned = cleanText(headline).replace(/\s{2,}/g, ' ')
   const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)}`)
+  const navOnlyHeadline = /^[A-Z0-9&,\s/-]{18,}$/.test(cleaned) &&
+    /\b(PROPERTIES|SERVICES|OUR TEAM|NEWS|RESEARCH|CONTACT|ABOUT|CAREERS|INVESTORS|PRODUCTS|SOLUTIONS|LOCATIONS)\b/.test(cleaned) &&
+    !/\b(OPENS|EXPANDS|ACQUIRES|APPOINTS|ANNOUNCES|LAUNCHES|BUILDS|BREAKS GROUND|MERGES)\b/.test(cleaned)
   if (!cleaned) return buildCompanyContextHeadline(account, null)
   if ((candidate?.priority || 0) >= 8 && (!candidate || !isOfficialCompanyAnnouncement(account, candidate))) return buildCompanyContextHeadline(account, null)
   if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '')) return buildCompanyContextHeadline(account, null)
+  if (navOnlyHeadline || looksLikeRawNavigationText(cleaned)) return buildCompanyContextHeadline(account, null)
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
     return buildCompanyContextHeadline(account, null)
   }
@@ -6434,6 +6551,9 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
     .replace(/\butility billing\b/gi, 'electricity bill')
     .replace(/\benergy costs?\b/gi, 'electricity costs')
     .replace(/\benergy consumption\b/gi, 'electricity usage')
+    .replace(/\bsummer\s+summer peak hours\s+summer peak\b/gi, 'summer peak')
+    .replace(/\bsummer peak hours\s+summer peak\b/gi, 'summer peak')
+    .replace(/\bsummer\s+summer peak\b/gi, 'summer peak')
   const normalizedDetail = normalizeEntityToken(cleaned)
   const normalizedHeadline = normalizeEntityToken(headline)
   const normalizedCandidateTitle = normalizeEntityToken(candidate?.title || '')
@@ -6991,7 +7111,7 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their specific operational focus or business focus (e.g. tire recycling operation, psychiatric facility, print and fulfillment setup, Latin foods production plant) in [Location]. You MUST name their specific, concrete business type or activity instead of generic words. For example: "I've been researching a tire recycling operation in Fort Worth" or "I've been looking at a compounding pharmacy footprint in Houston" or "I've been researching a school district operation in Fort Worth". Never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 - Do NOT repeat words or phrases redundantly.
@@ -7775,7 +7895,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate)
       validated = {
         ...validated,
-        opener: cleanText(validated.opener) || generatedOpener,
+        opener: openerNeedsRewrite(validated.opener || '') ? generatedOpener : cleanText(validated.opener),
       }
 
       validated = normalizeBriefSections(validated)
