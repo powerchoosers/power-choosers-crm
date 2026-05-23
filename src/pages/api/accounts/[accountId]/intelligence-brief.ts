@@ -2205,6 +2205,8 @@ function buildStructuredIdentityProfile(
   const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
   const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|\bfoodservice\b)/i.test(text)
     && !/(fiberglass|conduit|strut|epoxy|resin|electrical|mechanical markets?|winding equipment|curing ovens?|phenolic|duct)/i.test(text)
+  const isCoffeeRoaster = /\b(small-batch|custom)?\s*coffee roasting\b|\bcustom roasting\b|\broasting equipment\b|\bgreen beans\b|\bcoffee roaster\b/i.test(text)
+  const isGrainBakeryManufacturer = /\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
@@ -2305,6 +2307,26 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['ready-mixed concrete', 'aggregates', 'crushed stone', 'sand and gravel', 'concrete delivery', 'batch plants', 'mixer trucks', 'construction materials'], ['ready-mixed concrete', 'aggregates', 'concrete delivery'])
         powerKeywords = selectIdentityKeywords(text, ['batching equipment', 'aggregate handling', 'conveyors', 'pumps', 'compressors', 'washout/reclaim systems', 'yard lighting', 'truck dispatch'], ['batching equipment', 'aggregate handling', 'truck dispatch'])
         talkTrackGuardrails = ['No generic manufacturing language', 'No retail language', 'No office-only language', 'No dock-only logistics language']
+        break
+      }
+
+      if (isCoffeeRoaster) {
+        companyType = 'coffee roasting operation'
+        operatingModel = 'small-batch roasting and wholesale coffee supply'
+        facilityType = 'coffee roasting / production facility'
+        identityKeywords = selectIdentityKeywords(text, ['small-batch roasting', 'custom roasting', 'coffee roasting', 'green beans', 'wholesale coffee', 'restaurant and coffeehouse customers'], ['coffee roasting', 'green beans', 'wholesale coffee'])
+        powerKeywords = selectIdentityKeywords(text, ['roasting equipment', 'cooling', 'green bean storage', 'packaging', 'HVAC'], ['roasting equipment', 'cooling', 'packaging'])
+        talkTrackGuardrails = ['No restaurant language', 'No dining-room language', 'No retail-only language']
+        break
+      }
+
+      if (isGrainBakeryManufacturer) {
+        companyType = multiSiteInfo.isMultiSite ? 'grain-based and frozen bakery production network' : 'grain-based and frozen bakery manufacturer'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site bakery manufacturing footprint' : 'bakery production facility'
+        facilityType = 'food production plant'
+        identityKeywords = selectIdentityKeywords(text, ['grain-based products', 'frozen bakery products', 'flour mill', 'biscuits', 'muffins', 'bakery manufacturing'], ['grain-based products', 'frozen bakery products', 'bakery manufacturing'])
+        powerKeywords = selectIdentityKeywords(text, ['mixing', 'milling', 'ovens', 'freezers', 'packaging', 'sanitation', 'HVAC'], ['mixing', 'ovens', 'freezers', 'packaging'])
+        talkTrackGuardrails = ['No restaurant language', 'No retail language', 'No logistics-only language']
         break
       }
 
@@ -2935,6 +2957,12 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   if (/site-store|site store|petrochemical site|industrial plant support/.test(identity) || /inventory handling|delivery tracking|petrochemical plant support|receiving/i.test(driverText)) {
     return `Often times in site-store logistics, inventory handling, receiving, warehouse support, and delivery tracking can stack up during the same busy window.`
   }
+  if (/coffee roasting|custom roasting|coffee roaster/.test(identity) || /roasting equipment|green bean|packaging/i.test(driverText)) {
+    return `Often times in coffee roasting, the roasters, cooling, green bean storage, packaging, and HVAC can stack up during the same production window.`
+  }
+  if (/grain-based|frozen bakery|bakery production/.test(identity) || /mixing|milling|ovens|freezers|sanitation/i.test(driverText)) {
+    return `Often times in bakery manufacturing, mixing, milling, ovens, freezers, packaging, and HVAC can stack up during the same production window.`
+  }
   if (/fiberglass conduit|fiberglass strut|conduit manufacturing/.test(identity) || /winding equipment|curing ovens?|resin|finishing/i.test(driverText)) {
     return `Often times in fiberglass conduit manufacturing, winding equipment, curing ovens, finishing, and plant HVAC can stack up during the same production window.`
   }
@@ -2998,6 +3026,12 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
       }
       return `I'm curious, how do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month, or is that side of things pretty much handled?`
     case 'manufacturing':
+      if (/roasting equipment|green bean|coffee roasting|custom roasting/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether roasting equipment, cooling, storage, or packaging is what pushed the bill, or is that side of things pretty much handled?`
+      }
+      if (/mixing|milling|ovens|freezers|frozen bakery|grain-based|bakery/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether the freezers, mixing and milling equipment, ovens, or HVAC are what pushed the bill, or is that side of things pretty much handled?`
+      }
       if (/winding equipment|curing ovens?|resin|finishing|fiberglass|conduit/i.test(driverText)) {
         return `I'm curious, how do y'all tell whether winding, curing, finishing, or plant HVAC is what pushed the bill, or is that side of things pretty much handled?`
       }
@@ -3170,6 +3204,11 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (!text) return 'unknown'
   // Energy brokers and consultants — do not classify as any operational cluster
   if (isCompetitorEnergyBroker(account)) return 'office_services'
+  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
+  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
+  if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/.test(text)) return 'education_nonprofit'
+  if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/.test(text) &&
+      !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
@@ -3231,6 +3270,11 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
   if (/(hospital|medical center|regional hospital|health system|emergency room|acute care)/i.test(coreText)) return 'healthcare'
+  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
+  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/i.test(coreText)) return 'school_district'
+  if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/i.test(coreText)) return 'education_nonprofit'
+  if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/i.test(coreText) &&
+      !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/i.test(coreText)) return 'manufacturing'
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
@@ -3547,6 +3591,34 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
       }
     case 'manufacturing':
+      if (/\bcoffee roasting|custom roasting|green beans|roasting equipment\b/i.test(text)) {
+        return {
+          label: 'Coffee roasting operation',
+          angle: 'Roasting equipment, cooling, green bean storage, packaging, and HVAC shaping the highest usage moments.',
+          question: `I'm curious, how do y'all tell whether roasting equipment, cooling, storage, or packaging is what pushed the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times in coffee roasting, the roasters, cooling, green bean storage, packaging, and HVAC can stack up during the same production window.`,
+            `Often times for custom coffee roasters, it's hard to tell whether the roasting schedule or cooling load is what created the highest usage moment.`,
+            `Often times with small-batch roasting, the bill moves more from production timing than from normal office or retail usage.`,
+          ],
+          focus: ['roasting equipment', 'cooling', 'green bean storage', 'packaging', 'HVAC', 'production timing'],
+        }
+      }
+
+      if (/\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)) {
+        return {
+          label: 'Grain-based and frozen bakery production',
+          angle: 'Mixing, milling, ovens, freezers, packaging, sanitation, and HVAC creating high-usage production windows.',
+          question: `I'm curious, how do y'all tell whether the freezers, mixing and milling equipment, ovens, or HVAC are what pushed the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times in bakery manufacturing, mixing, milling, ovens, freezers, packaging, and HVAC can stack up during the same production window.`,
+            `Often times for frozen bakery production, it's hard to tell whether freezer banks, ovens, or mixing equipment are creating the highest usage moments.`,
+            `Often times with grain-based production, the bill moves more from production timing and cold storage than from normal building usage.`,
+          ],
+          focus: ['mixing', 'milling', 'ovens', 'freezers', 'packaging', 'sanitation', 'HVAC'],
+        }
+      }
+
       if (hasReadyMixConcreteSignals(text)) {
         const concreteMultiSite = detectMultiSiteScale(account, candidate)
         const locationDesc = concreteMultiSite.isMultiSite && concreteMultiSite.locationCount
@@ -6207,6 +6279,28 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     return shortenText(detail, 560)
   }
 
+  if (/\bcoffee roasting|custom roasting|green beans|roasting equipment\b/i.test(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates as a coffee roasting business serving restaurant and coffeehouse customers.`,
+      `The relevant operating pieces are roasting equipment, cooling, green bean storage, packaging, and HVAC, not a restaurant dining room.`,
+      `The electricity angle is checking whether roasting schedules and cooling cycles are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
+  if (/\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(detailText)) {
+    const multiSiteInfo = detectMultiSiteScale(account, candidate)
+    const locationText = multiSiteInfo.locationCount ? ` across ${multiSiteInfo.locationCount}+ facilities` : ''
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and manufactures grain-based and frozen bakery products${locationText}.`,
+      `The relevant operating pieces are mixing, milling, ovens, freezers, packaging, sanitation, and plant HVAC.`,
+      `The electricity angle is checking which production windows create the highest usage moments instead of treating the facilities like generic warehouses or restaurants.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   if (profile?.industryCluster === 'restaurant' && (multiSiteInfo.isMultiSite || /\b(franchisee groups?|restaurant group|restaurants? across|multi[-\s]?location|locations? across)\b/i.test(detailText))) {
     const locationText = multiSiteInfo.locationCount
@@ -6272,6 +6366,14 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
     return `${companyName} Petrochemical Site-Store Logistics Operating Context`
   }
 
+  if (/\bcoffee roasting|custom roasting|green beans|roasting equipment\b/i.test(text)) {
+    return `${companyName} Coffee Roasting Production Context`
+  }
+
+  if (/\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)) {
+    return `${companyName} Grain-Based and Frozen Bakery Production Context`
+  }
+
   if (profile?.industryCluster === 'restaurant') {
     const multiSiteInfo = detectMultiSiteScale(account, candidate)
     if (multiSiteInfo.isMultiSite) {
@@ -6328,6 +6430,7 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
   const cleaned = simplifyTalkTrackLanguage(removeInternalSalesInstructionSentences(detail))
     .replace(/\bcommercial energy liabilities\b/gi, 'electricity cost pressure')
     .replace(/\bdemand charges?\b/gi, 'charges tied to when the site uses the most power')
+    .replace(/\btransmission fee exposure\b/gi, 'cost exposure tied to when the site uses the most power')
     .replace(/\butility billing\b/gi, 'electricity bill')
     .replace(/\benergy costs?\b/gi, 'electricity costs')
     .replace(/\benergy consumption\b/gi, 'electricity usage')
