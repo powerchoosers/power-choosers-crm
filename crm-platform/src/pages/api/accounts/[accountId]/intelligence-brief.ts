@@ -3,6 +3,7 @@ import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { buildAudienceProfile, buildAudienceProfileBlock, type AudienceProfile } from '@/lib/contact-persona'
 import { splitIntelligenceBriefSections } from '@/lib/intelligence-brief-context'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Simple LRU Cache for talk track deduplication
 class TalkTrackCache {
@@ -4694,7 +4695,7 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their facility/industry type in their location. For example: "I've been researching a manufacturing operation in ${city || 'Texas'}" or "I've been researching a logistics network in ${city || 'Texas'}" or "I've been researching an office-style footprint in ${city || 'Texas'}".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their specific operational focus or business focus (e.g. tire recycling operation, psychiatric facility, print and fulfillment setup, Latin foods production plant) in ${city || 'Texas'}. You MUST name their specific, concrete business type or activity instead of generic words. For example: "I've been researching a tire recycling operation in Fort Worth" or "I've been looking at a compounding pharmacy footprint in Houston" or "I've been researching a school district operation in Fort Worth". Never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
@@ -4743,41 +4744,91 @@ Return JSON only with this shape:
 
   try {
     const openrouterKey = process.env.OPEN_ROUTER_API_KEY || process.env.OPENROUTER_API_KEY
-    if (!openrouterKey) {
-      console.warn('[Intelligence Brief] OPEN_ROUTER_API_KEY not set, skipping AI generation')
-      return null
-    }
+    const geminiKey = process.env.NEXT_PUBLIC_FREE_GEMINI_KEY || process.env.GEMINI_API_KEY
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://powerchoosers.com',
-        'X-Title': 'Power Choosers CRM',
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4.6',
-        response_format: { type: 'json_object' },
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
+    let content = ''
+    let openRouterFailed = false
+
+    if (openrouterKey) {
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openrouterKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://powerchoosers.com',
+            'X-Title': 'Power Choosers CRM',
           },
-        ],
-        temperature: 0.7,
-        max_tokens: 400,
-      }),
-    })
+          body: JSON.stringify({
+            model: 'anthropic/claude-sonnet-4.6',
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'user',
+                content: prompt,
+              },
+            ],
+            temperature: 0.7,
+            max_tokens: 400,
+          }),
+        })
 
-    if (!response.ok) {
-      console.warn('[Intelligence Brief] AI generation failed:', response.status, response.statusText)
-      return null
+        if (!response.ok) {
+          throw new Error(`OpenRouter error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        content = cleanText(data?.choices?.[0]?.message?.content || '')
+      } catch (err: any) {
+        console.warn('[Intelligence Brief Rewrite] OpenRouter call failed, falling back to direct Gemini API...', err.message)
+        openRouterFailed = true
+      }
+    } else {
+      openRouterFailed = true
     }
 
-    const data = await response.json()
-    const content = cleanText(data?.choices?.[0]?.message?.content || '')
-    
+    if (openRouterFailed) {
+      if (!geminiKey) {
+        console.warn('[Intelligence Brief Rewrite] Neither OpenRouter nor Gemini API keys are configured for rewrite')
+        return null
+      }
+      console.log('[Intelligence Brief Rewrite] Calling Google Generative AI direct API fallback...')
+      const genAI = new GoogleGenerativeAI(geminiKey)
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-pro-latest', 'gemini-2.0-flash-lite']
+      let lastError = null
+
+      for (const modelName of modelsToTry) {
+        try {
+          console.log(`[Intelligence Brief Rewrite] Attempting direct Gemini API with model: ${modelName}`)
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: 'You are a plainspoken energy analyst and strategist polishing sales openers and talk tracks. Return JSON only.',
+          })
+          const result = await model.generateContent({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.7,
+            }
+          })
+          const text = result.response.text()?.trim()
+          if (text) {
+            content = cleanText(text)
+            console.log(`[Intelligence Brief Rewrite] Direct Gemini API call succeeded with model: ${modelName}`)
+            break
+          }
+        } catch (err: any) {
+          console.warn(`[Intelligence Brief Rewrite] Direct Gemini API failed for model ${modelName}:`, err.message)
+          lastError = err
+        }
+      }
+
+      if (!content) {
+        console.warn('[Intelligence Brief] AI generation returned empty content or all models failed. Last error:', lastError?.message)
+        return null
+      }
+    }
+
     if (!content) {
       console.warn('[Intelligence Brief] AI generation returned empty content')
       return null
@@ -5310,7 +5361,7 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   }
   // Title that is just the company name with location appended (directory style)
   if (companyLower.length > 3) {
-    const nameVariant = lower.replace(/[-|–|,|\s]+/g, '')
+    const nameVariant = companyLower.replace(/[-|–|,|\s]+/g, '')
     const titleVariant = lower.replace(/[-|–|,|\s]+/g, '')
     if (titleVariant.startsWith(nameVariant) && titleVariant.length - nameVariant.length < 30) return true
   }
@@ -6006,12 +6057,14 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   const confidence = toTitleCase(cleanText(result?.confidence_level))
 
   if (!usable || !headline || !detail || !talkTrack || !sourceUrl || !signalDate) {
+    console.warn('[Intelligence Brief Validation] Missing required fields:', { usable, headline: !!headline, detail: !!detail, talkTrack: !!talkTrack, sourceUrl: !!sourceUrl, signalDate: !!signalDate })
     return null
   }
 
   // Reject briefs where the headline is a raw page/browser title or directory stub
   // e.g. 'Home', 'Homepage - Team Worldwide', 'Spicy Pickle profile', 'My Pharmacy USA - Find your Daily Medications Here'
   if (isBoilerplatePageTitle(headline, cleanText(account.name) || '')) {
+    console.warn('[Intelligence Brief Validation] Boilerplate page title headline:', headline)
     return null
   }
   // Reject directory profile stubs like '[Company] profile' or '[Company] - [City], [State]'
@@ -6022,14 +6075,17 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
     /^.{3,60}\s+profile$/i.test(headline) ||
     /^.{3,60}\s*[-|—]\s*(company overview|company profile|linkedin|yelp|yellowpages|manta|dnb|dun & bradstreet)$/i.test(headline)
   ) {
+    console.warn('[Intelligence Brief Validation] Directory profile headline:', headline)
     return null
   }
 
   if (isStaleNewsSignal(candidate)) {
+    console.warn('[Intelligence Brief Validation] Stale news signal:', candidate?.title)
     return null
   }
 
   if (isLikelyNonEnglishText(headline, detail, talkTrack, sourceUrl, result?.source_title || '', result?.source_domain || '')) {
+    console.warn('[Intelligence Brief Validation] Likely non-English text')
     return null
   }
 
@@ -6038,15 +6094,19 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const outputText = `${headline} ${detail} ${talkTrack}`
   if (/\b(sec filing|filing tied|filing about|recent filing|public filing)\b/i.test(talkTrack) && !sourceIsSec) {
+    console.warn('[Intelligence Brief Validation] SEC filing reference on non-SEC source:', talkTrack)
     return null
   }
   if (/\b(acquisition|acquired|merger|buyout|takeover|ownership change|new owner|new ownership|inherited)\b/i.test(outputText) && !hasAcquisitionEvidence(candidateText)) {
+    console.warn('[Intelligence Brief Validation] Mismatched acquisition claim:', outputText)
     return null
   }
   if (candidate?.priority === 2 && !isTexasRelevantLocationSignal(`${candidate?.title || ''} ${candidate?.snippet || ''} ${detail} ${talkTrack}`)) {
+    console.warn('[Intelligence Brief Validation] Out of state location on priority 2 signal')
     return null
   }
   if (!isTexasRelevantLocationSignal(`${candidate?.title || ''} ${candidate?.snippet || ''} ${detail}`) && /\b(move-?in|new site|new location|new store|opening soon|opening|launching|launches)\b/i.test(talkTrack)) {
+    console.warn('[Intelligence Brief Validation] New location signal not in Texas')
     return null
   }
 
@@ -6054,6 +6114,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
   const talkTrackSentenceCount = splitTalkTrackSentences(talkTrack).length
   if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 95) {
+    console.warn('[Intelligence Brief Validation] Length constraints failed:', { talkTrack, sentenceCount: talkTrackSentenceCount, wordCount: talkTrackWordCount })
     return null
   }
 
@@ -6296,8 +6357,9 @@ async function runOpenRouterResearch(
   audienceProfile: AudienceProfile | null = null,
 ) {
   const openRouterKey = process.env.OPEN_ROUTER_API_KEY
-  if (!openRouterKey) {
-    throw new Error('OPEN_ROUTER_API_KEY is not configured')
+  const geminiKey = process.env.NEXT_PUBLIC_FREE_GEMINI_KEY || process.env.GEMINI_API_KEY
+  if (!openRouterKey && !geminiKey) {
+    throw new Error('Neither OPEN_ROUTER_API_KEY nor GEMINI_API_KEY is configured')
   }
 
   const selectedCandidates = candidates.slice(0, 16)
@@ -6438,7 +6500,7 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their facility/industry type in their location. For example: "I've been researching a manufacturing operation in [Location]" or "I've been researching a logistics network in [Location]" or "I've been researching an office-style footprint in [Location]".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook around researching their specific operational focus or business focus (e.g. tire recycling operation, psychiatric facility, print and fulfillment setup, Latin foods production plant) in [Location]. You MUST name their specific, concrete business type or activity instead of generic words. For example: "I've been researching a tire recycling operation in Fort Worth" or "I've been looking at a compounding pharmacy footprint in Houston" or "I've been researching a school district operation in Fort Worth". Never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 - Do NOT repeat words or phrases redundantly.
@@ -6481,7 +6543,10 @@ Decision rules:
 - Do NOT use any source with a URL from news.google.com or Google News RSS. If all candidates are Google News RSS, set usable_signal to false.
 - If the research payload only contains basic website descriptions, generic homepages, or search results that are just the company's main homepage, you MUST set "usable_signal" to false. This is critical so the system can transition to fallback mode and build a clean industry context brief.
 - Signal Headline must be a meaningful, human-readable summary of the actual event or company context — NEVER a raw page title, browser tab title, domain name, or the company name alone. Do NOT output anything like "Home - Lincoln Manufacturing, Inc." or "Welcome to Acme Corp" as the headline. Write it as a real intelligence insight: e.g. "Lincoln Manufacturing Expands Oil Field Threading Operations in Texas" or "Avalanche Food Group Opens Bread Zeppelin Location in Shenandoah."
-- Signal Detail must be a synthesized, coherent, and useful summary of the event (who, what, where, and when) in 2 to 4 complete sentences. Explain what happened clearly to give the reader real value. Do NOT copy/paste raw product category lists, cookie consent banners, nav menu text, boilerplate homepage copy, or unstructured website snippets. If the only available data is homepage boilerplate, set usable_signal to false instead.
+- Signal Detail must be a dense, strategic sales-intelligence summary of the event (exactly 3 to 4 sentences). Do NOT just write a generic company description or bullet points of what they do. Instead, describe:
+  1. The operational power-use profile of the company (e.g. "operating 24/7 cleanrooms and refrigeration", "running high-volume CNC machinery", "running classroom HVAC across a school district").
+  2. The specific commercial energy liabilities they face (e.g. "heavy demand ratchet exposure from starting up large motors", "high summer 4CP coincident peak liability from comfort cooling during ERCOT scarcity periods", "seasonal budget volatility from HVAC peak load").
+  3. The strategic sales angle/pain point for Lewis to lead with (e.g. "leverage contract review to check for demand ratchet floors", "lead with active peak timing during summer 4CP hours to eliminate transmission liability", "discuss seasonal predictability and contract structuring").
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
@@ -6588,7 +6653,10 @@ FALLBACK MODE: No recent news signals were found. Generate an intelligence brief
 Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
 - Create a headline that positions the company within their industry context. The headline must be a meaningful intelligence insight — NEVER a raw page title, browser tab title, or the company name alone. Write it like a research analyst would: e.g. "Texas-Based Oil Field Equipment Manufacturer with Multi-Site Production Footprint" or "Multi-Location Restaurant Group Operating Across Houston Metro."
-- Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector. Write 2 to 4 complete synthesized sentences. Do NOT copy raw product lists, cookie banners, nav menu text, or homepage boilerplate. If the company site lists specific products or services (like "API threading, pup joints, inflatable packers"), translate those into what they mean operationally: "a manufacturer of precision oil field completion components including threaded connections and downhole tools."
+- Signal Detail must be a dense, strategic sales-intelligence summary (exactly 3 to 4 sentences). Do NOT just write a generic company description or bullet points of what they do. Instead, describe:
+  1. Their actual operational power-use profile (e.g. "operating 24/7 cleanrooms and refrigeration", "running high-volume CNC machinery", "running classroom HVAC across a school district").
+  2. The specific commercial energy liabilities they face (e.g. "heavy demand ratchet exposure from starting up large motors", "high summer 4CP coincident peak liability from comfort cooling during ERCOT scarcity periods", "seasonal budget volatility from HVAC peak load").
+  3. The strategic sales angle/pain point for Lewis to lead with (e.g. "leverage contract review to check for demand ratchet floors", "lead with active peak timing during summer 4CP hours to eliminate transmission liability", "discuss seasonal predictability and contract structuring").
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates. You MUST customize the talk track to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders.
 - Talk Track should sound like you actually researched this specific company.
 - Use the problemFrame and questionFrame in the context ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
@@ -6706,45 +6774,100 @@ ${audienceProfileBlock ? `AUDIENCE_PROFILE:\n${audienceProfileBlock}\n` : ''}
 RESEARCH PAYLOAD:
 ${JSON.stringify(researchPayload, null, 2)}`
 
-  const { response, text } = await fetchTextWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${openRouterKey}`,
-      'HTTP-Referer': process.env.API_BASE_URL || 'https://nodalpoint.io',
-      'X-Title': 'Nodal Point Intelligence Brief',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: fullPrompt },
-        { role: 'user', content: 'Generate the account intelligence brief now.' },
-      ],
-      temperature: isFallbackMode ? 0.3 : 0.2,
-      max_tokens: 4000,
-    }),
-  }, 25000)
+  let rawContent = ''
+  let openRouterFailed = false
 
-  if (!response.ok) {
-    throw new Error(`OpenRouter error: ${response.status} ${text.slice(0, 300)}`)
+  if (openRouterKey) {
+    try {
+      const { response, text } = await fetchTextWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterKey}`,
+          'HTTP-Referer': process.env.API_BASE_URL || 'https://nodalpoint.io',
+          'X-Title': 'Nodal Point Intelligence Brief',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: fullPrompt },
+            { role: 'user', content: 'Generate the account intelligence brief now.' },
+          ],
+          temperature: isFallbackMode ? 0.3 : 0.2,
+          max_tokens: 4000,
+        }),
+      }, 25000)
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter error: ${response.status} ${text.slice(0, 300)}`)
+      }
+
+      const raw = text?.trim()
+      if (!raw) {
+        throw new Error('OpenRouter returned an empty response')
+      }
+
+      let responseBody: any = null
+      try {
+        responseBody = JSON.parse(raw)
+      } catch {
+        throw new Error('Could not parse OpenRouter wrapper response as JSON')
+      }
+
+      const content = cleanText(responseBody?.choices?.[0]?.message?.content)
+      if (!content) {
+        throw new Error('OpenRouter returned an empty model response')
+      }
+      rawContent = content
+    } catch (err: any) {
+      console.warn('[Intelligence Brief] OpenRouter call failed, falling back to direct Gemini API...', err.message)
+      openRouterFailed = true
+    }
+  } else {
+    openRouterFailed = true
   }
 
-  const raw = text?.trim()
-  if (!raw) {
-    throw new Error('OpenRouter returned an empty response')
-  }
+  if (openRouterFailed) {
+    if (!geminiKey) {
+      throw new Error('OpenRouter failed and no direct Gemini API key (NEXT_PUBLIC_FREE_GEMINI_KEY) is configured')
+    }
+    console.log('[Intelligence Brief] Calling Google Generative AI direct API fallback...')
+    const genAI = new GoogleGenerativeAI(geminiKey)
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-3.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-pro-latest', 'gemini-2.0-flash-lite']
+    let responseText = ''
+    let lastError = null
 
-  let responseBody: any = null
-  try {
-    responseBody = JSON.parse(raw)
-  } catch {
-    throw new Error('Could not parse OpenRouter wrapper response as JSON')
-  }
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`[Intelligence Brief] Attempting direct Gemini API with model: ${modelName}`)
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          systemInstruction: fullPrompt,
+        })
+        const result = await model.generateContent({
+          contents: [{ role: 'user', parts: [{ text: `TALK_TRACK_CONTEXT:\n${talkTrackContextJson}\n\n${audienceProfileBlock ? `AUDIENCE_PROFILE:\n${audienceProfileBlock}\n` : ''}\n\nRESEARCH PAYLOAD:\n${JSON.stringify(researchPayload, null, 2)}` }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: isFallbackMode ? 0.3 : 0.2,
+          }
+        })
+        const text = result.response.text()?.trim()
+        if (text) {
+          responseText = text
+          console.log(`[Intelligence Brief] Direct Gemini API call succeeded with model: ${modelName}`)
+          break
+        }
+      } catch (err: any) {
+        console.warn(`[Intelligence Brief] Direct Gemini API failed for model ${modelName}:`, err.message)
+        lastError = err
+      }
+    }
 
-  const rawContent = cleanText(responseBody?.choices?.[0]?.message?.content)
-  if (!rawContent) {
-    throw new Error('OpenRouter returned an empty model response')
+    if (!responseText) {
+      throw new Error(`Direct Gemini API failed for all models. Last error: ${lastError?.message || 'Unknown'}`)
+    }
+    rawContent = cleanText(responseText)
   }
 
   let parsed: BriefResult | null = null
