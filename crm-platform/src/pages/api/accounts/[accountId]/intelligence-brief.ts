@@ -1026,6 +1026,10 @@ function normalizeWebsiteCandidate(value: unknown) {
   }
 }
 
+function getAccountWebsiteRoot(account: AccountRow) {
+  return normalizeWebsiteCandidate(account.website || account.domain)
+}
+
 function buildHierarchyResearchContext(
   account: AccountRow,
   relatedAccounts: Array<Partial<AccountRow> & { id: string }> = [],
@@ -5177,7 +5181,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const companyName = cleanText(account.name) || 'the company'
   const signalAnchor = cleanText(deriveSignalAnchor(account, candidate))
-  const title = cleanText(candidate?.title || '')
+  const rawTitle = cleanText(candidate?.title || '')
+  const title = isBoilerplatePageTitle(rawTitle, companyName) ? '' : rawTitle
     .replace(/\s*[-|]\s*(AftermarketNews|Google News|PR Newswire|Business Wire|GlobeNewswire|News)\s*$/i, '')
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const companyKey = companyName.toLowerCase()
@@ -5492,10 +5497,11 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/^(skip to content|skip to main content|skip navigation|skip to main|skip content|skip main|menu|toggle navigation)$/i.test(t.trim())) return true
 
   // HTTP error and server response strings that leak into titles
-  if (/^(the request could not be satisfied|access denied|403 forbidden|404 not found|error 403|error 404|service unavailable|bad gateway|gateway timeout|too many requests|you are using an outdated browser)/i.test(t)) return true
+  if (/^(server error|the request could not be satisfied|access denied|403 forbidden|404 not found|error 403|error 404|service unavailable|bad gateway|gateway timeout|too many requests|you are using an outdated browser)/i.test(t)) return true
   if (/^(close menu|open menu|main menu|site menu|search)$/i.test(t.trim())) return true
   if (/\byou are using an outdated browser\b/i.test(t)) return true
   if (/\bdefend your assets\b.*\boutdated browser\b/i.test(t)) return true
+  if (/\buses cookies to enhance your experience\b/i.test(t)) return true
   if (/\b(performing|checking)\s+(security|site connection)\s+verification\b/i.test(t)) return true
   if (/\bsecurity service to protect against malicious bots\b/i.test(t)) return true
   if (/\brequires cookies to be enabled\b/i.test(t)) return true
@@ -5511,6 +5517,7 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/\bhomepage\b/i.test(t) && t.split(/\s+/).length <= 5) return true
   if (/^why\s+[a-z0-9 &/-]{3,40}$/i.test(t.trim())) return true
   if (/^benefits\s+why\s+use\b/i.test(t.trim())) return true
+  if (/^[a-z0-9 '&.-]{2,80}\s+in the news$/i.test(t.trim())) return true
 
   // Title is just the company name (with optional site name separator)
   const strippedCompanyChars = companyLower.replace(/[^a-z0-9]/g, '')
@@ -6025,7 +6032,11 @@ async function fetchLinkedInHits(account: AccountRow) {
 }
 
 async function fetchGeneralWebHits(account: AccountRow, hierarchyContext: HierarchyResearchContext | null = null) {
-  return fetchBingRssHits(buildSearchBuckets(account, true, hierarchyContext), 'web', 4, account)
+  const [domainHits, broaderHits] = await Promise.all([
+    fetchBingRssHits(buildSearchBuckets(account, true, hierarchyContext), 'web', 4, account),
+    fetchBingRssHits(buildSearchBuckets(account, false, hierarchyContext).slice(0, 4), 'web', 3, account),
+  ])
+  return dedupeAndSort([...domainHits, ...broaderHits], account)
 }
 
 async function fetchHierarchyWebsiteHits(hierarchyContext: HierarchyResearchContext | null) {
@@ -6049,7 +6060,7 @@ async function fetchHierarchyWebsiteHits(hierarchyContext: HierarchyResearchCont
 
   const hits = await Promise.all(targets.map(async (target) => {
     try {
-      return await fetchPageHit(
+      return await fetchJinaPage(
         target.url || '',
         { priority: 8, label: target.label, query: target.query },
         'web',
@@ -6067,6 +6078,8 @@ async function fetchHierarchyWebsiteHits(hierarchyContext: HierarchyResearchCont
 async function collectResearchCandidates(account: AccountRow, hierarchyContext: HierarchyResearchContext | null = null) {
   const buckets = buildSearchBuckets(account, false, hierarchyContext)
   const settled = (await Promise.allSettled([
+    fetchOfficialWebsiteHits(account),
+    fetchHierarchyWebsiteHits(hierarchyContext),
     (async () => {
       const rssResults = await Promise.all(buckets.map(async (bucket) => {
         const url = `https://news.google.com/rss/search?q=${encodeURIComponent(bucket.query)}&hl=en-US&gl=US&ceid=US:en`
@@ -6088,11 +6101,11 @@ async function collectResearchCandidates(account: AccountRow, hierarchyContext: 
     fetchSecFilingHits(account),
   ])) as PromiseSettledResult<ResearchHit[]>[]
 
-  const [newsHits, bingNewsHits, webHits, linkedInHits, secSearchHits, secFilingHits] = settled.map((result: PromiseSettledResult<ResearchHit[]>) => (
+  const [officialWebsiteHits, hierarchyWebsiteHits, newsHits, bingNewsHits, webHits, linkedInHits, secSearchHits, secFilingHits] = settled.map((result: PromiseSettledResult<ResearchHit[]>) => (
     result.status === 'fulfilled' ? result.value : []
-  )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
+  )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
 
-  return dedupeAndSort([...newsHits, ...bingNewsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits], account)
+  return dedupeAndSort([...newsHits, ...bingNewsHits, ...officialWebsiteHits, ...webHits, ...hierarchyWebsiteHits, ...linkedInHits, ...secSearchHits, ...secFilingHits], account)
 }
 
 function serializeAccount(account: AccountRow) {
@@ -6194,6 +6207,20 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     return shortenText(detail, 560)
   }
 
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
+  if (profile?.industryCluster === 'restaurant' && (multiSiteInfo.isMultiSite || /\b(franchisee groups?|restaurant group|restaurants? across|multi[-\s]?location|locations? across)\b/i.test(detailText))) {
+    const locationText = multiSiteInfo.locationCount
+      ? `${multiSiteInfo.locationCount}+ restaurant locations`
+      : 'multiple restaurant locations'
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates as a restaurant group supporting ${locationText}.`,
+      `The relevant operating pieces are kitchen timing, refrigeration, dining-room HVAC, and location-by-location bill review.`,
+      `The electricity angle is checking which locations are creating the highest usage moments instead of treating the restaurant group like one blended bill.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(companyType)} ${companyType.toLowerCase() === 'commercial account' ? 'commercial facility' : companyType.toLowerCase()}.`
   
   const operationDetail = identityKeywords.length
@@ -6245,6 +6272,15 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
     return `${companyName} Petrochemical Site-Store Logistics Operating Context`
   }
 
+  if (profile?.industryCluster === 'restaurant') {
+    const multiSiteInfo = detectMultiSiteScale(account, candidate)
+    if (multiSiteInfo.isMultiSite) {
+      const locationText = multiSiteInfo.locationCount ? `${multiSiteInfo.locationCount}+` : 'Multi-Location'
+      return `${companyName} ${locationText} Restaurant Group Operating Context`
+    }
+    return `${companyName} Restaurant Operations and Billing Context`
+  }
+
   if (profile?.industryCluster === 'retail') {
     if (/(grocery|supermarket|market|food market)/i.test(text)) return `${companyName} Manages Grocery Store and Refrigerated Retail Load`
     if (hasConvenienceStoreSignals(text)) return `${companyName} Operates Multi-Store Convenience Retail Footprint`
@@ -6261,14 +6297,15 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
 }
 
 function normalizeFinalSignalHeadline(headline: string, account: AccountRow, candidate: ResearchHit | null = null) {
-  const cleaned = cleanText(headline)
+  const cleaned = cleanText(headline).replace(/\s{2,}/g, ' ')
   const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)}`)
   if (!cleaned) return buildCompanyContextHeadline(account, null)
+  if ((candidate?.priority || 0) >= 8 && (!candidate || !isOfficialCompanyAnnouncement(account, candidate))) return buildCompanyContextHeadline(account, null)
   if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '')) return buildCompanyContextHeadline(account, null)
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
     return buildCompanyContextHeadline(account, null)
   }
-  if (/\b(close menu|open menu|security verification|site connection security|requires cookies|benefits why use)\b/i.test(cleaned)) {
+  if (/\b(server error|close menu|open menu|security verification|site connection security|requires cookies|uses cookies|benefits why use|in the news)\b/i.test(cleaned)) {
     return buildCompanyContextHeadline(account, null)
   }
   if (/\bwebsite facility and billing intel\b/i.test(cleaned)) {
@@ -6277,8 +6314,23 @@ function normalizeFinalSignalHeadline(headline: string, account: AccountRow, can
   return cleaned
 }
 
+function removeInternalSalesInstructionSentences(value: string) {
+  const text = cleanText(value)
+  if (!text) return ''
+  return text
+    .split(/(?<=[.!?])\s+/)
+    .filter((sentence) => !/\b(lewis|nodal point|seller|sales angle|strategic sales angle|lead with|should focus|can lead)\b/i.test(sentence))
+    .join(' ')
+    .trim()
+}
+
 function normalizeSignalDetail(detail: string, headline: string, account: AccountRow, candidate: ResearchHit | null) {
-  const cleaned = cleanText(detail)
+  const cleaned = simplifyTalkTrackLanguage(removeInternalSalesInstructionSentences(detail))
+    .replace(/\bcommercial energy liabilities\b/gi, 'electricity cost pressure')
+    .replace(/\bdemand charges?\b/gi, 'charges tied to when the site uses the most power')
+    .replace(/\butility billing\b/gi, 'electricity bill')
+    .replace(/\benergy costs?\b/gi, 'electricity costs')
+    .replace(/\benergy consumption\b/gi, 'electricity usage')
   const normalizedDetail = normalizeEntityToken(cleaned)
   const normalizedHeadline = normalizeEntityToken(headline)
   const normalizedCandidateTitle = normalizeEntityToken(candidate?.title || '')
@@ -6298,6 +6350,7 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
     wordCount < 12 ||
     repeatsShortDescription ||
     /^.{0,80}\bis a commercial account\b/i.test(cleaned) ||
+    /\b(lewis should|lewis can|strategic sales angle|sales angle)\b/i.test(cleaned) ||
     (!!normalizedHeadline && normalizedDetail === normalizedHeadline) ||
     (!!normalizedCandidateTitle && normalizedDetail === normalizedCandidateTitle) ||
     /\b(aftermarketnews|google news|newswire|rss)\b/i.test(cleaned) ||
@@ -6576,11 +6629,10 @@ async function fetchJinaPage(
   }
 }
 
-async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit | null> {
-  const domain = cleanText(account.domain)
-  if (!domain) return null
+function buildCompanyWebsiteTargets(account: AccountRow) {
+  const rootUrl = getAccountWebsiteRoot(account)
+  if (!rootUrl) return []
 
-  const rootUrl = domain.startsWith('http') ? domain : `https://${domain}`
   const makeUrl = (path: string) => {
     try {
       const url = new URL(rootUrl)
@@ -6592,13 +6644,27 @@ async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit
       return ''
     }
   }
-  const targets = uniqueStrings([
+
+  return uniqueStrings([
     rootUrl,
     makeUrl('/about-us'),
     makeUrl('/about'),
+    makeUrl('/company'),
+    makeUrl('/our-company'),
+    makeUrl('/services'),
+    makeUrl('/products'),
+    makeUrl('/locations'),
+    makeUrl('/news'),
+    makeUrl('/press'),
+    makeUrl('/careers'),
     makeUrl('/pages/about-us'),
     makeUrl('/pages/about'),
-  ].filter(Boolean), 5)
+  ].filter(Boolean), 10)
+}
+
+async function fetchOfficialWebsiteHits(account: AccountRow): Promise<ResearchHit[]> {
+  const targets = buildCompanyWebsiteTargets(account)
+  if (!targets.length) return []
 
   try {
     const results = await Promise.allSettled(targets.map((url, index) => fetchJinaPage(
@@ -6615,15 +6681,20 @@ async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit
       .map((result) => result.status === 'fulfilled' ? result.value : null)
       .filter(Boolean) as ResearchHit[]
 
-    return dedupeAndSort(hits, account)[0] || null
+    return dedupeAndSort(hits, account).slice(0, 6)
   } catch (error) {
     console.warn('[Intelligence Brief] Company website fetch failed:', error)
-    return null
+    return []
   }
 }
 
+async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit | null> {
+  const hits = await fetchOfficialWebsiteHits(account)
+  return hits[0] || null
+}
+
 function buildCompanyProfileFallbackHit(account: AccountRow): ResearchHit | null {
-  const domain = cleanText(account.domain)
+  const domain = cleanText(account.website || account.domain)
   const description = getPublicAccountDescription(account)
 
   if (!domain && !description) return null
@@ -7590,10 +7661,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      const finalHeadline = normalizeFinalSignalHeadline(validated.signal_headline || '', briefingAccount, talkTrackCandidate)
       validated = {
         ...validated,
-        signal_headline: normalizeFinalSignalHeadline(validated.signal_headline || '', briefingAccount, talkTrackCandidate),
-        signal_detail: normalizeSignalDetail(validated.signal_detail || '', validated.signal_headline || '', briefingAccount, talkTrackCandidate),
+        signal_headline: finalHeadline,
+        signal_detail: normalizeSignalDetail(validated.signal_detail || '', finalHeadline, briefingAccount, talkTrackCandidate),
         talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
       }
 
