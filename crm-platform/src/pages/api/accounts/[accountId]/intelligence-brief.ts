@@ -898,7 +898,6 @@ function buildIdentityProfileText(account: AccountRow, candidate: ResearchHit | 
     profile.facilityType,
     profile.identityKeywords.join(' '),
     profile.powerKeywords.join(' '),
-    profile.talkTrackGuardrails.join(' '),
   ].join(' ')).toLowerCase()
 }
 
@@ -4958,7 +4957,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountSchoolRetailJargon = accountIsSchool &&
     /\b(retail footprint|roll-?up view|store meters?|store-level|stores?|customer-facing retail|retail group|showroom)\b/i.test(lower)
   const accountIsAutomotive = hasStrongAutomotiveSignals(accountText)
-  const accountIsRetail = context.industryCluster === 'retail' || hasStrongRetailStoreSignals(accountText) || /\b(retail|store|stores?|showroom|customer-facing)\b/i.test(accountText)
+  const accountIsRetail = context.industryCluster === 'retail' ||
+    ((hasStrongRetailStoreSignals(accountText) || /\b(retail|store|stores?|showroom|customer-facing)\b/i.test(accountText)) &&
+     !['manufacturing', 'logistics', 'food_storage', 'print_fulfillment', 'moving_storage'].includes(context.industryCluster))
   const accountIsAutoPartsDistribution = hasStrongAutoPartsDistributionSignals(accountText)
   const accountAutoPartsDealershipJargon = accountIsAutoPartsDistribution &&
     /\b(dealership|dealerships|showroom traffic|service bays?|lot lighting|vehicle inventory|auto dealer)\b/i.test(lower)
@@ -5326,6 +5327,9 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (!t) return true
   const lower = t.toLowerCase()
   const companyLower = cleanText(accountName).toLowerCase()
+
+  // Skip navigation and accessibility boilerplate
+  if (/^(skip to content|skip to main content|skip navigation|skip to main|skip content|skip main|menu|toggle navigation)$/i.test(t.trim())) return true
 
   // HTTP error and server response strings that leak into titles
   if (/^(the request could not be satisfied|access denied|403 forbidden|404 not found|error 403|error 404|service unavailable|bad gateway|gateway timeout|too many requests|you are using an outdated browser)/i.test(t)) return true
@@ -6196,6 +6200,45 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   }
 }
 
+function cleanCompanyNameForSearch(name: string): string {
+  return cleanText(name)
+    .replace(/\b(llc|inc|l\.l\.c\.|co\.|corp\.|corporation|ltd|limited|company|lp|gmbh|p\.a\.|pa)\b/gi, '')
+    .replace(/[^a-z0-9\s&]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function stripHeaderBoilerplate(text: string, companyName: string): string {
+  const t = cleanText(text)
+  if (!t || !companyName) return t
+
+  const lower = t.toLowerCase()
+  const cleanComp = cleanCompanyNameForSearch(companyName)
+  const companyLower = cleanComp.toLowerCase()
+
+  // Find the company name in the text
+  if (companyLower.length > 2) {
+    const idx = lower.indexOf(companyLower)
+    if (idx > 0 && idx < 450) {
+      const beforeText = lower.slice(0, idx)
+      // Check if the preceding text contains navigation or announcement boilerplate keywords
+      const hasNavKeywords = /\b(skip to content|skip to main|skip navigation|menu|toggle|navigation|home|about|locations|providers|careers|contact|search|pay my bill|schedule|patient|portal|login|sign in)\b/i.test(beforeText)
+      
+      if (hasNavKeywords) {
+        return t.slice(idx)
+      }
+    }
+  }
+
+  // Also catch generic "Skip to content" or "Skip navigation" at the very beginning
+  const skipMatch = /^\s*(skip to content|skip to main content|skip navigation|skip main|menu|toggle navigation)\b\s*[-|–|,|.]*/i.exec(t)
+  if (skipMatch) {
+    return t.slice(skipMatch[0].length).trim()
+  }
+
+  return t
+}
+
 /**
  * Fetches a URL via Jina AI Reader (r.jina.ai), which returns clean markdown
  * stripped of nav, cookie banners, JS warnings, and boilerplate HTML.
@@ -6232,12 +6275,15 @@ async function fetchJinaPage(
     const bodyText = bodyLines.join(' ').slice(0, 2000)
 
     const companyName = cleanText(titleFallback)
+    const cleanCompName = companyName.replace(/\b(website|profile|site)\b/gi, '').trim()
+    const cleanedBodyText = stripHeaderBoilerplate(bodyText, cleanCompName)
+
     // Use the raw title only if it looks meaningful; otherwise fall back to snippet
     const title = isBoilerplatePageTitle(rawTitle, companyName)
-      ? sanitizeResearchTitle(rawTitle, companyName, bodyText)
+      ? sanitizeResearchTitle(rawTitle, companyName, cleanedBodyText)
       : rawTitle
 
-    const snippet = bodyText.slice(0, 520) || title
+    const snippet = cleanedBodyText.slice(0, 520) || title
 
     if (!title && !snippet) return null
 
