@@ -685,11 +685,11 @@ function hasStrongOfficeServicesSignals(text: string) {
 }
 
 function hasStrongSchoolSignals(text: string) {
-  return /(school district|independent school district|isd\b|public school|charter school|k-12|school campus|students|classrooms|teachers|students|school\b)/i.test(text)
+  return /(school district|independent school district|isd\b|public school|charter school|k-12|school campus|students|classrooms|teachers|school\b|academy|daycare|preschool|childcare|tutoring|learning center)/i.test(text)
 }
 
 function hasStrongAutomotiveDealerSignals(text: string) {
-  return /(dealership|dealerships|car dealer|auto dealer|vehicle inventory|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
+  return /\b(dealerships?|car dealer|auto dealer|vehicle inventory|showrooms?|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text)
 }
 
 function getIndefiniteArticle(word: string): string {
@@ -765,7 +765,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     return true
   }
 
-  if (schoolSignals && /(retail|store|showroom|shopping|customer-facing retail|retail group|retail footprint|roll-?up view)/i.test(profileText)) {
+  if (schoolSignals && /(retail|store|showroom|shopping|customer-facing retail|retail group|retail footprint|roll-?up view|dealership|service bay|automotive)/i.test(profileText)) {
     return true
   }
 
@@ -2136,7 +2136,8 @@ function buildStructuredIdentityProfile(
   hierarchyWebsiteHits: ResearchHit[] = [],
 ): IntelligenceProfile | null {
   const savedProfile = getAccountIdentityProfile(account)
-  const researchText = candidates
+  const companySpecificCandidates = candidates.filter((c) => c.label !== 'Industry Trends')
+  const researchText = companySpecificCandidates
     .slice(0, 8)
     .map((candidate) => `${candidate.title} ${candidate.snippet}`)
     .join(' ')
@@ -2149,12 +2150,12 @@ function buildStructuredIdentityProfile(
     ...account,
     description: cleanText(`${getPublicAccountDescription(account)} ${researchText} ${hierarchyText}`),
   }
-  const primaryCandidate = candidates[0] || null
+  const primaryCandidate = companySpecificCandidates[0] || null
   const baseCluster = inferIndustryClusterFromSignals(account, null)
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
   const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText} ${buildIdentityProfileText(account, primaryCandidate)}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText}`).toLowerCase()
 
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
@@ -2456,6 +2457,27 @@ function buildStructuredIdentityProfile(
       talkTrackGuardrails = ['No factory language', 'No shift or production language']
       break
 
+    case 'education_nonprofit':
+      if (/(academy|daycare|preschool|childcare|tutoring|learning center)/i.test(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'educational academy network' : 'educational academy'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location learning-center network' : 'single learning-center site'
+        facilityType = 'learning center / classrooms'
+        identityKeywords = selectIdentityKeywords(text, ['academy', 'learning center', 'preschool', 'daycare', 'tutoring', 'childcare', 'education'], ['educational academy', 'childcare', 'learning center'])
+        powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'classroom technology', 'safety systems', 'seasonal schedule'], ['HVAC', 'classroom technology', 'lighting'])
+        talkTrackGuardrails = ['No factory language', 'No retail language', 'No hotel language']
+        break
+      }
+      {
+        const isCharityOrFoundation = /(nonprofit|non-profit|charity|foundation|association|human services|community services)/i.test(text)
+        companyType = isCharityOrFoundation ? 'nonprofit organization' : 'educational or nonprofit entity'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-facility program network' : 'single-facility operation'
+        facilityType = 'office / program space'
+        identityKeywords = selectIdentityKeywords(text, ['nonprofit', 'charity', 'foundation', 'community services', 'education', 'human services'], [isCharityOrFoundation ? 'nonprofit' : 'educational services'])
+        powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'office operations', 'program hours'], ['HVAC', 'lighting', 'office operations'])
+        talkTrackGuardrails = ['No retail language', 'No factory language', 'No dealership language']
+      }
+      break
+
     case 'higher_education':
       companyType = 'college or university'
       operatingModel = multiSiteInfo.isMultiSite ? 'campus network' : 'single campus'
@@ -2604,7 +2626,6 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
 }
 
 const TALK_TRACK_GENERIC_PATTERNS = [
-  /autopilot/i,
   /site\s*by\s*site/i,
   /load profile/i,
   /energy load/i,
@@ -2702,28 +2723,28 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
 }
 
 const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
-  manufacturing: ['manufacturing', 'industrial', 'factory', 'plant'],
-  logistics: ['logistics', 'warehouse', 'distribution', 'fulfillment'],
-  print_fulfillment: ['printing', 'direct mail', 'document reproduction', 'print fulfillment'],
-  public_transit: ['public transit', 'trolley', 'streetcar', 'transportation authority'],
-  moving_storage: ['moving and storage', 'commercial moving', 'storage', 'relocation'],
-  food_storage: ['cold storage', 'refrigeration', 'freezer', 'food storage'],
-  healthcare: ['healthcare', 'hospital', 'clinic', 'medical', 'senior living', 'assisted living', 'nursing'],
-  banking: ['bank', 'banking', 'credit union', 'financial services'],
-  retail: ['retail', 'store', 'shopping', 'showroom'],
-  restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service', 'venue', 'wedding', 'event space', 'lodging', 'hotel', 'motel'],
-  hotel_owner: ['hotel', 'hotels', 'resort', 'resorts', 'motel', 'inn', 'lodging', 'guest rooms', 'brand flag'],
-  hospitality_group: ['hospitality group', 'hotel management', 'portfolio of hotels', 'management company', 'multiple properties', 'brands'],
-  school_district: ['school district', 'isd', 'independent school district', 'public school', 'k-12', 'campus'],
-  higher_education: ['college', 'university', 'higher education', 'community college', 'campus'],
-  residential_care: ["children's home", 'foster care', 'adoption', 'residential services', 'independent living', 'counseling center', 'residential care'],
-  education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'university', 'college'],
-  religious: ['church', 'synagogue', 'mosque', 'temple', 'congregation', 'parish', 'worship', 'ministry'],
-  technology: ['technology', 'tech', 'software', 'saas', 'data center'],
-  energy_intensive: ['energy-intensive', 'heavy site', 'industrial gas', 'refinery', 'mining', 'quarry'],
-  office_services: ['office', 'professional services', 'consulting', 'legal', 'accounting'],
-  multi_site: ['multi-site', 'portfolio', 'branch', 'chain'],
-  public_sector: ['city', 'municipal', 'government', 'public sector', 'civic', 'utility'],
+  manufacturing: ['factory production', 'industrial plant', 'manufacturing shop', 'fabrication facility'],
+  logistics: ['logistics distribution', 'freight terminal', 'cargo distribution', 'shipping hub'],
+  print_fulfillment: ['printing press', 'direct mail house', 'document reproduction', 'print fulfillment'],
+  public_transit: ['public transit', 'trolley system', 'streetcar barn', 'transit authority'],
+  moving_storage: ['moving and storage', 'commercial moving company', 'relocation services'],
+  food_storage: ['cold storage freezer', 'refrigerated warehouse', 'freezer facility', 'food storage depot'],
+  healthcare: ['acute care hospital', 'medical clinic facility', 'clinical lab setup', 'outpatient facility'],
+  banking: ['bank branch office', 'credit union branch', 'financial services branch'],
+  retail: ['retail showroom', 'customer-facing retail store', 'shopping outlet'],
+  restaurant: ['restaurant kitchen', 'dining operations', 'food service venue', 'fast food outlet'],
+  hotel_owner: ['hotel flag', 'guest rooms', 'resort property', 'lodging facility'],
+  hospitality_group: ['hotel portfolio', 'hospitality management group', 'multi-property hospitality'],
+  school_district: ['k-12 school district', 'independent school district', 'public school campus'],
+  higher_education: ['university campus', 'student residence hall', 'college campus', 'dormitory building'],
+  residential_care: ["children's foster home", 'residential care facility', 'independent living facility', 'counseling center space'],
+  education_nonprofit: ['nonprofit building', 'education nonprofit campus', 'community center facility'],
+  religious: ['worship sanctuary', 'church sanctuary', 'synagogue sanctuary', 'temple congregation'],
+  technology: ['data center facility', 'server cooling room', 'tech server farm'],
+  energy_intensive: ['petrochemical refinery', 'stone quarry mining', 'industrial gas plant'],
+  office_services: ['professional consulting firm', 'legal office space', 'accounting office space'],
+  multi_site: ['multi-site commercial portfolio', 'retail store chain', 'multi-location branch network'],
+  public_sector: ['municipal facility', 'civic administration building', 'public safety station'],
   unknown: [],
 }
 
@@ -3053,7 +3074,8 @@ function isInDeregulatedMarket(account: AccountRow): boolean {
 
 function inferIndustryClusterFromSignals(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const notes = getAccountNotes(account)
-  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const cleanCandidate = candidate?.label === 'Industry Trends' ? null : candidate
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)} ${notes} ${cleanCandidate?.title || ''} ${cleanCandidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
   // Energy brokers and consultants — do not classify as any operational cluster
@@ -3104,11 +3126,11 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
-  if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
+  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/.test(text) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(text)) return 'religious'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
   if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
   if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
-  if (/(school|education|university|college|nonprofit|foundation|charity)/.test(text)) return 'education_nonprofit'
+  if (/(school|education|university|college|nonprofit|foundation|charity|academy|daycare|preschool|childcare|tutoring|learning center)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
   if (/\b(multi[-\s]?site|portfolio|branch(?:es)?|(?<!supply\s)chain|holdings)\b/i.test(text)) return 'multi_site'
@@ -3124,12 +3146,13 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
   if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
 
-  const savedProfile = getAccountIdentityProfile(account, candidate)
+  const cleanCandidate = candidate?.label === 'Industry Trends' ? null : candidate
+  const savedProfile = getAccountIdentityProfile(account, cleanCandidate)
   if (savedProfile?.industryCluster) {
     return savedProfile.industryCluster
   }
 
-  return inferIndustryClusterFromSignals(account, candidate)
+  return inferIndustryClusterFromSignals(account, cleanCandidate)
 }
 
 function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false): SignalFamily {
@@ -4653,12 +4676,18 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
 
   const prompt = `You are a plainspoken energy analyst and strategist. You are writing BOTH a permission-based OPENER and a TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
-VOICE & TONE:
-- Conversational, peer-to-peer, plainspoken, and expert.
-- Sounds exactly like Lewis Patterson calling out of the blue.
-- Lewis style means short, direct, curious, low-pressure, and spoken out loud. Use "I'm calling you out the blue here, so I'll be brief" in the opener, then keep the talk track to one plain problem and one plain question.
-- Write it like Lewis would actually say it on a call: no polished marketing, no lecture, no long setup, and no technical terms unless they are translated immediately.
-- Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
+VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
+- Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
+- Cadence: Use contractions naturally (y'all, y'all's, it's, don't, can't, we're). Avoid polished, formal, or high-flown sales language. Sound undeniably like Lewis Patterson calling out of the blue.
+- Texas energy broker tone: Lewis Patterson is a real guy in Fort Worth. He calls out of the blue, speaks plain English, does not lecture, and translates technical terms immediately (e.g., use "charges tied to when y'all use the most power" or "peak charges that stick on the bill" instead of "demand charges" or "demand ratchet").
+- Persuasion Psychology & Hypnotism Framework:
+  1. Pacing: Start the talk track by pacing the prospect's actual reality. Make a statement about their operational setup that they must internally agree with (e.g., "Having those commercial bakery ovens preheating every morning...", "When y'all run those salsa packaging lines for the afternoon shift...", "Having those clinical operatory chairs filled all day..."). Pacing establishes immediate trust and drops their critical guard.
+  2. Leading: Connect that paced reality to the electricity meter billing structure. Use temporal or causal links (e.g., "...which naturally pulls a heavy demand spike on the utility meter right when prices are highest," or "...which leaves that meter carrying a peak charge longer than people expect.").
+  3. Presupposition: Assume they are already running a successful operation. Never use conditional "if" statements (e.g. "If you run machines" or "If you have spikes"). Presuppose the reality: "When y'all operate that CNC machinery..." or "Having that cleanroom HVAC running 24/7...".
+  4. Double Bind (The Illusion of Choice): The second sentence must present a choice between two actions/states, both of which lead to a conversation rather than a rejection. Frame the choice around whether they are actively timing the market/comparing renewal options, or if that side of things is just running on autopilot. Start the question with "I'm curious..." or "How do y'all..." and end exactly with one of the safety-valve phrases.
+- Scraping Flexibility & Ultimate Specificity:
+  - Do NOT use generic templates or vague phrases like "operations", "usage", "facility cost creep", "the extra usage as it grows".
+  - You MUST scrape the research payload, description, and website summary for specific operational nouns, products, tools, machinery, or services unique to this company (e.g., "board game shipping", "trolley maintenance", "shelter beds", "laundry setups", "clinical operatories", "tutoring sessions", "cold room refrigeration"). Weave these exact nouns into the pacing sentence. Show them you know exactly what they do, without sounding like a dry encyclopedia.
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
 OPENER RULES (Exactly two sentences):
@@ -4669,13 +4698,14 @@ OPENER RULES (Exactly two sentences):
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
-TALK TRACK RULES (Exactly two sentences):
-- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
-- Sentence 2: One short curiosity question that invites them to explain how they handle it. Use "I'm curious..." or "How do y'all..." when it sounds like Lewis, and stop after the question.
+TALK_TRACK_RULES (Exactly two sentences):
+- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. You MUST customize it to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
+- Sentence 2: One short curiosity question that invites them to explain how they handle it. It MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
 - Use the STRUCTURED BRIEFING CONTEXT as the source of truth. The signal is the reason for the call; the company identity and operational drivers decide the talk track.
 - If the signal and company identity conflict, company identity wins.
-- Use the problemFrame and questionFrame as the preferred shape unless the research gives a more specific but still accurate version.
-- CRITICAL: The talk track MUST consist of exactly these two sentences.
+- Use the problemFrame and questionFrame ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
+- CRITICAL: The talk track MUST consist of exactly these two sentences. Not one, not three. Exactly two.
+- CRITICAL: The word count of the talk track MUST be between 15 and 85 words.
 - CRITICAL: Do NOT use "care about" or "usually care about" statements. Do NOT make assumptions about what the prospect cares about.
 - CRITICAL: The opener and the talk track sentences must start with a capitalized letter.
 - Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "one high-usage month can leave that meter carrying a higher charge longer than people expect."
@@ -4774,7 +4804,7 @@ Return JSON only with this shape:
     // Validate the AI-generated talk track
     const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
     const sentenceCount = splitTalkTrackSentences(talkTrack).length
-    if (sentenceCount !== 2 || wordCount < 14 || wordCount > 60) {
+    if (sentenceCount !== 2 || wordCount < 14 || wordCount > 95) {
       console.warn('[Intelligence Brief] AI talk track word count/sentence count out of range:', wordCount, sentenceCount)
       return null
     }
@@ -4804,7 +4834,7 @@ Return JSON only with this shape:
       return null
     }
 
-    if (!/or is that side of things pretty much on autopilot\?/i.test(talkTrack)) {
+    if (!/or is that (?:side of things )?pretty much (?:on autopilot|handled)\?/i.test(talkTrack)) {
       console.warn('[Intelligence Brief] AI talk track missing autopilot safety valve')
       return null
     }
@@ -4840,7 +4870,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(ownership changes|ownership change|got inherited|what got inherited|inherited on the electricity side)\b/i.test(lower)
   const unsupportedFootprintAngle = context.signalFamily !== 'restructuring' &&
     /\b(footprint change|stranded power costs|unused meters|leftover contracts|meter cleanup|contract cleanup)\b/i.test(lower)
-  const repeatedQuestionEcho = /\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b[\s\S]{0,140}\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b/i.test(lower)
+  const repeatedQuestionEcho = /\b(autopilot|proactively|current setup)\b[\s\S]{0,120}\b\1\b/i.test(lower)
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
   const footprintOpener = /reviewing the operational footprint|operational footprint for|reviewing the company profile|company profile for/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
@@ -4913,11 +4943,46 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 2
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
     if (cluster === context.industryCluster) return false
-    return labels.some((label) => lower.includes(label.toLowerCase()))
+    return labels.some((label) => {
+      const escaped = escapeRegExp(label.toLowerCase())
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(lower)
+    })
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 60 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+
+  if (needsRewrite) {
+    console.warn('[Intelligence Brief Rewrite Validation] Rejected talk track:', {
+      talkTrack,
+      reasons: {
+        genericHits: genericHits > 0,
+        genericOpening,
+        isCompetitor,
+        bannedJargonTerms,
+        redundantFootprint,
+        unsupportedLeadershipAngle,
+        unsupportedAcquisitionAngle,
+        unsupportedFootprintAngle,
+        repeatedQuestionEcho,
+        filingJargon,
+        footprintOpener,
+        incompleteReportOpener,
+        schoolManufacturingJargon: schoolManufacturingJargon || accountSchoolManufacturingJargon,
+        accountSchoolPracticeJargon,
+        accountSchoolRetailJargon,
+        residentialRestaurantJargon,
+        hotelEventSpaceJargon,
+        unexplainedJargon,
+        sentenceCount: sentenceCount !== 2 ? sentenceCount : false,
+        wordCount: (wordCount < 14 || wordCount > 95) ? wordCount : false,
+        overstuffed,
+        mismatchedIndustryLabel: mismatchedIndustryLabel && !accountDmeMedicalAllowance
+      }
+    })
+  }
+
+  return needsRewrite
 }
 
 function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
@@ -5988,7 +6053,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   // Validate talk track length (two short sentences)
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
   const talkTrackSentenceCount = splitTalkTrackSentences(talkTrack).length
-  if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 60) {
+  if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 95) {
     return null
   }
 
@@ -6345,12 +6410,18 @@ async function runOpenRouterResearch(
 Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
 If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.
 
-VOICE & TONE (For both "opener" and "talk_track"):
-- Conversational, peer-to-peer, plainspoken, and expert.
-- Sounds exactly like Lewis Patterson calling out of the blue.
-- Lewis style means short, direct, curious, low-pressure, and spoken out loud. Use "I'm calling you out the blue here, so I'll be brief" in the opener, then keep the talk track to one plain problem and one plain question.
-- Write it like Lewis would actually say it on a call: no polished marketing, no lecture, no long setup, and no technical terms unless they are translated immediately.
-- Never use "broker-speak" or corporate marketing jargon (e.g., "streamline operations", "energy consultant", "we can help", "save money", "optimize efficiency").
+VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
+- Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
+- Cadence: Use contractions naturally (y'all, y'all's, it's, don't, can't, we're). Avoid polished, formal, or high-flown sales language. Sound undeniably like Lewis Patterson calling out of the blue.
+- Texas energy broker tone: Lewis Patterson is a real guy in Fort Worth. He calls out of the blue, speaks plain English, does not lecture, and translates technical terms immediately (e.g., use "charges tied to when y'all use the most power" or "peak charges that stick on the bill" instead of "demand charges" or "demand ratchet").
+- Persuasion Psychology & Hypnotism Framework:
+  1. Pacing: Start the talk track by pacing the prospect's actual reality. Make a statement about their operational setup that they must internally agree with (e.g., "Having those commercial bakery ovens preheating every morning...", "When y'all run those salsa packaging lines for the afternoon shift...", "Having those clinical operatory chairs filled all day..."). Pacing establishes immediate trust and drops their critical guard.
+  2. Leading: Connect that paced reality to the electricity meter billing structure. Use temporal or causal links (e.g., "...which naturally pulls a heavy demand spike on the utility meter right when prices are highest," or "...which leaves that meter carrying a peak charge longer than people expect.").
+  3. Presupposition: Assume they are already running a successful operation. Never use conditional "if" statements (e.g. "If you run machines" or "If you have spikes"). Presuppose the reality: "When y'all operate that CNC machinery..." or "Having that cleanroom HVAC running 24/7...".
+  4. Double Bind (The Illusion of Choice): The second sentence must present a choice between two actions/states, both of which lead to a conversation rather than a rejection. Frame the choice around whether they are actively timing the market/comparing renewal options, or if that side of things is just running on autopilot. Start the question with "I'm curious..." or "How do y'all..." and end exactly with one of the safety-valve phrases.
+- Scraping Flexibility & Ultimate Specificity:
+  - Do NOT use generic templates or vague phrases like "operations", "usage", "facility cost creep", "the extra usage as it grows".
+  - You MUST scrape the research payload, description, and website summary for specific operational nouns, products, tools, machinery, or services unique to this company (e.g., "board game shipping", "trolley maintenance", "shelter beds", "laundry setups", "clinical operatories", "tutoring sessions", "cold room refrigeration"). Weave these exact nouns into the pacing sentence. Show them you know exactly what they do, without sounding like a dry encyclopedia.
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
 MARKET ELIGIBILITY RULES:
@@ -6373,9 +6444,11 @@ OPENER RULES (Exactly two sentences):
 - Do NOT repeat words or phrases redundantly.
 
 TALK_TRACK_RULES (Exactly two sentences):
-- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
-- Sentence 2: One short curiosity question that invites them to explain how they handle it. Use "I'm curious..." or "How do y'all..." when it sounds like Lewis, and stop after the question.
-- CRITICAL: The talk track MUST consist of exactly these two sentences.
+- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. You MUST customize it to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
+- Sentence 2: One short curiosity question that invites them to explain how they handle it. It MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
+- Use the problemFrame and questionFrame ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
+- CRITICAL: The talk track MUST consist of exactly these two sentences. Not one, not three. Exactly two.
+- CRITICAL: The word count of the talk track MUST be between 15 and 85 words.
 - CRITICAL: Do NOT use "care about" or "usually care about" statements. Do NOT make assumptions about what the prospect cares about.
 - CRITICAL: The opener and the talk track sentences must start with a capitalized letter.
 - Do NOT use confusing jargon like "Coincident Kitchen Peak" or "load factor" or "demand ratchet" directly. Instead, explain the billing mechanic simply in everyday language: "one high-usage month can leave that meter carrying a higher charge longer than people expect."
@@ -6516,9 +6589,12 @@ Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
 - Create a headline that positions the company within their industry context. The headline must be a meaningful intelligence insight — NEVER a raw page title, browser tab title, or the company name alone. Write it like a research analyst would: e.g. "Texas-Based Oil Field Equipment Manufacturer with Multi-Site Production Footprint" or "Multi-Location Restaurant Group Operating Across Houston Metro."
 - Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector. Write 2 to 4 complete synthesized sentences. Do NOT copy raw product lists, cookie banners, nav menu text, or homepage boilerplate. If the company site lists specific products or services (like "API threading, pup joints, inflatable packers"), translate those into what they mean operationally: "a manufacturer of precision oil field completion components including threaded connections and downhole tools."
-- Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
+- Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates. You MUST customize the talk track to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders.
 - Talk Track should sound like you actually researched this specific company.
-- Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language.
+- Use the problemFrame and questionFrame in the context ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
+- Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language. Not one, not three. Exactly two.
+- Sentence 2 MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
+- The word count of the talk track MUST be between 15 and 85 words.
 - Do not say "the useful check" or state what leaders "usually care about". State one specific problem in plain English, then ask one plain curiosity question.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
