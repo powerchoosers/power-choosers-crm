@@ -1790,7 +1790,7 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   // Infer industry cluster to prevent cross-industry regex false matches
   const cluster = inferIndustryCluster(account, candidate)
 
-  if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
+  if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential[- ]care|shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing)/.test(text)) {
     return 'Often times for a residential care nonprofit, it\'s hard to separate what the homes, counseling spaces, and support services are each adding to the bill because of how multiple meters roll up.'
   }
 
@@ -1896,39 +1896,47 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
 
   if (multiLocation) {
     if (hasStrongDmeSignals(accountText)) {
-      return `For a multi-location equipment network, each direct-service location can behave differently on its own meter because deliveries, inventory, storage, and service turnaround do not hit every branch the same way.`
+      return `Often times for a multi-location equipment network, each direct-service location behaves differently on its own meter because deliveries, inventory, storage, and service turnaround don't hit every branch the same way.`
     }
     if (context.industryCluster === 'restaurant') {
-      return `For a multi-location restaurant group, kitchen equipment, HVAC, refrigeration, and hours can make one store look fine while another one is carrying the heavier bill.`
+      return `Often times for a multi-location restaurant group, it's hard to prevent kitchen equipment, HVAC, and refrigeration from driving up the peak charge on separate store meters.`
     }
     if (context.industryCluster === 'retail') {
       if (hasStrongAutomotiveSignals(accountText)) {
-        return `For a multi-location dealership group, showroom traffic, service bays, parts, and lot lighting can make each dealership behave differently on its own meter.`
+        return `Often times for a multi-location dealership group, it's difficult to prevent service bays, parts departments, and showroom AC from running wide open at the same time.`
       }
-      return `For a multi-location retail group, store hours, traffic, lighting, and HVAC can hide very different cost patterns by location.`
+      return `Often times for a multi-location retail group, store hours, traffic, lighting, and HVAC hide very different cost patterns by location.`
     }
   }
 
   if (context.industryOpeners && context.industryOpeners.length > 0) {
-    return context.industryOpeners[0]
+    const opener = context.industryOpeners[0]
+    if (opener && !opener.toLowerCase().startsWith('often times')) {
+      return `Often times ${opener.charAt(0).toLowerCase()}${opener.slice(1)}`
+    }
+    return opener
   }
 
-  return `The question is whether the bill still lines up with how the business is actually using power.`
+  return `Often times for a commercial facility, it's difficult to determine whether the utility meters are actually aligned with the real operational activity.`
 }
 
 function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
   if (multiLocation) {
     if (context.industryCluster === 'restaurant' || context.industryCluster === 'retail') {
-       return 'Have you compared the sites side by side, or is each one still being handled separately?'
+       return `I'm curious, have you compared the sites side by side, or is each location pretty much handled separately?`
     }
   }
 
   if (context.question) {
+    const question = context.question.replace(/\?+$/, '')
+    if (question && !question.toLowerCase().startsWith("i'm curious")) {
+      return `I'm curious, ${question.charAt(0).toLowerCase()}${question.slice(1)}, or is that side of things pretty much on autopilot?`
+    }
     return context.question
   }
 
-  return 'Have you looked at whether the bill still lines up with how the business is actually being run?'
+  return `I'm curious, have you looked at whether the bill setup still matches how y'all use power, or is that side of things pretty much on autopilot?`
 }
 
 function isLikelyBadSourceUrl(value: string) {
@@ -2823,38 +2831,38 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   const driverText = humanizeDriverList(drivers)
   const identity = cleanText(companyIdentity).toLowerCase()
   if (/food production|food processing|food manufacturer/.test(identity)) {
-    return `For a food production operation, refrigeration, cooking, packaging, and sanitation can all hit the bill in different ways.`
+    return `Often times in a food production operation, it's hard to prevent refrigeration, cooking, and sanitation from hitting the meter at the exact same time.`
   }
   if (/convenience store/.test(identity)) {
-    return `For a convenience-store chain, coolers, lighting, fuel-canopy load, and summer AC can make certain stores run heavier than the rest.`
+    return `Often times for a convenience-store chain, it's difficult to keep coolers, lighting, fuel-canopy load, and summer AC from driving up a high local billing floor.`
   }
   if (/game and hobby|specialty game/.test(identity)) {
-    return `For a game and hobby retailer, store lighting, customer comfort, online orders, and back-room support can all move the bill.`
+    return `Often times for a specialty retailer, it's hard to separate retail floor cooling and lighting from back-room fulfillment and online order support.`
   }
   if (/hospital/.test(identity)) {
-    return `For a hospital, emergency care, imaging, patient areas, lab work, and HVAC can all create different spikes on the bill.`
+    return `Often times for a hospital facility, it's difficult to separate emergency care and imaging cycles from normal 24/7 HVAC loads.`
   }
   switch (cluster) {
     case 'print_fulfillment':
-      return `In print and fulfillment, the bill can move for a few different reasons: ${driverText}.`
+      return `Often times in print and fulfillment, it's hard to tell which processes are driving up the peak charge, whether it's print equipment, mailing machinery, or office HVAC.`
     case 'public_transit':
-      return `For a transit operation, the power side is usually tied to maintenance, lighting, support buildings, and schedule reliability.`
+      return `Often times for a transit operation, it's difficult to separate maintenance shop and support-building usage from the regular office load.`
     case 'moving_storage':
-      return `For a moving and storage company, the bill is usually more about storage space, dispatch, loading activity, lighting, and HVAC than production.`
+      return `Often times for a moving and storage company, it's hard to prevent storage space climate control, dispatch, and loading activity from spiking the billing floor.`
     case 'retail':
-      return `For a retail operation, seasonal traffic, lighting, comfort, and back-room support can make certain months look heavier than expected.`
+      return `Often times for a retail operation, it's hard to prevent seasonal customer traffic, lighting, and HVAC from driving up the peak charge.`
     case 'restaurant':
-      return `For a restaurant operation, kitchen equipment, refrigeration, and AC can all hit during the same busy windows.`
+      return `Often times for a restaurant operation, it's difficult to prevent kitchen equipment, refrigeration, and cooling from peaking during the exact same busy hours.`
     case 'healthcare':
-      return `For a healthcare facility, reliability, patient comfort, imaging or clinical equipment, and HVAC can all move the bill in different ways.`
+      return `Often times for a healthcare facility, it's hard to balance 24/7 patient comfort with clinical equipment load without creating unexpected demand spikes.`
     case 'residential_care':
-      return `For a residential-care operation, resident spaces, counseling areas, common areas, and HVAC can all show up differently on the bill.`
+      return `Often times for a residential-care operation, it's difficult to tell how resident spaces, counseling areas, and support HVAC roll up across the meters.`
     case 'logistics':
-      return `For a distribution operation, dock activity, storage, office load, and HVAC can each move the bill for different reasons.`
+      return `Often times for a distribution operation, it's hard to keep dock activity, storage climate control, and office HVAC from driving up the peak charge.`
     case 'manufacturing':
-      return `For a manufacturing operation, equipment timing, compressed air, process load, and HVAC can create the highest usage moments.`
+      return `Often times for a manufacturing operation, it's difficult to prevent equipment timing, compressed air, and process loads from spiking the meter during peak hours.`
     default:
-      return `For ${companyIdentity.toLowerCase()}, the bill can move for a few different reasons: ${driverText}.`
+      return `Often times for ${companyIdentity.toLowerCase()}, it's hard to prevent ${driverText} from hitting the meter at the same time.`
   }
 }
 
@@ -2864,33 +2872,33 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     ? audienceProfile.questionHint.replace(/\?+$/, '')
     : ''
   if (personaQuestion) {
-    return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that usually handled after the bill comes in?`
+    return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side of things pretty much on autopilot?`
   }
 
   switch (cluster) {
     case 'print_fulfillment':
-      return `How do y'all tell whether the print side, mailing side, or office side is driving the bill that month?`
+      return `I'm curious, how do y'all tell whether the print side, mailing side, or office side is driving the bill that month, or is that side of things pretty much handled?`
     case 'public_transit':
-      return `How do y'all separate the maintenance shop and support-building usage from the regular office load?`
+      return `I'm curious, how do y'all separate the maintenance shop and support-building usage from the regular office load, or is that pretty much on autopilot?`
     case 'moving_storage':
-      return `How do y'all tell whether storage, dispatch, or loading activity is what moved the bill that month?`
+      return `I'm curious, how do y'all tell whether storage, dispatch, or loading activity is what moved the bill that month, or is that pretty much on autopilot?`
     case 'retail':
-      return `How do y'all tell which stores or areas are actually moving the bill when the seasons change?`
+      return `I'm curious, how do y'all tell which stores or areas are actually moving the bill when the seasons change, or is that pretty much handled?`
     case 'restaurant':
-      return `How do y'all tell whether kitchen timing, refrigeration, or AC is creating the bigger spike?`
+      return `I'm curious, how do y'all tell whether kitchen timing, refrigeration, or AC is creating the bigger spike, or is that pretty much on autopilot?`
     case 'healthcare':
-      return `How do y'all tell which part of the facility is creating the bigger spikes without digging through the meter data?`
+      return `I'm curious, how do y'all tell which part of the facility is creating the bigger spikes without digging through the meter data, or is that pretty much handled?`
     case 'residential_care':
-      return `How do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month?`
+      return `I'm curious, how do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month, or is that pretty much on autopilot?`
     case 'logistics':
-      return `How do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month?`
+      return `I'm curious, how do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month, or is that side of things pretty much handled?`
     case 'manufacturing':
       if (/\brefrigeration\b|\bsanitation\b|\bpackaging\b|\bcooking\b/i.test(driverText)) {
-        return `How do y'all tell whether refrigeration, cooking, packaging, or sanitation is creating the bigger spike?`
+        return `I'm curious, how do y'all tell whether refrigeration, cooking, packaging, or sanitation is creating the bigger spike, or is that pretty much on autopilot?`
       }
-      return `How do y'all tell which equipment or schedule is creating the highest usage moment?`
+      return `I'm curious, how do y'all tell which equipment or schedule is creating the highest usage moment, or is that side of things pretty much on autopilot?`
     default:
-      return `How do y'all tell which part of the operation is actually moving the bill?`
+      return `I'm curious, how do y'all tell which part of the operation is actually moving the bill, or is that pretty much handled?`
   }
 }
 
@@ -4719,7 +4727,7 @@ Return JSON only with this shape:
         'X-Title': 'Power Choosers CRM',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-3.5-sonnet',
+        model: 'anthropic/claude-sonnet-4.6',
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -6631,14 +6639,14 @@ ${JSON.stringify(researchPayload, null, 2)}`
       'X-Title': 'Nodal Point Intelligence Brief',
     },
     body: JSON.stringify({
-      model: '~google/gemini-flash-latest',
+      model: 'google/gemini-2.5-flash',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: fullPrompt },
         { role: 'user', content: 'Generate the account intelligence brief now.' },
       ],
       temperature: isFallbackMode ? 0.3 : 0.2,
-      max_tokens: 900,
+      max_tokens: 4000,
     }),
   }, 25000)
 
@@ -6809,6 +6817,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         account: serializeAccount(updatedAccount as AccountRow),
         diagnostics: buildResearchDiagnostics([]),
         usedFallback: false,
+        inferredCluster: 'unknown',
       })
     }
 
@@ -7116,6 +7125,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const serialized = serializeAccount(updatedAccount as AccountRow)
+    const profile = (getAccountMetadata(updatedAccount as AccountRow).intelligenceProfile || getAccountMetadata(account).intelligenceProfile) as IntelligenceProfile | undefined
+    const inferredCluster = profile?.industryCluster || null
 
     if (validated) {
       return res.status(200).json({
@@ -7127,6 +7138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         account: serialized,
         diagnostics,
         usedFallback,
+        inferredCluster,
       })
     }
 
@@ -7135,6 +7147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: FALLBACK_MESSAGE,
       account: serialized,
       diagnostics,
+      inferredCluster,
     })
   } catch (error) {
     console.error('[Intelligence Brief] Unexpected handler failure:', error)
