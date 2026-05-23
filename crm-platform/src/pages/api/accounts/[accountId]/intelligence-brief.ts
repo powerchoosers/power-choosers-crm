@@ -708,7 +708,6 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     profile.facilityType,
     ...(profile.identityKeywords || []),
     ...(profile.powerKeywords || []),
-    ...(profile.talkTrackGuardrails || []),
   ].join(' ')).toLowerCase()
 
   if (!profileText) return false
@@ -2160,7 +2159,8 @@ function buildStructuredIdentityProfile(
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
 
-  const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
+  const classificationText = text.replace(/hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/gi, 'healthcare')
+  const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(classificationText)
   const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
   const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
   const isDentalPractice = hasStrongDentalSignals(text)
@@ -2860,7 +2860,8 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   if (/game and hobby|specialty game/.test(identity)) {
     return `Often times for a specialty retailer, it's hard to separate retail floor cooling and lighting from back-room fulfillment and online order support.`
   }
-  if (/hospital/.test(identity)) {
+  const isGenericHospitalIndustry = /hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/i.test(identity)
+  if (/hospital/.test(identity) && !isGenericHospitalIndustry) {
     return `Often times for a hospital facility, it's difficult to separate emergency care and imaging cycles from normal 24/7 HVAC loads.`
   }
   switch (cluster) {
@@ -3867,7 +3868,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
-      const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(text)
+      const classificationText = text.replace(/hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/gi, 'healthcare')
+      const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(classificationText)
       const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic imaging|imaging center|ortho|orthopedic|pediatric|wellness|doctor)/i.test(text) && !hasHospitalSignals
       const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
@@ -5326,7 +5328,7 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   const t = cleanText(title)
   if (!t) return true
   const lower = t.toLowerCase()
-  const companyLower = cleanText(accountName).toLowerCase()
+  const companyLower = cleanCompanyNameForSearch(accountName).toLowerCase()
 
   // Skip navigation and accessibility boilerplate
   if (/^(skip to content|skip to main content|skip navigation|skip to main|skip content|skip main|menu|toggle navigation)$/i.test(t.trim())) return true
@@ -5354,14 +5356,19 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/^[^|–-]{3,80}\s*[|–-]\s*(home|homepage|official site|official website|welcome)$/i.test(t)) return true
   if (/^(home|homepage|official site|official website|welcome)\s*[|–-]\s*[^|–-]{3,80}$/i.test(t)) return true
 
+  // Repetitive company name check (e.g. "Shine Pediatrics At Shine Pediatrics...")
+  if (companyLower.length > 3 && lower.split(companyLower).length > 2) return true
+
   // SEO title tags: company name followed by a marketing tagline — not a news signal
   // e.g. 'My Pharmacy USA - Find your Daily Medications Need Here'
   //      'Team Worldwide - Large Enough to Serve You'
   //      'Danmar Industries | Compressed Air Solutions | Houston TX'
   if (companyLower.length > 3 && lower.startsWith(companyLower)) {
     const afterName = lower.slice(companyLower.length).trim()
-    // Title is just the name plus a short tagline
-    if (/^[-|–|,]/.test(afterName) && afterName.split(/\s+/).length <= 12) return true
+    const startsWithFiller = /^(is|at|we|our|the|your|welcome|offers|provides|serves|specializes|specialise|specialises|helping)\b/i.test(afterName)
+    const startsWithSeparator = /^[-|–|,|:|]/.test(afterName)
+    // Title is just the name plus a short tagline or filler phrase
+    if ((startsWithSeparator && afterName.split(/\s+/).length <= 15) || (startsWithFiller && afterName.split(/\s+/).length <= 25)) return true
   }
   // Title that is just the company name with location appended (directory style)
   if (companyLower.length > 3) {
@@ -5957,29 +5964,50 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
   const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
   const snippet = stripWebsiteNavigationNoise(cleanText(candidate?.snippet))
 
-  const verifiedFact = snippet &&
+  const isEventSignal = candidate && candidate.priority && candidate.priority < 8
+  const verifiedFact = (isEventSignal && snippet &&
     snippet.split(/\s+/).filter(Boolean).length >= 12 &&
     !isSameAsAccountDescription(snippet, account) &&
-    !looksLikeRawNavigationText(snippet)
+    !looksLikeRawNavigationText(snippet))
       ? shortenText(snippet, 260)
       : ''
 
-  if (profile) {
-    const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(profile.companyType)} ${profile.companyType}.`
-    const operationDetail = profile.identityKeywords.length
-      ? `The operating context points to ${profile.identityKeywords.slice(0, 4).join(', ')}.`
-      : `${profile.operatingModel || profile.facilityType} is the relevant operating context.`
-    const sellingAngle = profile.powerKeywords.length
-      ? `The likely electricity angle is separating ${profile.powerKeywords.slice(0, 4).join(', ')} from the normal monthly bill, not treating the account as a generic ${cleanText(account.industry) || 'business'}.`
-      : `The likely electricity angle is checking whether the facility setup still matches how the business actually uses power.`
-    const parts = [
-      verifiedFact,
-      operatingFact,
-      operationDetail,
-      sellingAngle,
-    ].filter(Boolean)
-    const detail = cleanText(parts.join(' '))
-    if (detail.split(/\s+/).filter(Boolean).length >= 12) return shortenText(detail, 520)
+  // Fallback to local inference if profile is missing
+  const cluster = profile?.industryCluster || inferIndustryCluster(account, candidate)
+  const industryGuidance = buildIndustryGuidance(cluster, account, candidate) || buildSignalGuidance('industry_context', account, candidate)
+  
+  const companyType = profile?.companyType || industryGuidance.label || 'commercial facility'
+  const operatingModel = profile?.operatingModel || (industryGuidance.focus?.length ? industryGuidance.focus.slice(0, 3).join(', ') : 'operations')
+  const facilityType = profile?.facilityType || industryGuidance.label || 'commercial property'
+  
+  const identityKeywords = profile?.identityKeywords?.length
+    ? profile.identityKeywords
+    : industryGuidance.focus || []
+
+  const powerKeywords = profile?.powerKeywords?.length
+    ? profile.powerKeywords
+    : industryGuidance.focus || []
+
+  const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(companyType)} ${companyType.toLowerCase() === 'commercial account' ? 'commercial facility' : companyType.toLowerCase()}.`
+  
+  const operationDetail = identityKeywords.length
+    ? `The operating context points to managing ${identityKeywords.slice(0, 4).join(', ')}.`
+    : `${operatingModel || facilityType} is the relevant operating context.`
+    
+  const sellingAngle = powerKeywords.length
+    ? `The likely electricity angle is separating ${powerKeywords.slice(0, 4).join(', ')} from the normal monthly bill, not treating the account as a generic ${cleanText(account.industry) || 'business'}.`
+    : `The likely electricity angle is checking whether the facility setup still matches how the business actually uses power.`
+
+  const parts = [
+    verifiedFact,
+    operatingFact,
+    operationDetail,
+    sellingAngle,
+  ].filter(Boolean)
+  
+  const detail = cleanText(parts.join(' '))
+  if (detail.split(/\s+/).filter(Boolean).length >= 12) {
+    return shortenText(detail, 520)
   }
 
   const description = getPublicAccountDescription(account)
@@ -6164,12 +6192,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const rawTitle = isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')
   // Sanitize: if the title is just a browser tab / directory stub, use the snippet preview or a descriptive fallback
   const headline = sanitizeResearchTitle(rawTitle, companyName, snippet) || buildCompanyContextHeadline(account, candidate)
-  const detailParts = [
-    snippet && !isSameAsAccountDescription(snippet, account) && !isBoilerplatePageTitle(snippet.split(/[.!?]/)[0]?.trim() || '', companyName)
-      ? snippet
-      : buildFallbackSignalDetail(account, candidate) || getPublicAccountDescription(account) || `${companyName} is a commercial account in Texas.`,
-  ]
-  let detail = detailParts.join(' ')
+  let detail = buildFallbackSignalDetail(account, candidate) || getPublicAccountDescription(account) || `${companyName} is a commercial account in Texas.`
   if (detail.length < 20) {
     const city = cleanText(account.city)
     const state = cleanText(account.state)
