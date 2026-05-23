@@ -618,7 +618,7 @@ function hasStrongDentalSignals(text: string) {
 }
 
 function hasStrongAutomotiveSignals(text: string) {
-  return /(auto group|automotive|dealership|dealerships|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)/i.test(text)
+  return /\b(auto group|automotive|dealerships?|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text)
 }
 
 function hasStrongRetailStoreSignals(text: string) {
@@ -655,6 +655,18 @@ function hasPublicTransitSignals(text: string) {
 
 function hasMovingStorageSignals(text: string) {
   return /(moving (?:and|&) storage|moving storage|moving company|relocation services?|commercial moving|residential moving|household goods|storage company|warehousing and moving|supply chain solutions|van line|movers?\b)/i.test(text)
+}
+
+function hasReadyMixConcreteSignals(text: string) {
+  return /(ready[-\s]?mixed concrete|ready mix concrete|concrete batch(?:ing)?|batch plants?|concrete plants?|aggregate products?|construction aggregates?|crushed stone|sand and gravel|volumetric mixer|mixer trucks?|concrete delivery|cementitious|asphalt and ready[-\s]?mixed concrete)/i.test(text)
+}
+
+function hasFiberglassConduitSignals(text: string) {
+  return /(fiberglass conduit|fiberglass strut|epoxy fiberglass|phenolic conduit|flame shield|haz duct|high[-\s]?speed winding|curing ovens?|electrical and mechanical markets?|conduit system|fiberglass fittings)/i.test(text)
+}
+
+function hasIndustrialSiteLogisticsSignals(text: string) {
+  return /(site store management|expendable and consumable materials|petrochemical or energy plant|inventory management|warehouse management|materials and delivery tracking|transportation management|purchase order processing|electronic receiving|third party integrator|low dollar value,? high usage materials)/i.test(text)
 }
 
 function hasStrongDmeSignals(text: string) {
@@ -770,6 +782,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (logisticsSignals && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(profileText)) {
+    return true
+  }
+
+  if (logisticsSignals && /(healthcare|hospital|clinic|medical|behavioral health|mental health|patient care|counseling|therapy|crisis spaces?)/i.test(profileText)) {
     return true
   }
 
@@ -951,6 +967,23 @@ function getAccountNotes(account: AccountRow) {
   ]
 
   return candidates.map(cleanText).filter(Boolean).join(' ').toLowerCase()
+}
+
+function getAccountHierarchyProfile(account: AccountRow) {
+  const metadata = account.metadata && typeof account.metadata === 'object' && !Array.isArray(account.metadata)
+    ? account.metadata as Record<string, unknown>
+    : {}
+  const context = metadata.intelligenceHierarchyContext && typeof metadata.intelligenceHierarchyContext === 'object' && !Array.isArray(metadata.intelligenceHierarchyContext)
+    ? metadata.intelligenceHierarchyContext as Record<string, unknown>
+    : {}
+  const parent = context.parent && typeof context.parent === 'object' && !Array.isArray(context.parent)
+    ? context.parent as Record<string, unknown>
+    : {}
+
+  return {
+    organizationRole: cleanText(context.organizationRole),
+    parentName: cleanText(parent.name),
+  }
 }
 
 function isLikelyUuid(value: unknown) {
@@ -2166,7 +2199,8 @@ function buildStructuredIdentityProfile(
   const isDentalPractice = hasStrongDentalSignals(text)
   const isDmeProvider = hasStrongDmeSignals(text)
   const isBloodCenter = /(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/i.test(text)
-  const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|foodservice|production facilities)/i.test(text)
+  const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|\bfoodservice\b)/i.test(text)
+    && !/(fiberglass|conduit|strut|epoxy|resin|electrical|mechanical markets?|winding equipment|curing ovens?|phenolic|duct)/i.test(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
@@ -2175,6 +2209,7 @@ function buildStructuredIdentityProfile(
   const isGameRetailer = hasGameRetailSignals(text)
   const isManufacturersRepAgency = hasStrongManufacturersRepSignals(text)
   const isBakeryCafe = hasStrongBakeryCafeSignals(text)
+  const isReadyMixConcrete = hasReadyMixConcreteSignals(text)
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
   const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
@@ -2259,6 +2294,26 @@ function buildStructuredIdentityProfile(
       break
 
     case 'manufacturing':
+      if (isReadyMixConcrete) {
+        companyType = multiSiteInfo.isMultiSite ? 'ready-mix concrete and aggregates network' : 'ready-mix concrete and aggregates supplier'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site ready-mix and aggregates footprint' : 'ready-mix production and job-site delivery operation'
+        facilityType = 'ready-mix / aggregates operation'
+        identityKeywords = selectIdentityKeywords(text, ['ready-mixed concrete', 'aggregates', 'crushed stone', 'sand and gravel', 'concrete delivery', 'batch plants', 'mixer trucks', 'construction materials'], ['ready-mixed concrete', 'aggregates', 'concrete delivery'])
+        powerKeywords = selectIdentityKeywords(text, ['batching equipment', 'aggregate handling', 'conveyors', 'pumps', 'compressors', 'washout/reclaim systems', 'yard lighting', 'truck dispatch'], ['batching equipment', 'aggregate handling', 'truck dispatch'])
+        talkTrackGuardrails = ['No generic manufacturing language', 'No retail language', 'No office-only language', 'No dock-only logistics language']
+        break
+      }
+
+      if (hasFiberglassConduitSignals(text)) {
+        companyType = 'fiberglass conduit manufacturer'
+        operatingModel = 'fiberglass conduit and strut production'
+        facilityType = 'fiberglass conduit production facility'
+        identityKeywords = selectIdentityKeywords(text, ['fiberglass conduit', 'fiberglass strut', 'epoxy fiberglass', 'phenolic conduit', 'flame shield', 'haz duct', 'electrical and mechanical markets'], ['fiberglass conduit', 'fiberglass strut', 'electrical infrastructure products'])
+        powerKeywords = selectIdentityKeywords(text, ['winding equipment', 'curing ovens', 'resin/process areas', 'finishing', 'plant HVAC'], ['winding equipment', 'curing ovens', 'finishing'])
+        talkTrackGuardrails = ['No food production language', 'No restaurant language', 'No retail language', 'No office-only language']
+        break
+      }
+
       if (isFoodProduction) {
         companyType = multiSiteInfo.isMultiSite ? 'food production network' : 'food manufacturer'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-site production network' : 'production facility'
@@ -2851,6 +2906,9 @@ function humanizeDriverList(items: string[], limit = 4) {
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
   const driverText = humanizeDriverList(drivers)
   const identity = cleanText(companyIdentity).toLowerCase()
+  if (/ready[-\s]?mix|ready[-\s]?mixed concrete|aggregates/.test(identity)) {
+    return `Often times in ready-mix concrete, batching equipment, aggregate handling, truck dispatch, and yard lighting can hit the meter at the same time.`
+  }
   if (/food production|food processing|food manufacturer/.test(identity)) {
     return `Often times in a food production operation, it's hard to prevent refrigeration, cooking, and sanitation from hitting the meter at the exact same time.`
   }
@@ -2863,6 +2921,18 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   const isGenericHospitalIndustry = /hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/i.test(identity)
   if (/hospital/.test(identity) && !isGenericHospitalIndustry) {
     return `Often times for a hospital facility, it's difficult to separate emergency care and imaging cycles from normal 24/7 HVAC loads.`
+  }
+  if (/behavioral health|community care|substance use|recovery|residential treatment/.test(identity) || /counseling|therapy|crisis spaces?|resident|residential/i.test(driverText)) {
+    return `Often times for behavioral-health and recovery programs, counseling spaces, residential areas, and HVAC can all move the bill differently depending on the daily schedule.`
+  }
+  if (/medical practice|clinic|clinical care/.test(identity) || /imaging|lab|laboratory|patient hours|treatment rooms/i.test(driverText)) {
+    return `Often times in a clinic setting, imaging, lab work, treatment rooms, and patient-hour HVAC can hit the meter in different ways throughout the day.`
+  }
+  if (/site-store|site store|petrochemical site|industrial plant support/.test(identity) || /inventory handling|delivery tracking|petrochemical plant support|receiving/i.test(driverText)) {
+    return `Often times in site-store logistics, inventory handling, receiving, warehouse support, and delivery tracking can stack up during the same busy window.`
+  }
+  if (/fiberglass conduit|fiberglass strut|conduit manufacturing/.test(identity) || /winding equipment|curing ovens?|resin|finishing/i.test(driverText)) {
+    return `Often times in fiberglass conduit manufacturing, winding equipment, curing ovens, finishing, and plant HVAC can stack up during the same production window.`
   }
   switch (cluster) {
     case 'print_fulfillment':
@@ -2909,12 +2979,27 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     case 'restaurant':
       return `I'm curious, how do y'all tell whether kitchen timing, refrigeration, or AC is creating the bigger spike, or is that pretty much on autopilot?`
     case 'healthcare':
+      if (/counseling|therapy|crisis spaces?|resident|residential/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether program spaces, residential areas, or HVAC are what moved the bill that month, or is that pretty much handled?`
+      }
+      if (/imaging|lab|laboratory|patient hours|treatment rooms/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether imaging, lab areas, treatment rooms, or HVAC are what pushed the bill, or is that side of things pretty much handled?`
+      }
       return `I'm curious, how do y'all tell which part of the facility is creating the bigger spikes without digging through the meter data, or is that pretty much handled?`
     case 'residential_care':
       return `I'm curious, how do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month, or is that pretty much on autopilot?`
     case 'logistics':
+      if (/site-store|site store|inventory handling|delivery tracking|petrochemical plant support|receiving/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether site stores, inventory handling, delivery tracking, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
+      }
       return `I'm curious, how do y'all tell whether dock activity, storage, or HVAC is driving the heavier bill that month, or is that side of things pretty much handled?`
     case 'manufacturing':
+      if (/winding equipment|curing ovens?|resin|finishing|fiberglass|conduit/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether winding, curing, finishing, or plant HVAC is what pushed the bill, or is that side of things pretty much handled?`
+      }
+      if (/batching equipment|aggregate handling|truck dispatch|yard lighting|ready[-\s]?mix|ready[-\s]?mixed concrete|aggregates/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether batching, aggregate handling, truck dispatch, or yard lighting is what pushed the bill, or is that side of things pretty much handled?`
+      }
       if (/\brefrigeration\b|\bsanitation\b|\bpackaging\b|\bcooking\b/i.test(driverText)) {
         return `I'm curious, how do y'all tell whether refrigeration, cooking, packaging, or sanitation is creating the bigger spike, or is that pretty much on autopilot?`
       }
@@ -3081,6 +3166,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (!text) return 'unknown'
   // Energy brokers and consultants — do not classify as any operational cluster
   if (isCompetitorEnergyBroker(account)) return 'office_services'
+  if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil and gas|oilfield|natural gas|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream|pipeline|petroleum)/.test(text)) {
@@ -3457,6 +3543,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
       }
     case 'manufacturing':
+      if (hasReadyMixConcreteSignals(text)) {
+        const concreteMultiSite = detectMultiSiteScale(account, candidate)
+        const locationDesc = concreteMultiSite.isMultiSite && concreteMultiSite.locationCount
+          ? concreteMultiSite.locationCount >= 10
+            ? `${concreteMultiSite.locationCount}+ ready-mix or aggregates sites`
+            : `${concreteMultiSite.locationCount} ready-mix or aggregates sites`
+          : 'the ready-mix and aggregates operation'
+
+        return {
+          label: 'Ready-mix concrete and aggregates',
+          angle: `Ready-mix batching, aggregate handling, mixer-truck dispatch, yard lighting, and site-level timing shaping the bill across ${locationDesc}.`,
+          question: `I'm curious, how do y'all tell whether batching, aggregate handling, truck dispatch, or yard lighting is what pushed the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times in ready-mix concrete, batching equipment, aggregate handling, truck dispatch, and yard lighting can all hit the meter during the same busy window.`,
+            `Often times for concrete and aggregates operations, it's hard to tell whether the batch plant, material handling, or yard activity is what created the highest usage moment.`,
+            `Often times with ready-mix sites, the bill can move more from timing around batching and dispatch than from normal office or building usage.`,
+          ],
+          focus: ['ready-mix batching', 'aggregate handling', 'mixer-truck dispatch', 'yard lighting', 'washout/reclaim systems', 'site-level timing'],
+        }
+      }
+
+      if (hasFiberglassConduitSignals(text)) {
+        return {
+          label: 'Fiberglass conduit manufacturing',
+          angle: 'Winding equipment, curing ovens, resin/process areas, finishing, and plant HVAC creating the highest usage moments.',
+          question: `I'm curious, how do y'all tell whether winding, curing, finishing, or plant HVAC is what pushed the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times in fiberglass conduit manufacturing, winding equipment, curing ovens, finishing, and plant HVAC can stack up during the same production window.`,
+            `Often times for conduit production, it's hard to tell whether the winding line, curing process, or general plant load created the highest usage moment.`,
+            `Often times with fiberglass production, process heat and production timing move the bill more than normal building usage.`,
+          ],
+          focus: ['winding equipment', 'curing ovens', 'resin/process areas', 'finishing', 'plant HVAC', 'production timing'],
+        }
+      }
+
       if (hasStrongPetrochemicalSignals(text)) {
         return {
           label: 'Petrochemical manufacturing',
@@ -3583,6 +3704,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'logistics':
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
       const logisticsAcquisitionHeavy = /\b(acquisition|acquisitions|acquired|rollup|distribution|building materials|wholesale|lumber|yards?|branches?)\b/i.test(text)
+
+      if (hasIndustrialSiteLogisticsSignals(text)) {
+        return {
+          label: 'Petrochemical site-store logistics',
+          angle: 'Site-store management, consumable materials, inventory control, warehouse support, and delivery tracking inside petrochemical or energy plants.',
+          question: `I'm curious, how do y'all tell whether site stores, inventory handling, delivery tracking, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times in petrochemical site-store logistics, inventory handling, warehouse support, and delivery tracking can all hit the meter during the same busy window.`,
+            `Often times for site-store operators inside industrial plants, it's hard to separate materials handling from normal office and warehouse support load.`,
+            `Often times with consumable-materials programs, the bill moves from the timing of receiving, inventory work, and delivery activity more than from a standard office setup.`,
+          ],
+          focus: ['site-store management', 'inventory handling', 'warehouse support', 'delivery tracking', 'receiving', 'petrochemical plant support'],
+        }
+      }
 
       if (hasStrongAutoPartsDistributionSignals(text)) {
         const locationDesc = logisticsMultiSite.locationCount
@@ -5079,14 +5214,37 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const companyName = cleanText(account.name) || 'the company'
   const city = cleanText(account.city)
   const state = cleanText(account.state)
-  const locationClause = city && state ? `in ${city}` : state ? `in ${state}` : 'in Texas'
+  const descriptionText = getPublicAccountDescription(account)
+  const nonTexasDescriptor = !/\b(texas|tx|ercot|dfw|dallas|houston|austin|san antonio|fort worth|el paso|arlington|plano|irving|pasadena|spring|euless|weatherford|texarkana|colleyville)\b/i.test(descriptionText)
+    && /\b(indiana|florida|california|new york|new jersey|ohio|illinois|alabama|georgia|tennessee|oklahoma|louisiana|arkansas|missouri|kansas|colorado|arizona|nevada)\b/i.test(descriptionText)
+  const locationClause = nonTexasDescriptor
+    ? ''
+    : city && state ? `in ${city}` : state ? `in ${state}` : 'in Texas'
   const profile = getAccountIdentityProfile(account)
   const companyType = cleanText(profile?.companyType || '')
   const facilityType = cleanText(profile?.facilityType || '')
   const cluster = context.industryCluster
+  const specificAccountLane = companyType && !/^(commercial account|retail business)$/i.test(companyType)
+    ? companyType.toLowerCase()
+      .replace(/\s+(network|provider|supplier|operator|company|business)$/i, '')
+      .trim()
+    : hasIndustrialSiteLogisticsSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))
+      ? 'petrochemical site-store logistics'
+    : cluster === 'manufacturing' && hasReadyMixConcreteSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))
+      ? 'ready-mix concrete and aggregates'
+      : cluster === 'manufacturing'
+        ? 'industrial'
+        : cluster === 'restaurant'
+          ? 'restaurant'
+          : cluster === 'retail'
+            ? 'retail'
+            : 'commercial'
 
   // Build an operational descriptor from what we actually know
   const operationDescriptor = (() => {
+    if (hasIndustrialSiteLogisticsSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))) {
+      return `a petrochemical site-store logistics operation${locationClause ? ` ${locationClause}` : ''}`
+    }
     if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
       const typeStr = companyType.toLowerCase()
       const article = getIndefiniteArticle(typeStr)
@@ -5132,7 +5290,7 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
 
   return [
     `${greeting}. I'm calling you out the blue here, so I'll be brief. I've been researching ${operationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
-    `${greeting}. I'm calling you out the blue here, so I'll be brief. I came across ${companyName} while looking at ${cluster === 'manufacturing' ? 'industrial' : cluster === 'restaurant' ? 'restaurant' : cluster === 'retail' ? 'retail' : 'commercial'} accounts in Texas, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, so I'll be brief. I came across ${companyName} while looking at ${specificAccountLane} accounts${nonTexasDescriptor ? '' : ' in Texas'}, and had a curious question about y'alls electricity agreements and contracts.`,
     `${greeting}. I'm calling you out the blue here, so I'll be brief. I've been doing some research on ${operationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
   ]
 }
@@ -5335,17 +5493,24 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
 
   // HTTP error and server response strings that leak into titles
   if (/^(the request could not be satisfied|access denied|403 forbidden|404 not found|error 403|error 404|service unavailable|bad gateway|gateway timeout|too many requests|you are using an outdated browser)/i.test(t)) return true
+  if (/^(close menu|open menu|main menu|site menu|search)$/i.test(t.trim())) return true
   if (/\byou are using an outdated browser\b/i.test(t)) return true
   if (/\bdefend your assets\b.*\boutdated browser\b/i.test(t)) return true
+  if (/\b(performing|checking)\s+(security|site connection)\s+verification\b/i.test(t)) return true
+  if (/\bsecurity service to protect against malicious bots\b/i.test(t)) return true
+  if (/\brequires cookies to be enabled\b/i.test(t)) return true
 
   // Pure homepage title patterns
   if (/^home\s*[-|–]\s*/i.test(t)) return true
   if (/\s*[-|–]\s*home$/i.test(t)) return true
   if (/^welcome to\b/i.test(t)) return true
   if (/^about\s*[-|–]\s*/i.test(t)) return true
-  if (/^(home|about|contact|services|products|solutions|default)$/i.test(t.trim())) return true
+  if (/^(home|about|our company|company|contact|services|products|solutions|search|default)$/i.test(t.trim())) return true
+  if (/^(?:https?:\/\/)?(?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\/)?$/i.test(t.trim())) return true
   if (/^homepage\s*[-|–]/i.test(t)) return true
   if (/\bhomepage\b/i.test(t) && t.split(/\s+/).length <= 5) return true
+  if (/^why\s+[a-z0-9 &/-]{3,40}$/i.test(t.trim())) return true
+  if (/^benefits\s+why\s+use\b/i.test(t.trim())) return true
 
   // Title is just the company name (with optional site name separator)
   const strippedCompanyChars = companyLower.replace(/[^a-z0-9]/g, '')
@@ -5386,9 +5551,14 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
  * so the AI has something meaningful to work with instead of "Home - Company Name".
  */
 function sanitizeResearchTitle(title: string, accountName: string, snippet: string): string {
+  const titleText = cleanText(title)
+  const snippetText = cleanText(snippet)
+  if (/website facility and billing intel$/i.test(titleText) && hasReadyMixConcreteSignals(`${titleText} ${snippetText}`)) {
+    return `${cleanText(accountName)} Ready-Mix Concrete and Aggregates Operating Context`
+  }
   if (!isBoilerplatePageTitle(title, accountName)) return title
   // Try to extract a meaningful phrase from the snippet instead
-  const snippetPreview = cleanText(snippet).split(/[.!?]/)[0]?.trim()
+  const snippetPreview = snippetText.split(/[.!?]/)[0]?.trim()
   if (snippetPreview && snippetPreview.length > 20 && snippetPreview.length < 120) {
     return snippetPreview
   }
@@ -5988,15 +6158,52 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     ? profile.powerKeywords
     : industryGuidance.focus || []
 
+  const detailText = cleanText(`${companyName} ${getPublicAccountDescription(account)} ${profile?.companyType || ''} ${identityKeywords.join(' ')} ${powerKeywords.join(' ')}`).toLowerCase()
+  if (hasReadyMixConcreteSignals(detailText)) {
+    const hierarchyProfile = getAccountHierarchyProfile(account)
+    const parentFact = hierarchyProfile.parentName
+      ? `${companyName} is tied to ${hierarchyProfile.parentName} through the parent-company relationship.`
+      : ''
+    const detail = [
+      verifiedFact,
+      parentFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and is tied to ready-mix concrete, aggregates, and construction-materials supply.`,
+      `The relevant operating pieces are batching, aggregate handling, mixer-truck dispatch, yard lighting, and support equipment, not a generic manufacturing floor.`,
+      `The electricity angle is checking which site activity creates the highest usage moments on that meter before those charges quietly become part of the monthly bill.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
+  if (hasFiberglassConduitSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and manufactures fiberglass conduit, strut, and related electrical infrastructure products.`,
+      `The relevant operating pieces are winding equipment, curing ovens, resin/process areas, finishing, and plant HVAC, not food production or generic electronics.`,
+      `The electricity angle is checking whether production timing and heat/process equipment are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
+  if (hasIndustrialSiteLogisticsSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and supports petrochemical or energy plant operations through site-store logistics, inventory management, warehouse support, and delivery tracking.`,
+      `The relevant operating pieces are receiving, materials handling, storage, dispatch, and support-space HVAC, not clinical care or generic freight.`,
+      `The electricity angle is checking whether those busy support windows are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(companyType)} ${companyType.toLowerCase() === 'commercial account' ? 'commercial facility' : companyType.toLowerCase()}.`
   
   const operationDetail = identityKeywords.length
-    ? `The operating context points to managing ${identityKeywords.slice(0, 4).join(', ')}.`
+    ? `The relevant operating pieces are ${identityKeywords.slice(0, 4).join(', ')}.`
     : `${operatingModel || facilityType} is the relevant operating context.`
     
+  const simplifiedPowerKeywords = powerKeywords.map((keyword) => simplifyTalkTrackLanguage(keyword))
   const sellingAngle = powerKeywords.length
-    ? `The likely electricity angle is separating ${powerKeywords.slice(0, 4).join(', ')} from the normal monthly bill, not treating the account as a generic ${cleanText(account.industry) || 'business'}.`
-    : `The likely electricity angle is checking whether the facility setup still matches how the business actually uses power.`
+    ? `The electricity angle is checking whether ${humanizeDriverList(simplifiedPowerKeywords, 4)} are creating the highest usage moments before they quietly become part of the monthly bill.`
+    : `The electricity angle is checking whether the facility setup still matches how the business actually uses power.`
 
   const parts = [
     verifiedFact,
@@ -6026,7 +6233,20 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
   const profile = getAccountIdentityProfile(account, candidate)
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (hasReadyMixConcreteSignals(text)) {
+    return `${companyName} Ready-Mix Concrete and Aggregates Operating Context`
+  }
+
+  if (hasFiberglassConduitSignals(text)) {
+    return `${companyName} Fiberglass Conduit Manufacturing Operating Context`
+  }
+
+  if (hasIndustrialSiteLogisticsSignals(text)) {
+    return `${companyName} Petrochemical Site-Store Logistics Operating Context`
+  }
+
   if (profile?.industryCluster === 'retail') {
+    if (/(grocery|supermarket|market|food market)/i.test(text)) return `${companyName} Manages Grocery Store and Refrigerated Retail Load`
     if (hasConvenienceStoreSignals(text)) return `${companyName} Operates Multi-Store Convenience Retail Footprint`
     if (hasGameRetailSignals(text)) return `${companyName} Runs Specialty Game Retail and Online Order Operations`
     if (hasStrongAutomotiveSignals(text)) return `${companyName} Manages Dealership Retail and Service Operations`
@@ -6038,6 +6258,23 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
   }
 
   return `${companyName} Facility and Billing Intel`
+}
+
+function normalizeFinalSignalHeadline(headline: string, account: AccountRow, candidate: ResearchHit | null = null) {
+  const cleaned = cleanText(headline)
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)}`)
+  if (!cleaned) return buildCompanyContextHeadline(account, null)
+  if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '')) return buildCompanyContextHeadline(account, null)
+  if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
+    return buildCompanyContextHeadline(account, null)
+  }
+  if (/\b(close menu|open menu|security verification|site connection security|requires cookies|benefits why use)\b/i.test(cleaned)) {
+    return buildCompanyContextHeadline(account, null)
+  }
+  if (/\bwebsite facility and billing intel\b/i.test(cleaned)) {
+    return buildCompanyContextHeadline(account, null)
+  }
+  return cleaned
 }
 
 function normalizeSignalDetail(detail: string, headline: string, account: AccountRow, candidate: ResearchHit | null) {
@@ -6074,7 +6311,10 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
 
 function validateBriefResult(result: BriefResult, candidate: ResearchHit | null, account: AccountRow) {
   const usable = Boolean(result?.usable_signal)
-  const headline = cleanText(result?.signal_headline)
+  let headline = cleanText(result?.signal_headline)
+  if (/website facility and billing intel$/i.test(headline) && hasReadyMixConcreteSignals(cleanText(`${headline} ${getPublicAccountDescription(account)} ${candidate?.snippet || ''}`))) {
+    headline = `${cleanText(account.name) || 'Company'} Ready-Mix Concrete and Aggregates Operating Context`
+  }
   const detail = normalizeSignalDetail(cleanText(result?.signal_detail), headline, account, candidate)
   const talkTrack = simplifyTalkTrackLanguage(cleanText(result?.talk_track))
   const candidateUrl = cleanText(candidate?.url)
@@ -6097,6 +6337,14 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   // e.g. 'Home', 'Homepage - Team Worldwide', 'Spicy Pickle profile', 'My Pharmacy USA - Find your Daily Medications Here'
   if (isBoilerplatePageTitle(headline, cleanText(account.name) || '')) {
     console.warn('[Intelligence Brief Validation] Boilerplate page title headline:', headline)
+    return null
+  }
+  if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(headline) && !hasStrongAutomotiveSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)}`))) {
+    console.warn('[Intelligence Brief Validation] Automotive headline mismatch:', headline)
+    return null
+  }
+  if (/\b(close menu|open menu|security verification|site connection security|requires cookies|benefits why use)\b/i.test(headline)) {
+    console.warn('[Intelligence Brief Validation] Navigation/security headline:', headline)
     return null
   }
   // Reject directory profile stubs like '[Company] profile' or '[Company] - [City], [State]'
@@ -7111,6 +7359,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           metadata: {
             ...getAccountMetadata(account as AccountRow),
             intelligenceProfile: identityProfile,
+            intelligenceHierarchyContext: hierarchyContext ? {
+              organizationRole: hierarchyContext.organizationRole,
+              parent: hierarchyContext.parent ? {
+                name: hierarchyContext.parent.name,
+                website: hierarchyContext.parent.website,
+                city: hierarchyContext.parent.city,
+                state: hierarchyContext.parent.state,
+              } : null,
+              subsidiaries: hierarchyContext.subsidiaries.slice(0, 6).map((item) => ({
+                name: item.name,
+                website: item.website,
+                city: item.city,
+                state: item.state,
+              })),
+            } : null,
           },
         }
       : account as AccountRow
@@ -7329,6 +7592,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       validated = {
         ...validated,
+        signal_headline: normalizeFinalSignalHeadline(validated.signal_headline || '', briefingAccount, talkTrackCandidate),
         signal_detail: normalizeSignalDetail(validated.signal_detail || '', validated.signal_headline || '', briefingAccount, talkTrackCandidate),
         talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
       }
