@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, Mail, Clock, Plus, Sparkles, Star, Building2, Smartphone, Landmark, Trash2, ArrowUpRight } from 'lucide-react'
 import { format } from 'date-fns'
 import { ContactDetail, type ContactAdditionalPhone } from '@/hooks/useContacts'
+import { resolveTimezone } from '@/lib/timezone'
 import { useCallStore } from '@/store/callStore'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
@@ -84,13 +85,23 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
 
   // Update local time every minute (client-side only to avoid hydration mismatch)
   useEffect(() => {
+    const tz = resolveTimezone({
+      city: contact.city,
+      state: contact.state,
+      phone: contact.mobile || contact.phone || contact.workDirectPhone || contact.otherPhone || contact.companyPhone
+    })
     const updateTime = () => {
-      setLocalTime(format(new Date(), 'h:mm a'))
+      setLocalTime(new Date().toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: tz
+      }))
     }
     updateTime()
     const interval = setInterval(updateTime, 60000)
     return () => clearInterval(interval)
-  }, [])
+  }, [contact.city, contact.state, contact.mobile, contact.phone, contact.workDirectPhone, contact.otherPhone, contact.companyPhone])
 
   const handleCallClick = (phone: PhoneEntry) => {
     if (!phone.value || isEditing) return
