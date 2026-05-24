@@ -467,7 +467,7 @@ export function TaskCreationPanel() {
                                             <div className="min-w-0">
                                                 <div className="text-xs text-zinc-200 truncate">{account.name}</div>
                                                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate">
-                                                    {['account', account.location || [account.city, account.state].filter(Boolean).join(', ') || account.industry].filter(Boolean).join(' · ')}
+                                                    {['account', account.contractEnd || null, account.location || [account.city, account.state].filter(Boolean).join(', ') || account.industry].filter(Boolean).join(' · ')}
                                                 </div>
                                             </div>
                                         </button>

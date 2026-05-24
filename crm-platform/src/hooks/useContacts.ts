@@ -281,19 +281,19 @@ type ContactRow = {
 
 const PAGE_SIZE = 50
 
-const CONTACTS_QUERY_BUSTER = 'v6'
+const CONTACTS_QUERY_BUSTER = 'v7'
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
 const CONTACT_ACCOUNT_SELECT = 'id, name, domain, website, logo_url, city, state, address, zip, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, metadata'
-const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, city, state, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, city, state, address, zip)'
-const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, website, logo_url, phone, city, state, address, zip, industry)'
+const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, website, logo_url, phone, metadata, industry, city, state, address, service_addresses)'
 const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
           email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt,
           lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes,
           metadata, updatedAt,
           accounts!contacts_accountId_fkey (
-            id, name, domain, logo_url, metadata, city, state, industry, address,
+            id, name, domain, website, logo_url, metadata, city, state, industry, address,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
             service_addresses, description, phone
           )
@@ -919,6 +919,7 @@ export function useSearchContacts(queryTerm: string) {
             accountId: item.accountId || undefined,
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || item.companyPhone || '',
             companyPhone: item.companyPhone || account?.phone || '',
+            website: account?.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
           };
         });
       } catch (err) {
@@ -1025,14 +1026,14 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             workPhone: item.workPhone || metadata?.workDirectPhone || '',
             workDirectPhone: item.workPhone || metadata?.workDirectPhone || '',
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
-            companyPhone: item.companyPhone || '',
+            companyPhone: item.companyPhone || account?.phone || '',
             primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
             additionalPhones: extractAdditionalPhones(metadata, signals, [item.phone, item.mobile, item.workPhone, item.otherPhone, item.companyPhone]),
             communicationSignals: signals,
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
             accountLocation: formatCityState(account?.city, account?.state),
-            companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
+            companyDomain: account?.domain || account?.website || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
             status: item.status || 'Lead',
             lastContact: item.lastContactedAt || item.createdAt || item.created_at || new Date().toISOString(),
@@ -1040,7 +1041,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             industry: account?.industry || undefined,
             title: item.title || metadata?.title || metadata?.job_title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
             location: item.city ? `${item.city}, ${item.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
-            website: item.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
+            website: item.website || account?.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
             metadata: metadata
           }
         }) as Contact[];

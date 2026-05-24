@@ -44,9 +44,14 @@ AS $$
       OR c."otherPhone" ILIKE '%' || btrim(p_search) || '%'
       OR c.city ILIKE '%' || btrim(p_search) || '%'
       OR c.state ILIKE '%' || btrim(p_search) || '%'
+      OR c.notes ILIKE '%' || btrim(p_search) || '%'
+      OR c."linkedinUrl" ILIKE '%' || btrim(p_search) || '%'
       OR a.name ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.domain, a.website, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.industry, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(a.description, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(a.linkedin_url, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(to_char(a.contract_end_date, 'YYYY-MM-DD'), '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.city, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.state, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.address, '') ILIKE '%' || btrim(p_search) || '%'
@@ -145,9 +150,14 @@ AS $$
       OR c."otherPhone" ILIKE '%' || btrim(p_search) || '%'
       OR c.city ILIKE '%' || btrim(p_search) || '%'
       OR c.state ILIKE '%' || btrim(p_search) || '%'
+      OR c.notes ILIKE '%' || btrim(p_search) || '%'
+      OR c."linkedinUrl" ILIKE '%' || btrim(p_search) || '%'
       OR a.name ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.domain, a.website, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.industry, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(a.description, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(a.linkedin_url, '') ILIKE '%' || btrim(p_search) || '%'
+      OR COALESCE(to_char(a.contract_end_date, 'YYYY-MM-DD'), '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.city, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.state, '') ILIKE '%' || btrim(p_search) || '%'
       OR COALESCE(a.address, '') ILIKE '%' || btrim(p_search) || '%'
@@ -213,83 +223,86 @@ RETURNS SETOF accounts
 LANGUAGE sql
 STABLE
 AS $function$
-  select a.*
-  from public.accounts a
-  where exists (
-    select 1
-    from public.list_members lm
-    where lm."listId" = p_list_id
-      and lm."targetId" = a.id
-      and lm."targetType" in ('account', 'accounts', 'company', 'companies')
+  SELECT *
+  FROM public.accounts a
+  WHERE EXISTS (
+    SELECT 1
+    FROM public.list_members lm
+    WHERE lm."listId" = p_list_id
+      AND lm."targetId" = a.id
+      AND lm."targetType" IN ('account', 'accounts', 'company', 'companies')
   )
-  and (
-    p_owner_ids is null
-    or cardinality(p_owner_ids) = 0
-    or a."ownerId" = any(p_owner_ids)
+  AND (
+    p_owner_ids IS NULL
+    OR cardinality(p_owner_ids) = 0
+    OR a."ownerId" = ANY(p_owner_ids)
   )
-  and (
-    p_search is null
-    or p_search = ''
-    or a.name ilike ('%' || p_search || '%')
-    or coalesce(a.domain, '') ilike ('%' || p_search || '%')
-    or coalesce(a.website, '') ilike ('%' || p_search || '%')
-    or coalesce(a.industry, '') ilike ('%' || p_search || '%')
-    or coalesce(a.city, '') ilike ('%' || p_search || '%')
-    or coalesce(a.state, '') ilike ('%' || p_search || '%')
-    or coalesce(a.address, '') ilike ('%' || p_search || '%')
-    or coalesce(a.zip, '') ilike ('%' || p_search || '%')
-    or coalesce(a.phone, '') ilike ('%' || p_search || '%')
+  AND (
+    p_search IS NULL
+    OR p_search = ''
+    OR a.name ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.domain, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.description, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.website, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.linkedin_url, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(to_char(a.contract_end_date, 'YYYY-MM-DD'), '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.industry, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.city, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.state, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.address, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.zip, '') ILIKE ('%' || p_search || '%')
+    OR COALESCE(a.phone, '') ILIKE ('%' || p_search || '%')
   )
-  and (
-    p_industries is null
-    or cardinality(p_industries) = 0
-    or a.industry = any(p_industries)
+  AND (
+    p_industries IS NULL
+    OR cardinality(p_industries) = 0
+    OR a.industry = ANY(p_industries)
   )
-  and (
-    p_locations is null
-    or cardinality(p_locations) = 0
-    or exists (
-      select 1
-      from unnest(p_locations) as loc(term)
-      where (
-        coalesce(a.city, '') ilike ('%' || loc.term || '%')
-        or coalesce(a.state, '') ilike ('%' || loc.term || '%')
-        or coalesce(a.address, '') ilike ('%' || loc.term || '%')
-        or coalesce(a.zip, '') ilike ('%' || loc.term || '%')
+  AND (
+    p_locations IS NULL
+    OR cardinality(p_locations) = 0
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(p_locations) AS loc(term)
+      WHERE (
+        COALESCE(a.city, '') ILIKE ('%' || loc.term || '%')
+        OR COALESCE(a.state, '') ILIKE ('%' || loc.term || '%')
+        OR COALESCE(a.address, '') ILIKE ('%' || loc.term || '%')
+        OR COALESCE(a.zip, '') ILIKE ('%' || loc.term || '%')
       )
     )
   )
-  and (
-    p_statuses is null
-    or cardinality(p_statuses) = 0
-    or exists (
-      select 1
-      from unnest(p_statuses) as st(term)
-      where (
+  AND (
+    p_statuses IS NULL
+    OR cardinality(p_statuses) = 0
+    OR EXISTS (
+      SELECT 1
+      FROM unnest(p_statuses) AS st(term)
+      WHERE (
         upper(replace(st.term, '-', '_')) = 'ACTIVE_LOAD'
-        and upper(coalesce(a.status, '')) in ('ACTIVE', 'ACTIVE_LOAD')
-        and a.contract_end_date >= current_date
+        AND upper(coalesce(a.status, '')) IN ('ACTIVE', 'ACTIVE_LOAD')
+        AND a.contract_end_date >= current_date
       )
-      or (
+      OR (
         upper(replace(st.term, '-', '_')) = 'CUSTOMER'
-        and upper(coalesce(a.status, '')) = 'CUSTOMER'
+        AND upper(coalesce(a.status, '')) = 'CUSTOMER'
       )
-      or (
+      OR (
         upper(replace(st.term, '-', '_')) = 'PROSPECT'
-        and upper(coalesce(a.status, '')) = 'PROSPECT'
+        AND upper(coalesce(a.status, '')) = 'PROSPECT'
       )
-      or (
+      OR (
         upper(replace(st.term, '-', '_')) = 'CHURNED'
-        and upper(coalesce(a.status, '')) = 'CHURNED'
+        AND upper(coalesce(a.status, '')) = 'CHURNED'
       )
-      or (
-        upper(replace(st.term, '-', '_')) not in ('ACTIVE_LOAD', 'CUSTOMER', 'PROSPECT', 'CHURNED')
-        and upper(coalesce(a.status, '')) = upper(replace(st.term, '-', '_'))
+      OR (
+        upper(replace(st.term, '-', '_')) NOT IN ('ACTIVE_LOAD', 'CUSTOMER', 'PROSPECT', 'CHURNED')
+        AND upper(coalesce(a.status, '')) = upper(replace(st.term, '-', '_'))
       )
     )
   )
-  order by a.name asc
-  limit p_limit offset p_offset;
+  ORDER BY a.name ASC
+  LIMIT p_limit OFFSET p_offset;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.get_accounts_count_by_list(
@@ -323,7 +336,10 @@ AS $function$
     or p_search = ''
     or a.name ilike ('%' || p_search || '%')
     or coalesce(a.domain, '') ilike ('%' || p_search || '%')
+    or coalesce(a.description, '') ilike ('%' || p_search || '%')
     or coalesce(a.website, '') ilike ('%' || p_search || '%')
+    or coalesce(a.linkedin_url, '') ilike ('%' || p_search || '%')
+    or coalesce(to_char(a.contract_end_date, 'YYYY-MM-DD'), '') ilike ('%' || p_search || '%')
     or coalesce(a.industry, '') ilike ('%' || p_search || '%')
     or coalesce(a.city, '') ilike ('%' || p_search || '%')
     or coalesce(a.state, '') ilike ('%' || p_search || '%')
