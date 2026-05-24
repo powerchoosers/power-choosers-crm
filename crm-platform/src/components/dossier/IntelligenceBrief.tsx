@@ -245,10 +245,18 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     const contractLabel = getHumanDate(contractDate) || 'the current contract'
     const briefText = cleanTextLocal(`${brief.headline} ${brief.detail} ${brief.talkTrack}`).toLowerCase()
     
-    const facility = cleanTextLocal(profile?.facilityType || industryName || 'commercial facility').toLowerCase()
-    const opModel = cleanTextLocal(profile?.operatingModel || 'how the site runs day to day').toLowerCase()
+    const isSchoolBrief = /\b(k-?12|k4-?12|private school|school|students|classrooms|campus hvac|athletics|cafeterias)\b/i.test(briefText)
+    let facility = cleanTextLocal(profile?.facilityType || industryName || 'commercial facility').toLowerCase()
+    let opModel = cleanTextLocal(profile?.operatingModel || 'how the site runs day to day').toLowerCase()
+    if (isSchoolBrief && /\b(church|worship|sanctuary|ministry|religious)\b/i.test(`${facility} ${opModel}`)) {
+      facility = 'school campus'
+      opModel = 'school campus operations'
+    }
     const profileKeywords = Array.isArray(profile?.powerKeywords) && profile.powerKeywords.length > 0
-      ? profile.powerKeywords.map((k) => cleanTextLocal(k).toLowerCase()).filter(Boolean)
+      ? profile.powerKeywords
+        .map((k) => cleanTextLocal(k).toLowerCase())
+        .filter(Boolean)
+        .filter((keyword) => !isSchoolBrief || !/\b(sanctuary|worship|ministry|church)\b/i.test(keyword))
       : []
     const briefKeywords = [
       'HVAC',
