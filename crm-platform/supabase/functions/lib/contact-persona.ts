@@ -220,13 +220,18 @@ function inferRoleFamily(title: string, industry: string, signals: string[]): Au
   if (/(nonprofit|foundation|charity|mission|ministry|faith|church|501c3|community)/.test(combined)) return 'nonprofit'
   if (/(hotel|hospitality|guest|resort|lodging|inn|motel|banquet|event)/.test(combined)) return 'hospitality'
   if (/(retail|store|merchandising|brand|showroom)/.test(combined)) return 'retail'
+  if (looksPalletManagementBusiness(combined)) return 'logistics'
   if (/(logistics|warehouse|freight|distribution|shipping|3pl|nvocc|cargo|transport)/.test(combined)) return 'logistics'
   if (/(manufacturing|production|plant|factory|fabrication|processing|packaging|food manufacturing|food production)/.test(combined)) return 'manufacturing'
 
   return 'other'
 }
 
-function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyName: string): string[] {
+function looksPalletManagementBusiness(text: string) {
+  return /(pallet management|pallet services?|pallet repair|pallet recycling|pallet retrieval|pallet sortation|pallet redistribution|total pallet management|reverse logistics|wood packaging|remanufactur(?:ing|ed)? pallets?)/i.test(text)
+}
+
+function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyName: string, signals: string[] = []): string[] {
   const baseTitle = title || 'this person'
   const generic = [
     'plain-English answer',
@@ -248,7 +253,9 @@ function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyN
     nonprofit: ['mission funds', 'budget protection', 'service continuity', 'avoiding surprises'],
     hospitality: ['guest comfort', 'laundry and HVAC', 'site-level usage', 'which property is the outlier'],
     retail: ['store-level peaks', 'showroom or floor load', 'which locations are different', 'whether the bill lines up with traffic'],
-    logistics: ['dock activity', 'refrigeration if any', 'site usage timing', 'which locations are driving peaks'],
+    logistics: looksPalletManagementBusiness(`${title} ${companyName} ${signals.join(' ')}`)
+      ? ['pallet retrieval and repair flow', 'reverse logistics timing', 'sortation and inventory cycles', 'which sites are different']
+      : ['dock activity', 'refrigeration if any', 'site usage timing', 'which locations are driving peaks'],
     manufacturing: ['production schedules', 'equipment start times', 'which lines create the spikes', 'whether the plant timing is still right'],
     other: generic,
   }
@@ -260,9 +267,10 @@ function buildCareAbouts(roleFamily: AudienceRoleFamily, title: string, companyN
   ], 5)
 }
 
-function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, companyName: string): string {
+function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, companyName: string, signals: string[] = []): string {
   const company = companyName || 'the company'
   const base = title || 'this contact'
+  const palletManagementBusiness = looksPalletManagementBusiness(`${title} ${companyName} ${signals.join(' ')}`)
   switch (roleFamily) {
     case 'finance':
       return `${base} usually cares about budget surprises and whether the bill is still making sense at ${company}.`
@@ -290,7 +298,9 @@ function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, company
     case 'retail':
       return `${base} usually cares about store-level traffic, lighting, HVAC, and which locations are the outliers at ${company}.`
     case 'logistics':
-      return `${base} usually cares about dock timing, refrigeration if any, and which sites are carrying the peaks at ${company}.`
+      return palletManagementBusiness
+        ? `${base} usually cares about pallet retrieval, repair turnaround, sortation, inventory cycles, and which sites are carrying the peaks at ${company}.`
+        : `${base} usually cares about dock timing, refrigeration if any, and which sites are carrying the peaks at ${company}.`
     case 'manufacturing':
       return `${base} usually cares about production timing, equipment starts, and the plant peak at ${company}.`
     default:
@@ -298,9 +308,10 @@ function buildRoleSummary(roleFamily: AudienceRoleFamily, title: string, company
   }
 }
 
-function buildOpenerHint(profile: AudienceProfile): string {
+function buildOpenerHint(profile: AudienceProfile, signals: string[] = []): string {
   const firstName = profile.contactFirstName || profile.contactName.split(/\s+/)[0] || 'there'
   const company = profile.companyName || 'the company'
+  const palletManagementBusiness = looksPalletManagementBusiness(`${profile.contactTitle} ${profile.companyName} ${signals.join(' ')}`)
   switch (profile.roleFamily) {
     case 'finance':
       return `At ${company}, ${firstName} usually cares about budget surprises and which sites are driving the spikes.`
@@ -328,7 +339,9 @@ function buildOpenerHint(profile: AudienceProfile): string {
     case 'retail':
       return `At ${company}, ${firstName} usually cares about store-level usage.`
     case 'logistics':
-      return `At ${company}, ${firstName} usually cares about dock timing.`
+      return palletManagementBusiness
+        ? `At ${company}, ${firstName} usually cares about pallet retrieval, repair turnaround, sortation, and which sites are carrying the peaks.`
+        : `At ${company}, ${firstName} usually cares about dock timing.`
     case 'manufacturing':
       return `At ${company}, ${firstName} usually cares about production timing.`
     default:
@@ -336,7 +349,8 @@ function buildOpenerHint(profile: AudienceProfile): string {
   }
 }
 
-function buildQuestionHint(profile: AudienceProfile): string {
+function buildQuestionHint(profile: AudienceProfile, signals: string[] = []): string {
+  const palletManagementBusiness = looksPalletManagementBusiness(`${profile.contactTitle} ${profile.companyName} ${signals.join(' ')}`)
   switch (profile.roleFamily) {
     case 'finance':
       return 'Have you been able to separate which sites are carrying the biggest peaks?'
@@ -364,7 +378,9 @@ function buildQuestionHint(profile: AudienceProfile): string {
     case 'retail':
       return 'Have you seen which stores are driving the bill the hardest?'
     case 'logistics':
-      return 'Have you mapped which sites are creating the peak charges?'
+      return palletManagementBusiness
+        ? 'Have you mapped which sites are driving the pallet network peaks?'
+        : 'Have you mapped which sites are creating the peak charges?'
     case 'manufacturing':
       return 'Have you been able to separate the production timing from the bill yet?'
     default:
@@ -372,7 +388,7 @@ function buildQuestionHint(profile: AudienceProfile): string {
   }
 }
 
-function buildGuardrails(profile: AudienceProfile): string[] {
+function buildGuardrails(profile: AudienceProfile, signals: string[] = []): string[] {
   const base = [
     'Use plain English.',
     'Use the first name once at most, only if it helps the opener.',
@@ -386,6 +402,8 @@ function buildGuardrails(profile: AudienceProfile): string[] {
   } else if (profile.source === 'decision_maker_card') {
     base.push('This is supporting context unless the step explicitly targets this person.')
   }
+
+  const palletManagementBusiness = looksPalletManagementBusiness(`${profile.contactTitle} ${profile.companyName} ${signals.join(' ')}`)
 
   const byRole: Record<AudienceRoleFamily, string[]> = {
     finance: ['Focus on budget surprises, timing, and site-level variance.'],
@@ -401,7 +419,9 @@ function buildGuardrails(profile: AudienceProfile): string[] {
     nonprofit: ['Focus on mission funds and avoiding surprise costs.'],
     hospitality: ['Focus on guest comfort, laundry, and HVAC.'],
     retail: ['Focus on store-level usage and traffic patterns.'],
-    logistics: ['Focus on dock activity, refrigeration if any, and site timing.'],
+    logistics: palletManagementBusiness
+      ? ['Focus on pallet retrieval, repair turnaround, sortation, inventory cycles, and site timing.']
+      : ['Focus on dock activity, refrigeration if any, and site timing.'],
     manufacturing: ['Focus on production timing, equipment starts, and the plant peak.'],
     other: ['Focus on the business problem that would matter to this person.'],
   }
@@ -460,6 +480,7 @@ export function buildAudienceProfile(
   )
 
   const backgroundSignals = uniqueStrings([
+    ...collectSignals(account?.description, 0, 4),
     ...collectSignals(contact?.notes, 0, 4),
     ...collectSignals(metadata?.notes, 0, 4),
     ...collectSignals(metadata?.about, 0, 4),
@@ -476,7 +497,7 @@ export function buildAudienceProfile(
     ...collectSignals(nestedApollo, 0, 6),
   ], 10)
 
-  const roleFamily = inferRoleFamily(contactTitle, industry, backgroundSignals)
+  const roleFamily = inferRoleFamily(contactTitle, industry, backgroundSignals, `${companyName} ${cleanText(account?.description || '')}`)
   const profile: AudienceProfile = {
     source,
     sourceLabel: sourceLabel || getSourceLabel(source),
@@ -487,8 +508,8 @@ export function buildAudienceProfile(
     companyName: companyName || 'Unknown company',
     industry: industry || 'Unknown industry',
     roleFamily,
-    roleSummary: buildRoleSummary(roleFamily, contactTitle, companyName || 'the company'),
-    careAbouts: buildCareAbouts(roleFamily, contactTitle, companyName || 'the company'),
+    roleSummary: buildRoleSummary(roleFamily, contactTitle, companyName || 'the company', backgroundSignals),
+    careAbouts: buildCareAbouts(roleFamily, contactTitle, companyName || 'the company', backgroundSignals),
     openerHint: buildOpenerHint({
       source,
       sourceLabel: sourceLabel || getSourceLabel(source),
@@ -507,7 +528,7 @@ export function buildAudienceProfile(
       evidence: [],
       guardrails: [],
       linkedInUrl: linkedInUrl || null,
-    }),
+    }, backgroundSignals),
     questionHint: buildQuestionHint({
       source,
       sourceLabel: sourceLabel || getSourceLabel(source),
@@ -526,7 +547,7 @@ export function buildAudienceProfile(
       evidence: [],
       guardrails: [],
       linkedInUrl: linkedInUrl || null,
-    }),
+    }, backgroundSignals),
     backgroundSignals,
     evidence: uniqueStrings([
       contactName ? `Name: ${contactName}` : '',
@@ -554,7 +575,7 @@ export function buildAudienceProfile(
       evidence: [],
       guardrails: [],
       linkedInUrl: linkedInUrl || null,
-    }),
+    }, backgroundSignals),
     linkedInUrl: linkedInUrl || null,
   }
 
