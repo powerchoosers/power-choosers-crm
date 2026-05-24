@@ -47,6 +47,13 @@ export function buildTaskVariableMap(context: TaskVariableContext): Record<strin
     clean(accountMeta.description) ||
     clean(contact.accountDescription);
 
+  const contactUtilityTerritory = clean(contact.utilityTerritory || contactMeta.utilityTerritory || contactMeta.energy?.utilityTerritory);
+  const accountUtilityTerritory = clean(account.utilityTerritory || accountMeta.utilityTerritory || accountMeta.energy?.utilityTerritory);
+  const contactMarketContext = clean(contact.marketContext || contactMeta.marketContext || contactMeta.energy?.marketContext);
+  const accountMarketContext = clean(account.marketContext || accountMeta.marketContext || accountMeta.energy?.marketContext);
+  const contactIsRegulated = Boolean(contact.isRegulated ?? contactMeta.isRegulated ?? contactMeta.energy?.isRegulated);
+  const accountIsRegulated = Boolean(account.isRegulated ?? accountMeta.isRegulated ?? accountMeta.energy?.isRegulated);
+
   return {
     'contact.firstName': fallback(firstName),
     'contact.lastName': fallback(lastName),
@@ -73,6 +80,9 @@ export function buildTaskVariableMap(context: TaskVariableContext): Record<strin
     'contact.currentRate': fallback(contact.currentRate || account.currentRate || account.current_rate),
     'contact.contractEnd': fallback(contact.contractEnd || account.contractEnd || account.contract_end_date),
     'contact.accountDescription': fallback(accountDescription),
+    'contact.utilityTerritory': fallback(contactUtilityTerritory),
+    'contact.marketContext': fallback(contactMarketContext),
+    'contact.isRegulated': contactIsRegulated ? 'yes' : 'no',
 
     'account.name': fallback(accountName),
     'account.industry': fallback(account.industry || contact.industry),
@@ -88,8 +98,14 @@ export function buildTaskVariableMap(context: TaskVariableContext): Record<strin
     'account.annualUsage': fallback(account.annualUsage || account.annual_usage || contact.annualUsage),
     'account.electricitySupplier': fallback(account.electricitySupplier || account.electricity_supplier || contact.electricitySupplier),
     'account.currentRate': fallback(account.currentRate || account.current_rate || contact.currentRate),
+    'account.utilityTerritory': fallback(accountUtilityTerritory),
+    'account.marketContext': fallback(accountMarketContext),
+    'account.isRegulated': accountIsRegulated ? 'yes' : 'no',
     'account.revenue': fallback(account.revenue),
     'account.employees': fallback(account.employees),
+    'utility_territory': fallback(accountUtilityTerritory || contactUtilityTerritory),
+    'market_context': fallback(accountMarketContext || contactMarketContext),
+    'is_regulated': (accountIsRegulated || contactIsRegulated) ? 'yes' : 'no',
   };
 }
 

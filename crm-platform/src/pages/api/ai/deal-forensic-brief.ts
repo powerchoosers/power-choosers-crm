@@ -34,6 +34,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     deal.yearlyCommission != null && deal.amount != null && deal.amount > 0
       ? ((deal.yearlyCommission / deal.amount) * 100).toFixed(2)
       : null
+  const accountLocation = [account?.city, account?.state].filter(Boolean).join(', ')
+  const utilityTerritory = account?.utilityTerritory || account?.utility_territory || account?.tdu || account?.tdsp || ''
+  const marketContext = account?.marketContext || account?.market_context || ''
+  const isRegulated = Boolean(
+    account?.isRegulated
+    || account?.is_regulated
+    || /\bregulated\b|\bmunicipal\b|\bnon[-\s]?opt[-\s]?in\b/i.test(String(marketContext))
+  )
 
   const fmtMoney = (n: number | undefined | null) =>
     n != null ? `$${Number(n).toLocaleString()}` : 'not set'
@@ -43,6 +51,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 DEAL FILE:
 - Contract Title: ${deal.title}
 - Account: ${account?.name || 'Unknown'}
+- Account Location: ${accountLocation || 'not set'}
+- Utility Territory: ${utilityTerritory || 'not set'}
+- Market Context: ${marketContext || 'unknown'}
+- Regulated Territory: ${isRegulated ? 'yes' : 'no/unknown'}
 - Stage: ${deal.stage}
 - Annual Contract Value: ${fmtMoney(deal.amount)}
 - Annual Usage: ${annualUsageMWh ? `${annualUsageMWh} MWh/yr (${Number(deal.annualUsage).toLocaleString()} kWh)` : 'not set'}
@@ -57,6 +69,7 @@ DEAL FILE:
 Return exactly 6 sections with these headers. No preamble. No closing remarks.
 
 ## RATE ASSESSMENT
+If the account is in a regulated or municipal utility territory, do not compare it to competitive ERCOT pricing without naming that distinction.
 Evaluate the ${rateInCents ? `${rateInCents}¢/kWh` : 'unknown'} rate against typical ERCOT market rates for a ${annualUsageMWh ? `${annualUsageMWh} MWh/yr` : 'unknown usage'} commercial C&I load. Is this rate competitive, above market, or below market? What load zone benchmark is most relevant (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST)? If usage or rate data is missing, state exactly what is needed and why it changes the analysis.
 
 ## 4CP EXPOSURE
