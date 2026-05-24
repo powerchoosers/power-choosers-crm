@@ -299,21 +299,21 @@ function cleanSequenceCopy(input) {
     .replace(/\bI could (?:highlight|share|give|provide|point out)\b/gi, (m) => m.replace('could', 'can'))
     .replace(/\bWould that be helpful\?\s*/gi, 'Worth a quick look? ')
     .replace(/\bWould that quick review be helpful\?\s*/gi, 'Worth a quick look? ')
-    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "Want me to send what I'd check first? ")
-    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "Want me to send what I'd check first? ")
-    .replace(/\bWant me to take a look\?\s*/gi, "Want me to send what I'd check first? ")
+    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "Want me to send the next thing I'd check? ")
+    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "Want me to send the next thing I'd check? ")
+    .replace(/\bWant me to take a look\?\s*/gi, "Want me to send the next thing I'd check? ")
     .replace(/\bWorth a quick check\?\s*/gi, 'Worth a quick look? ')
-    .replace(/\bWould you be open to a 15-minute call next week\?\s*/gi, "Want me to send what I'd check first? ")
-    .replace(/\bWould you be open to a quick call next week\?\s*/gi, "Want me to send what I'd check first? ")
-    .replace(/\bWould you be open to a short call next week\?\s*/gi, "Want me to send what I'd check first? ")
-    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a quick breakdown")
-    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a quick breakdown")
-    .replace(/\b2-3 specific observations\b/gi, "a quick breakdown")
-    .replace(/\bshort breakdown of what stands out\b/gi, "a quick breakdown of what I'd check")
+    .replace(/\bWould you be open to a 15-minute call next week\?\s*/gi, "Want me to send the next thing I'd check? ")
+    .replace(/\bWould you be open to a quick call next week\?\s*/gi, "Want me to send the next thing I'd check? ")
+    .replace(/\bWould you be open to a short call next week\?\s*/gi, "Want me to send the next thing I'd check? ")
+    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a short note")
+    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a short note")
+    .replace(/\b2-3 specific observations\b/gi, "a short note")
+    .replace(/\bshort breakdown of what stands out\b/gi, "a short note on what stands out")
     .replace(/\bI review electricity statements for Nodal Point\b/gi, 'I review commercial electricity costs')
     .replace(/\bMy company, Nodal Point, helps businesses understand their energy bills better\.?\s*/gi, 'I review commercial electricity costs for Nodal Point. ')
     .replace(/\bI review these bills\b/gi, 'I review these electricity costs')
-    .replace(/\b3-point readout\b/gi, 'quick breakdown')
+    .replace(/\b3-point readout\b/gi, 'short note')
 
   return text;
 }
@@ -355,17 +355,17 @@ function enforceStageSpecificCTA(input, replyStage) {
 
   if (stage === 'first_touch') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, "reply and I'll send what I'd check first");
+      text = text.replace(pattern, "reply and I'll send a short note");
     }
   } else if (stage === 'follow_up') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, 'reply and I can send the quick breakdown');
+      text = text.replace(pattern, 'reply and I can send a short note');
     }
   } else if (stage === 'no_reply') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, 'reply and I can send the quick note');
+      text = text.replace(pattern, 'reply and I can send a short note');
     }
-    text = text.replace(/\bwho (?:at [^?.,]+ )?(?:handles|reviews|owns) (?:your |the )?(?:electricity|energy|utility|power) (?:agreement|agreements|bill|bills|review)\??/gi, 'if this sits with you, reply and I can send the quick note');
+    text = text.replace(/\bwho (?:at [^?.,]+ )?(?:handles|reviews|owns) (?:your |the )?(?:electricity|energy|utility|power) (?:agreement|agreements|bill|bills|review)\??/gi, 'if this sits with you, reply and I can send a short note');
   }
 
   return text
@@ -408,8 +408,8 @@ function buildReplyStageDirective(stage) {
       '- Do not choose "delivery charges" or "demand charges" unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       '- Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
       '- Start with one concrete company, role, city, operating, or event fact. Make the first sentence sound like a real observation, not a template. Avoid the phrase "the useful question is."',
-      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a quick breakdown, a short note on what you would check first, a yes/no reply, a routing reply, or a plain comparison.',
-      '- First-touch tone should be direct but calm. First-touch CTA must be easy to answer. Good patterns: "Want me to send what I\'d check first?" "Reply yes and I\'ll send the quick breakdown." "Does this sit with you or someone else?" "Am I off base?"',
+      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short note, a yes/no reply, a routing reply, or a plain comparison.',
+      '- First-touch tone should be direct but calm. First-touch CTA must be easy to answer. Good patterns: "Want me to send the next thing I\'d check?" "Reply yes and I\'ll send a short note." "Does this sit with you or someone else?" "Am I off base?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
       '- Subject line should match the persona and stage, but do not keep reusing stock labels like "site cost check", "equipment timing", or "simple cost check". Use the company, city, issue, or timing when it sounds more natural.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
@@ -417,9 +417,9 @@ function buildReplyStageDirective(stage) {
     follow_up: [
       '- FOLLOW-UP: 45-75 words, 2-3 short paragraphs.',
       '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks. Do not repeat the same lane from the prior note if the prompt gives a new signal.',
-      '- Reinforce one concrete output that does not require document sharing yet: a quick breakdown, a short note, a short call, or a routing reply.',
+      '- Reinforce one concrete output that does not require document sharing yet: a short note, a short call, or a routing reply.',
       '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
-      '- Use one direct CTA only. Good patterns: "Want me to send what I\'d check first?" "Reply yes and I\'ll send the quick breakdown." "Is this worth checking before renewal?"',
+      '- Use one direct CTA only. Good patterns: "Want me to send the next thing I\'d check?" "Reply yes and I\'ll send a short note." "Is this worth checking before renewal?"',
       '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
       '- Subject line should sound slightly more diagnostic than Day 1, but avoid falling back to the same 2-3 subject formulas every time.',
     ].join('\n'),
@@ -427,10 +427,10 @@ function buildReplyStageDirective(stage) {
       '- NO REPLY: 30-50 words, maximum 2 sentences.',
       '- Assume you already reached the right person. Do not ask who owns electricity review.',
       '- Sentence 1 should state the value in plain English and name one likely leak area.',
-      '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a quick note.',
+      '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short note.',
       '- No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       '- Never ask for a bill, statement, or invoice in this branch.',
-      '- Subject line should be the sharpest and simplest one in the sequence, but do not keep defaulting to "quick breakdown" or "simple reply".',
+      '- Subject line should be the sharpest and simplest one in the sequence, but do not keep defaulting to stock labels or generic reply language.',
     ].join('\n'),
     general: [
       '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
@@ -739,10 +739,10 @@ export default async function handler(req, res) {
             - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
             - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
             - Keep it problem-based and specific. Persona examples:
-              - Finance: "site cost check", "before renewal slips", "simple cost check"
+              - Finance: "budget timing", "before renewal slips", "rate check"
               - Operations: "equipment timing", "delivery gap", "where demand adds cost"
               - Purchasing: "renewal timing", "vendor fit", "who owns contract timing?"
-              - Owner/VP: "simple cost check", "timing before renewal", "where the extra cost sits"
+              - Owner/VP: "budget timing", "timing before renewal", "where the extra cost sits"
             - Keep the subject line plain enough to feel manual, not clever enough to feel templated. Favor short, literal phrases over marketing language.
           13. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
@@ -762,18 +762,22 @@ export default async function handler(req, res) {
           15. INTELLIGENCE BRIEF RULE:
             - If INTELLIGENCE BRIEF is present and usable, it is the PRIMARY reason for the note unless the prompt explicitly says otherwise.
             - Start from the event, operating fact, or business question in the brief before you fall back to generic industry language.
-            - Use the brief to choose the lane, the first sentence, and the business question. Do not reduce a strong brief to generic "cost side", "quick breakdown", or "rate timing" language.
+            - Use the brief to choose the lane, the first sentence, and the business question. Do not reduce a strong brief to generic "cost side", "rate timing", or stock-label language.
             - However, ensure the Talk Track follows the other rules (no "I noticed on your website" etc.). If the Talk Track contains forbidden openers, strip the filler and keep the diagnostic insight.
             - If the brief is missing, low confidence, empty, or fallback-like, ignore it and lean on account, notes, and call context instead.
             - Never say "I saw a report about..." unless the event itself is named in the same sentence.
             - Never mention the source URL in the email body.
             - Treat stock labels in the original prompt as placeholders, not final copy. If the prompt says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company's real business terms and the current brief before writing.
+          15A. SEQUENCE HISTORY RULE:
+            - If NEURAL_CONTEXT or STRATEGY includes prior sequence touches, treat them as the last angle used.
+            - Move the next note forward from that angle. Do not repeat the same opener, subject formula, or CTA style word-for-word.
+            - If the prior touch was already highly specific, shift to a neighboring angle rather than restating the same idea.
           16. CTA RULE:
             - First touch: ask for a low-friction reply with a concrete offer, not a bill request and not a generic meeting ask.
-            - Early-sequence offer options: a quick breakdown, a short note on what you would check first, a plain comparison, a quick benchmark, or a simple routing reply.
+            - Early-sequence offer options: a short note, a plain comparison, or a simple routing reply.
             - First-touch and no-reply branches must NOT ask for a utility bill, statement, or invoice.
             - Later/high-intent branches may optionally ask for the latest statement only to confirm hard numbers after interest is established.
-            - Use PRESENT conditional or an affirmative CTA. Good examples: "Want me to send what I'd check first?" "Reply yes and I'll send the quick breakdown." "Does this sit with you or someone else?" "Am I off base?" NEVER past conditional: "if you sent it, I could reply."
+            - Use PRESENT conditional or an affirmative CTA. Good examples: "Want me to send the next thing I'd check?" "Reply yes and I'll send a short note." "Does this sit with you or someone else?" "Am I off base?" NEVER past conditional: "if you sent it, I could reply."
             - Avoid meeting asks in first touch unless the strategy explicitly says the prospect is already high-intent. A one-line reply is easier than a calendar commitment.
             - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" These are indirect and passive.
             - Do not stack more than one question. One CTA only.
@@ -835,7 +839,7 @@ export default async function handler(req, res) {
           REPLY-DRIVING GENERAL RULES:
           - Use the fewest context facts that still make the email feel manual. More detail is not better if it makes the ask harder to answer.
           - If the draft starts sounding generic, cut a sentence instead of adding a vague one.
-          - A direct request beats a clever line. The recipient should know exactly what they get back: a quick breakdown, a short note on what you would check first, a plain comparison, a short call, or later-stage hard-number validation.
+          - A direct request beats a clever line. The recipient should know exactly what they get back: a short note, a plain comparison, a short call, or later-stage hard-number validation.
           - If the draft smells like a fallback, replace it with a concrete value prop instead of making it shorter. Short is fine only when the payoff is obvious.
 
           HIGH_AGENCY_IDENTITY_RESOLUTION:
