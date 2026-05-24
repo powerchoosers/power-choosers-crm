@@ -744,6 +744,14 @@ function hasStrongSchoolSignals(text: string) {
   return /(school district|independent school district|isd\b|public school|charter school|k-12|school campus|students|classrooms|teachers|school\b|academy|daycare|preschool|childcare|tutoring|learning center)/i.test(text)
 }
 
+function hasPrivateK12SchoolSignals(text: string) {
+  return /\b(k-?12|k4-?12|pre[-\s]?k|primary\/secondary education|private school|college-preparatory|college preparatory|day school|selective admissions|students|classrooms|teachers|elementary|junior high|middle school|high school|school campus|school\b)\b/i.test(text)
+}
+
+function hasReligiousOrganizationSignals(text: string) {
+  return /(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/i.test(text) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(text)
+}
+
 function hasStrongAutomotiveDealerSignals(text: string) {
   return /\b(dealerships?|car dealer|auto dealer|vehicle inventory|certified pre-owned|new vehicles?|used vehicles?|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text) || /\b(?:car|auto|vehicle)\s+showrooms?\b/i.test(text) || /\b(?:pre-owned\s+(?:cars?|vehicles?|trucks?))\b/i.test(text)
 }
@@ -841,6 +849,10 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (schoolSignals && /(retail|store|showroom|shopping|customer-facing retail|retail group|retail footprint|roll-?up view|dealership|service bay|automotive)/i.test(profileText)) {
+    return true
+  }
+
+  if (hasPrivateK12SchoolSignals(accountText) && (profile.industryCluster === 'religious' || /(religious organization|worship|sanctuary|church \/ worship|church campus|ministry|congregation)/i.test(profileText))) {
     return true
   }
 
@@ -2628,12 +2640,19 @@ function buildStructuredIdentityProfile(
       break
 
     case 'school_district':
-      companyType = 'school district'
-      operatingModel = multiSiteInfo.isMultiSite ? 'multi-campus public-school system' : 'public-school campus'
+      {
+        const isPrivateSchool = /\b(private school|college-preparatory|college preparatory|day school|selective admissions|k4-?12|religious institutions?)\b/i.test(text) && !/(school district|independent school district|isd\b)/i.test(text)
+        companyType = isPrivateSchool ? 'private K-12 school' : 'school district'
+        operatingModel = isPrivateSchool
+          ? (multiSiteInfo.isMultiSite ? 'multi-campus private-school operation' : 'private-school campus')
+          : (multiSiteInfo.isMultiSite ? 'multi-campus public-school system' : 'public-school campus')
+        identityKeywords = isPrivateSchool
+          ? selectIdentityKeywords(text, ['private school', 'college-preparatory', 'day school', 'students', 'classrooms', 'athletics', 'cafeterias'], ['private school', 'students', 'classrooms'])
+          : selectIdentityKeywords(text, ['school district', 'campus', 'students', 'classrooms', 'chromebooks', 'athletics', 'cafeterias'], ['school district', 'campuses', 'classroom technology'])
+      }
       facilityType = 'school campus'
-      identityKeywords = selectIdentityKeywords(text, ['school district', 'campus', 'students', 'classrooms', 'chromebooks', 'athletics', 'cafeterias'], ['school district', 'campuses', 'classroom technology'])
       powerKeywords = selectIdentityKeywords(text, ['hvac', 'classroom technology', 'cafeterias', 'athletics', 'lighting'], ['HVAC', 'classroom technology', 'cafeterias'])
-      talkTrackGuardrails = ['No factory language', 'No shift or production language']
+      talkTrackGuardrails = ['No factory language', 'No shift or production language', 'No church, sanctuary, worship, or ministry language unless the account is clearly a church instead of a school']
       break
 
     case 'education_nonprofit':
@@ -3552,12 +3571,12 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)} ${notes} ${cleanCandidate?.title || ''} ${cleanCandidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
-  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/i.test(text) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(text)) return 'religious'
   // Energy brokers and consultants — do not classify as any operational cluster
   if (isCompetitorEnergyBroker(account)) return 'office_services'
-  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/.test(text)) return 'education_nonprofit'
+  if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
+  if (hasReligiousOrganizationSignals(text)) return 'religious'
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/.test(text) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
@@ -3620,9 +3639,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
-  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/.test(text) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(text)) return 'religious'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
-  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
+  if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
+  if (hasReligiousOrganizationSignals(text)) return 'religious'
   if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
   if (/(school|education|university|college|nonprofit|foundation|charity|academy|daycare|preschool|childcare|tutoring|learning center)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
@@ -3633,11 +3652,11 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
-  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/i.test(coreText) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(coreText)) return 'religious'
   if (/(hospital|medical center|regional hospital|health system|emergency room|acute care)/i.test(coreText)) return 'healthcare'
-  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/i.test(coreText)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/i.test(coreText)) return 'education_nonprofit'
+  if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
+  if (hasReligiousOrganizationSignals(coreText)) return 'religious'
   if (hasStrongCommercialRealEstateSignals(coreText)) return 'office_services'
   if (hasFurnitureManufacturingSignals(coreText)) return 'manufacturing'
   if (hasReadyMixConcreteSignals(coreText)) return 'manufacturing'
@@ -6714,6 +6733,7 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
   const verifiedFact = (isEventSignal && snippet &&
     snippet.split(/\s+/).filter(Boolean).length >= 12 &&
     !isSameAsAccountDescription(snippet, account) &&
+    !/\bchoosing the right school\b/i.test(snippet) &&
     !looksLikeRawNavigationText(snippet))
       ? shortenText(snippet, 260)
       : ''
@@ -6882,11 +6902,18 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
     return `${companyName} Manages Retail Store and Customer-Facing Facility Load`
   }
 
-  if (profile?.companyType) {
-    return `${companyName} ${toTitleCase(profile.companyType)} Facility and Billing Intel`
+  if (profile?.industryCluster === 'school_district') {
+    if (/\b(private k-?12 school|private school|college-preparatory|day school)\b/i.test(text)) {
+      return `${companyName} Private K-12 Campus Operating Context`
+    }
+    return `${companyName} School Campus Operating Context`
   }
 
-  return `${companyName} Facility and Billing Intel`
+  if (profile?.companyType) {
+    return cleanText(`${companyName} ${toTitleCase(profile.companyType)} Facility and Billing Intel`)
+  }
+
+  return cleanText(`${companyName} Facility and Billing Intel`)
 }
 
 function normalizeFinalSignalHeadline(headline: string, account: AccountRow, candidate: ResearchHit | null = null) {
@@ -6902,7 +6929,7 @@ function normalizeFinalSignalHeadline(headline: string, account: AccountRow, can
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
     return buildCompanyContextHeadline(account, null)
   }
-  if (/\b(server error|close menu|open menu|security verification|site connection security|requires cookies|uses cookies|benefits why use|in the news)\b/i.test(cleaned)) {
+  if (/\b(server error|close menu|open menu|security verification|site connection security|requires cookies|uses cookies|benefits why use|in the news|choosing the right school)\b/i.test(cleaned)) {
     return buildCompanyContextHeadline(account, null)
   }
   if (/\bwebsite facility and billing intel\b/i.test(cleaned)) {
@@ -6943,6 +6970,7 @@ function normalizeSignalDetail(detail: string, headline: string, account: Accoun
     /\bI agree\b/i.test(cleaned) ||
     /\bskip to content\b/i.test(cleaned) ||
     /\blearn more\b.*\blearn more\b/i.test(cleaned) ||
+    /\bchoosing the right school\b/i.test(cleaned) ||
     /\bphone:\s*\d/i.test(cleaned) ||
     (cleaned.endsWith('...') && wordCount < 40 && /^(welcome to|we are|we provide|we offer|our mission|about us)/i.test(cleaned))
 
