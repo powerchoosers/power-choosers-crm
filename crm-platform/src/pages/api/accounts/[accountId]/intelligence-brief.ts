@@ -307,12 +307,23 @@ type TalkTrackContext = {
 type BriefingContext = {
   companyIdentity: string
   signalReason: string
+  structuredFacts: StructuredBriefFacts
   operationalDrivers: string[]
   forbiddenLanguage: string[]
   personaLens: string
   confidence: IdentityConfidence
   problemFrame: string
   questionFrame: string
+}
+
+type StructuredBriefFacts = {
+  businessModel: string
+  activities: string[]
+  equipment: string[]
+  customerContext: string[]
+  energyDrivers: string[]
+  avoidAngles: string[]
+  sourceTerms: string[]
 }
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
@@ -2416,6 +2427,16 @@ function buildStructuredIdentityProfile(
         break
       }
 
+      if (isMaterialHandlingEquipment) {
+        companyType = multiSiteInfo.isMultiSite ? 'materials-handling equipment and service network' : 'materials-handling equipment supplier and service company'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location equipment sales, parts, and service footprint' : 'equipment sales, parts, and service operation'
+        facilityType = 'equipment sales / parts / service facility'
+        identityKeywords = selectIdentityKeywords(text, ['materials handling', 'forklifts', 'Komatsu forklifts', 'pallet storage rack', 'JLG aerial lift equipment', 'warehouse equipment', 'equipment service'], ['materials handling', 'forklifts', 'warehouse equipment'])
+        powerKeywords = selectIdentityKeywords(text, ['forklift charging', 'battery charging', 'service bays', 'parts areas', 'warehouse support', 'shop HVAC', 'HVLS fans'], ['forklift charging', 'service bays', 'parts areas'])
+        talkTrackGuardrails = ['No manufacturing language', 'No production-line language', 'No compressed-air/process-load language unless source confirms their own plant', 'No auto-parts branch language']
+        break
+      }
+
       if (isAutoPartsDistributor) {
         companyType = multiSiteInfo.isMultiSite ? 'wholesale auto-parts distribution network' : 'wholesale auto-parts supplier'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-location parts distribution network' : 'parts supply and distribution site'
@@ -2423,16 +2444,6 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['wholesale auto parts', 'automotive parts supplier', 'aftermarket parts', 'parts stores', 'distribution centers', 'same-day parts', 'repair centers'], ['wholesale auto parts', 'parts supplier', 'distribution network'])
         powerKeywords = selectIdentityKeywords(text, ['branch traffic', 'inventory turns', 'warehouse support', 'delivery timing', 'HVAC', 'parts counter'], ['branch traffic', 'inventory turns', 'delivery timing'])
         talkTrackGuardrails = ['No dealership language', 'No showroom/service-bay language unless the source confirms it', 'No lot-lighting language']
-        break
-      }
-
-      if (isMaterialHandlingEquipment) {
-        companyType = multiSiteInfo.isMultiSite ? 'materials-handling equipment and service network' : 'materials-handling equipment supplier and service company'
-        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location equipment sales, parts, and service footprint' : 'equipment sales, parts, and service operation'
-        facilityType = 'equipment sales / parts / service facility'
-        identityKeywords = selectIdentityKeywords(text, ['materials handling', 'forklifts', 'Komatsu forklifts', 'pallet storage rack', 'JLG aerial lift equipment', 'warehouse equipment', 'equipment service'], ['materials handling', 'forklifts', 'warehouse equipment'])
-        powerKeywords = selectIdentityKeywords(text, ['forklift charging', 'battery charging', 'service bays', 'parts areas', 'warehouse support', 'shop HVAC', 'HVLS fans'], ['forklift charging', 'service bays', 'parts areas'])
-        talkTrackGuardrails = ['No manufacturing language', 'No production-line language', 'No compressed-air/process-load language unless source confirms their own plant']
         break
       }
 
@@ -2997,6 +3008,100 @@ function humanizeDriverList(items: string[], limit = 4) {
   return `${cleaned.slice(0, -1).join(', ')}, and ${cleaned[cleaned.length - 1]}`
 }
 
+function extractStructuredBriefFacts(
+  account: AccountRow,
+  candidate: ResearchHit | null,
+  profile: IntelligenceProfile | null,
+  industryGuidance: ReturnType<typeof buildIndustryGuidance>,
+  signalGuidance: ReturnType<typeof buildSignalGuidance>,
+): StructuredBriefFacts {
+  const text = cleanText([
+    account.name,
+    account.industry,
+    getPublicAccountDescription(account),
+    getAccountNotes(account),
+    buildIdentityProfileText(account, candidate),
+    candidate?.title,
+    candidate?.snippet,
+  ].join(' ')).toLowerCase()
+
+  const activities = new Set<string>()
+  const equipment = new Set<string>()
+  const customerContext = new Set<string>()
+  const energyDrivers = new Set<string>()
+  const avoidAngles = new Set<string>()
+
+  const addIf = (pattern: RegExp, target: Set<string>, terms: string[]) => {
+    if (pattern.test(text)) terms.forEach((term) => target.add(term))
+  }
+
+  ;(profile?.identityKeywords || []).forEach((term) => activities.add(term))
+  ;(profile?.powerKeywords || []).forEach((term) => energyDrivers.add(term))
+  ;(industryGuidance.focus || []).forEach((term) => energyDrivers.add(term))
+  ;(signalGuidance.focus || []).forEach((term) => energyDrivers.add(term))
+
+  addIf(/materials?\s+handling|forklifts?|komatsu|pallet (?:storage )?rack|interlake[-\s]?mecalux|aerial lifts?|jlg\b|warehouse equipment/i, activities, ['materials handling equipment supply', 'equipment service', 'parts support'])
+  addIf(/materials?\s+handling|forklifts?|komatsu|pallet (?:storage )?rack|interlake[-\s]?mecalux|aerial lifts?|jlg\b|warehouse equipment/i, equipment, ['forklifts', 'pallet rack systems', 'aerial lift equipment'])
+  addIf(/forklift charging|battery charging|service bays?|parts areas?|shop hvac|hvls fans?|conveyors?/i, energyDrivers, ['forklift charging', 'service work', 'parts areas', 'shop HVAC'])
+  addIf(/warehouse facilities|distribution centers?|manufacturing plants?/i, customerContext, ['warehouse facilities', 'distribution centers', 'manufacturing plants'])
+  if (hasMaterialHandlingEquipmentSignals(text)) {
+    avoidAngles.add('generic distribution')
+    avoidAngles.add('manufacturing production')
+  }
+
+  addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
+  addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|walk[-\s]?in coolers?|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
+  addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
+
+  addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
+  addIf(/service bays?|lifts?|compressors?|showroom|lot lighting|parts department/i, equipment, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
+  addIf(/service bays?|showroom ac|lot lighting|parts department/i, energyDrivers, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
+
+  addIf(/clinic|medical practice|dental|operatories|imaging|lab|patient/i, activities, ['patient care', 'clinical operations'])
+  addIf(/operatories|imaging|lab|treatment rooms?|sterilization|patient rooms?/i, equipment, ['treatment rooms', 'clinical equipment', 'patient-hour HVAC'])
+  addIf(/operatories|imaging|lab|treatment rooms?|sterilization|patient-hour/i, energyDrivers, ['clinical equipment', 'patient-hour HVAC', 'treatment rooms'])
+
+  addIf(/school district|students|classrooms|athletics|cafeteria|school campus|public school|charter school/i, activities, ['campus operations', 'student schedule'])
+  addIf(/classroom technology|athletics|cafeterias?|school campus|students|classrooms/i, equipment, ['campus HVAC', 'classroom technology', 'athletics lighting', 'cafeterias'])
+  addIf(/classroom technology|athletics|cafeterias?|school campus|students|classrooms/i, energyDrivers, ['campus HVAC', 'classroom technology', 'athletics lighting'])
+
+  addIf(/manufactur|production|fabricat|assembly|plant/i, activities, ['production work'])
+  addIf(/production lines?|process equipment|compressed air|motors?|packaging|assembly/i, equipment, ['production equipment', 'process equipment', 'plant HVAC'])
+  addIf(/production lines?|process equipment|compressed air|motors?|packaging|assembly/i, energyDrivers, ['production equipment', 'process timing', 'plant HVAC'])
+
+  const businessModel = cleanText(profile?.companyType || industryGuidance.label || account.industry || 'commercial account')
+  const cleanList = (items: Set<string>, limit: number) => uniqueStrings(Array.from(items).map(simplifyTalkTrackLanguage), limit)
+  const facts = {
+    businessModel,
+    activities: cleanList(activities, 7),
+    equipment: cleanList(equipment, 7),
+    customerContext: cleanList(customerContext, 5),
+    energyDrivers: cleanList(energyDrivers, 7),
+    avoidAngles: cleanList(avoidAngles, 6),
+    sourceTerms: [] as string[],
+  }
+  facts.sourceTerms = uniqueStrings([
+    ...facts.activities,
+    ...facts.equipment,
+    ...facts.customerContext,
+    ...facts.energyDrivers,
+  ], 18)
+  return facts
+}
+
+function buildFactDrivenProblemFrame(facts: StructuredBriefFacts) {
+  const model = cleanText(facts.businessModel).toLowerCase()
+  const drivers = uniqueStrings([...facts.equipment, ...facts.energyDrivers], 5)
+  if (!model || drivers.length < 2) return ''
+  return `Often times for ${model}, ${humanizeDriverList(drivers, 4)} can all hit the meter during the same busy window.`
+}
+
+function buildFactDrivenQuestionFrame(facts: StructuredBriefFacts) {
+  const drivers = uniqueStrings([...facts.energyDrivers, ...facts.equipment], 5)
+  if (drivers.length < 2) return ''
+  return `I'm curious, how do y'all tell whether ${humanizeDriverList(drivers, 3)} is what moved the bill that month, or is that side of things pretty much handled?`
+}
+
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
   const driverText = humanizeDriverList(drivers)
   const identity = cleanText(companyIdentity).toLowerCase()
@@ -3194,6 +3299,28 @@ function talkTrackIsTooSimilarToPrevious(current: string, previous: string) {
   if (!currentText || !previousText) return false
   if (currentText.toLowerCase() === previousText.toLowerCase()) return true
   return talkTrackSimilarity(currentText, previousText) >= 0.58
+}
+
+function talkTrackDriftsFromStructuredFacts(talkTrack: string, context: TalkTrackContext) {
+  const facts = context.briefingContext.structuredFacts
+  const factTerms = uniqueStrings([
+    ...(facts.equipment || []),
+    ...(facts.energyDrivers || []),
+    ...(facts.activities || []),
+  ]
+    .map((term) => cleanText(term).toLowerCase())
+    .filter((term) => term.length >= 4 && !/^(hvac|lighting|operations|equipment|support|usage|activity|comfort)$/.test(term)), 16)
+
+  if (factTerms.length < 3) return false
+
+  const lower = cleanText(talkTrack).toLowerCase()
+  const overlap = factTerms.filter((term) => {
+    const escaped = escapeRegExp(term)
+    if (new RegExp(`\\b${escaped}\\b`, 'i').test(lower)) return true
+    return term.split(/\s+/).some((part) => part.length >= 6 && new RegExp(`\\b${escapeRegExp(part)}\\b`, 'i').test(lower))
+  })
+
+  return overlap.length === 0
 }
 
 function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) {
@@ -3912,6 +4039,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
+      if (hasMaterialHandlingEquipmentSignals(text)) {
+        return {
+          label: 'Materials-handling equipment and service',
+          angle: 'Forklift charging, lift service, parts areas, warehouse support, shop HVAC, and customer equipment support shaping the bill.',
+          question: `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for materials-handling equipment companies, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter during the same busy window.`,
+            `Often times for forklift and warehouse-equipment suppliers, it's hard to tell whether the service side, parts area, or equipment charging is what actually moved the bill that month.`,
+            `Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup.`,
+          ],
+          focus: ['forklift charging', 'battery charging', 'lift service', 'parts areas', 'warehouse support', 'shop HVAC', 'warehouse equipment'],
+        }
+      }
+
       if (hasStrongAutoPartsDistributionSignals(text)) {
         const locationDesc = logisticsMultiSite.locationCount
           ? `${logisticsMultiSite.locationCount}+ parts locations`
@@ -3930,20 +4071,6 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `Often times for a parts supply business, it's hard to catch when a single branch sets a high billing floor during a summer peak because the corporate view is too summarized.`,
           ],
           focus: ['parts branches', 'distribution centers', 'inventory turns', 'delivery timing', 'warehouse support', 'branch-level bill spikes'],
-        }
-      }
-
-      if (hasMaterialHandlingEquipmentSignals(text)) {
-        return {
-          label: 'Materials-handling equipment and service',
-          angle: 'Forklift charging, lift service, parts areas, warehouse support, shop HVAC, and customer equipment support shaping the bill.',
-          question: `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
-          openers: [
-            `Often times for materials-handling equipment companies, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter during the same busy window.`,
-            `Often times for forklift and warehouse-equipment suppliers, it's hard to tell whether the service side, parts area, or equipment charging is what actually moved the bill that month.`,
-            `Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup.`,
-          ],
-          focus: ['forklift charging', 'battery charging', 'lift service', 'parts areas', 'warehouse support', 'shop HVAC', 'warehouse equipment'],
         }
       }
 
@@ -4895,7 +5022,10 @@ function buildTalkTrackContext(
   const marketGuidance = buildMarketGuidance(industryCluster)
   const simplifyList = (items: string[]) => items.map(simplifyTalkTrackLanguage).filter(Boolean)
   const identity = getAccountIdentityProfile(account, candidate)
+  const structuredFacts = extractStructuredBriefFacts(account, candidate, identity, industryGuidance, signalGuidance)
   const operationalDrivers = uniqueStrings([
+    ...structuredFacts.energyDrivers,
+    ...structuredFacts.equipment,
     ...(identity?.powerKeywords || []),
     ...industryGuidance.focus,
     ...signalGuidance.focus,
@@ -4915,8 +5045,10 @@ function buildTalkTrackContext(
     'Do not mention scraping, LinkedIn, Google, RSS, or internal CRM notes.',
     'Do not sound like a commodity broker or say you can save money.',
   ], 10)
-  const problemFrame = simplifyTalkTrackLanguage(buildPlainProblemFrame(industryCluster, companyIdentity, operationalDrivers))
-  const questionFrame = simplifyTalkTrackLanguage(buildPlainQuestionFrame(industryCluster, operationalDrivers, audienceProfile))
+  const factProblemFrame = buildFactDrivenProblemFrame(structuredFacts)
+  const factQuestionFrame = buildFactDrivenQuestionFrame(structuredFacts)
+  const problemFrame = simplifyTalkTrackLanguage(factProblemFrame || buildPlainProblemFrame(industryCluster, companyIdentity, operationalDrivers))
+  const questionFrame = simplifyTalkTrackLanguage(factQuestionFrame || buildPlainQuestionFrame(industryCluster, operationalDrivers, audienceProfile))
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Open with a short permission-based cold-call opener, then move into a concrete company fact or operating detail.',
@@ -4975,6 +5107,7 @@ function buildTalkTrackContext(
     briefingContext: {
       companyIdentity,
       signalReason: simplifyTalkTrackLanguage(signalReason),
+      structuredFacts,
       operationalDrivers,
       forbiddenLanguage,
       personaLens,
@@ -5060,6 +5193,7 @@ TALK_TRACK_RULES (Exactly two sentences):
 - Sentence 2: One short curiosity question that invites them to explain how they handle it. It MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
 - Use the STRUCTURED BRIEFING CONTEXT as the source of truth. The signal is the reason for the call; the company identity and operational drivers decide the talk track.
 - If the signal and company identity conflict, company identity wins.
+- Use structuredFacts first. The talk track must mention at least one concrete activity, product, equipment type, or energy driver from structuredFacts. If structuredFacts says the company supplies/services equipment, do not talk as if they manufacture or operate their customers' facilities.
 - Use the problemFrame and questionFrame ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
 - CRITICAL: The talk track MUST consist of exactly these two sentences. Not one, not three. Exactly two.
 - CRITICAL: The word count of the talk track MUST be between 15 and 85 words.
@@ -5363,8 +5497,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     })
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
+  const structuredFactDrift = talkTrackDriftsFromStructuredFacts(text, context)
 
-  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || structuredFactDrift || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 
   if (needsRewrite) {
     console.warn('[Intelligence Brief Rewrite Validation] Rejected talk track:', {
@@ -5387,6 +5522,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
         accountSchoolRetailJargon,
         accountMaterialHandlingManufacturingJargon,
         accountMaterialHandlingGenericLogisticsJargon,
+        structuredFactDrift,
         residentialRestaurantJargon,
         hotelEventSpaceJargon,
         unexplainedJargon,
@@ -7184,6 +7320,7 @@ OPENER RULES (Exactly two sentences):
 TALK_TRACK_RULES (Exactly two sentences):
 - Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. You MUST customize it to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
 - Sentence 2: One short curiosity question that invites them to explain how they handle it. It MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
+- Use structuredFacts first. The talk track must mention at least one concrete activity, product, equipment type, or energy driver from structuredFacts. If structuredFacts says the company supplies/services equipment, do not talk as if they manufacture or operate their customers' facilities.
 - Use the problemFrame and questionFrame ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
 - CRITICAL: The talk track MUST consist of exactly these two sentences. Not one, not three. Exactly two.
 - CRITICAL: The word count of the talk track MUST be between 15 and 85 words.
@@ -7335,6 +7472,7 @@ Decision rules:
   3. The strategic sales angle/pain point for Lewis to lead with (e.g. "leverage contract review to check for demand ratchet floors", "lead with active peak timing during summer 4CP hours to eliminate transmission liability", "discuss seasonal predictability and contract structuring").
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates. You MUST customize the talk track to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders.
 - Talk Track should sound like you actually researched this specific company.
+- Use structuredFacts first. The talk track must mention at least one concrete activity, product, equipment type, or energy driver from structuredFacts. If structuredFacts says the company supplies/services equipment, do not talk as if they manufacture or operate their customers' facilities.
 - Use the problemFrame and questionFrame in the context ONLY as a conceptual guide for the underlying electricity mechanic (e.g. demand spikes, seasonal HVAC, refrigeration, laundry load). Do NOT copy them verbatim. You MUST rewrite the problem and question to incorporate specific details of this company's actual business.
 - Talk Track must be exactly 2 short sentences. Sentence 1 is the problem or observation. Sentence 2 is the question. Use conversational language. Not one, not three. Exactly two.
 - Sentence 2 MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
