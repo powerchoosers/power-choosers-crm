@@ -3050,7 +3050,7 @@ function extractStructuredBriefFacts(
   }
 
   addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
-  addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|walk[-\s]?in coolers?|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
+  addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
   addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
 
   addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
@@ -3091,15 +3091,23 @@ function extractStructuredBriefFacts(
 
 function buildFactDrivenProblemFrame(facts: StructuredBriefFacts) {
   const model = cleanText(facts.businessModel).toLowerCase()
-  const drivers = uniqueStrings([...facts.equipment, ...facts.energyDrivers], 5)
+  let drivers = uniqueStrings([...facts.equipment, ...facts.energyDrivers], 5)
+  if (drivers.some((driver) => /\bplant HVAC\b/i.test(driver))) {
+    drivers = drivers.filter((driver) => !/^HVAC$/i.test(driver))
+  }
   if (!model || drivers.length < 2) return ''
-  return `Often times for ${model}, ${humanizeDriverList(drivers, 4)} can all hit the meter during the same busy window.`
+  const article = /^(a|an|the|your)\b/i.test(model) ? '' : getIndefiniteArticle(model)
+  const articleSpace = article ? `${article} ` : ''
+  return `Often times for ${articleSpace}${model}, ${humanizeDriverList(drivers, 4)} can all hit the meter during the same busy window.`
 }
 
 function buildFactDrivenQuestionFrame(facts: StructuredBriefFacts) {
-  const drivers = uniqueStrings([...facts.energyDrivers, ...facts.equipment], 5)
+  let drivers = uniqueStrings([...facts.energyDrivers, ...facts.equipment], 5)
+  if (drivers.some((driver) => /\bplant HVAC\b/i.test(driver))) {
+    drivers = drivers.filter((driver) => !/^HVAC$/i.test(driver))
+  }
   if (drivers.length < 2) return ''
-  return `I'm curious, how do y'all tell whether ${humanizeDriverList(drivers, 3)} is what moved the bill that month, or is that side of things pretty much handled?`
+  return `I'm curious, how do y'all tell whether ${humanizeDriverList(drivers, 3)} are what moved the bill that month, or is that side of things pretty much handled?`
 }
 
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
@@ -5468,6 +5476,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(dme|durable medical equipment|medical equipment|equipment|inventory|delivery|storage|turnaround)\b/i.test(lower)
   const accountRestaurantManufacturingJargon = accountIsRestaurant &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution)\b/i.test(lower)
+  const accountRestaurantRetailJargon = accountIsRestaurant &&
+    /\b(showroom|showroom cooling|retail floor|store traffic|lot lighting|service bays?)\b/i.test(lower)
   const accountLogisticsManufacturingJargon = accountIsLogistics &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|process equipment|assembly)\b/i.test(lower)
   const accountMaterialHandlingManufacturingJargon = accountIsMaterialHandlingEquipment &&
@@ -5499,7 +5509,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
   const structuredFactDrift = talkTrackDriftsFromStructuredFacts(text, context)
 
-  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || structuredFactDrift || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountRestaurantRetailJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || structuredFactDrift || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 
   if (needsRewrite) {
     console.warn('[Intelligence Brief Rewrite Validation] Rejected talk track:', {
@@ -5520,6 +5530,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
         schoolManufacturingJargon: schoolManufacturingJargon || accountSchoolManufacturingJargon,
         accountSchoolPracticeJargon,
         accountSchoolRetailJargon,
+        accountRestaurantRetailJargon,
         accountMaterialHandlingManufacturingJargon,
         accountMaterialHandlingGenericLogisticsJargon,
         structuredFactDrift,
