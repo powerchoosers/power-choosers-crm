@@ -1,0 +1,442 @@
+[
+  {
+    "id": "e42cb622-efc9-4f83-908e-7ac30dc8293f",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief generated from company profile and industry context.",
+      "brief": {
+        "signal_headline": "Volkswagen of America Operates Extensive US Footprint Including R&D, Parts Distribution, and Manufacturing",
+        "signal_detail": "Volkswagen of America, Inc. Manages a diverse operational footprint in the US, encompassing research and development, parts and vehicle processing, parts distribution centers, and a manufacturing facility in Chattanooga, Tennessee. This multi-faceted operation suggests significant and varied electricity consumption across different types of facilities. The energy profile would likely include heavy industrial loads from manufacturing, HVAC and lighting for R&D and office spaces, and consistent power demands for parts distribution and vehicle processing. Managing these diverse loads and their associated peak charges across different locations could present a complex energy management challenge.",
+        "opener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into Volkswagen of America's operations, including your manufacturing facility in Chattanooga and your parts distribution centers, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Often times for a materials-handling equipment company, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter in the same busy window. I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://www.vw.com/en.html",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "VW.com | Official Home of Volkswagen Cars & SUVs",
+        "source_domain": "vw.com"
+      },
+      "account": {
+        "id": "e42cb622-efc9-4f83-908e-7ac30dc8293f",
+        "intelligenceBriefHeadline": "Volkswagen of America Operates Extensive US Footprint Including R&D, Parts Distribution, and Manufacturing",
+        "intelligenceBriefDetail": "Volkswagen of America, Inc. Manages a diverse operational footprint in the US, encompassing research and development, parts and vehicle processing, parts distribution centers, and a manufacturing facility in Chattanooga, Tennessee. This multi-faceted operation suggests significant and varied electricity consumption across different types of facilities. The energy profile would likely include heavy industrial loads from manufacturing, HVAC and lighting for R&D and office spaces, and consistent power demands for parts distribution and vehicle processing. Managing these diverse loads and their associated peak charges across different locations could present a complex energy management challenge.",
+        "intelligenceBriefOpener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into Volkswagen of America's operations, including your manufacturing facility in Chattanooga and your parts distribution centers, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Often times for a materials-handling equipment company, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter in the same busy window. I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://www.vw.com/en.html",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:43:11.036-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 1,
+        "bySourceKind": {
+          "news": 0,
+          "web": 1,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 1,
+            "label": "Acquisitions / M&A",
+            "title": "VW.com | Official Home of Volkswagen Cars & SUVs",
+            "url": "https://www.vw.com/en.html",
+            "sourceKind": "web",
+            "source": "Bing"
+          }
+        ]
+      },
+      "usedFallback": true,
+      "inferredCluster": "logistics"
+    }
+  },
+  {
+    "id": "accd8ce5-d74b-4d64-8a0b-d54d9c187d65",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief generated from company profile and industry context.",
+      "brief": {
+        "signal_headline": "Houston-Based Trailer Wheel & Frame Provides Comprehensive Trailer and Truck Services",
+        "signal_detail": "Trailer Wheel & Frame operates a facility in Houston offering trailer sales, service, parts, and commercial truck upfitting. Their operations involve dock activity, material handling, and shop HVAC, which are significant energy drivers. These activities, including the use of equipment for building and servicing trailers, can create variable electricity demand. Understanding these operational energy patterns is key to managing their commercial electricity costs effectively.",
+        "opener": "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your trailer fabrication and commercial truck upfit shop in Houston, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Having your service bays, welding equipment, and forklift charging all running through the same busy window can stack a pretty heavy spike on the meter right when Houston summer heat kicks the HVAC into overdrive too. I'm curious, how do y'all tell whether that shop load is what's moving the bill each month, or is that side of things pretty much on autopilot?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://trailerwheel.com/",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "Your trailer HQ since '72",
+        "source_domain": "trailerwheel.com"
+      },
+      "account": {
+        "id": "accd8ce5-d74b-4d64-8a0b-d54d9c187d65",
+        "intelligenceBriefHeadline": "Houston-Based Trailer Wheel & Frame Provides Comprehensive Trailer and Truck Services",
+        "intelligenceBriefDetail": "Trailer Wheel & Frame operates a facility in Houston offering trailer sales, service, parts, and commercial truck upfitting. Their operations involve dock activity, material handling, and shop HVAC, which are significant energy drivers. These activities, including the use of equipment for building and servicing trailers, can create variable electricity demand. Understanding these operational energy patterns is key to managing their commercial electricity costs effectively.",
+        "intelligenceBriefOpener": "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your trailer fabrication and commercial truck upfit shop in Houston, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Having your service bays, welding equipment, and forklift charging all running through the same busy window can stack a pretty heavy spike on the meter right when Houston summer heat kicks the HVAC into overdrive too. I'm curious, how do y'all tell whether that shop load is what's moving the bill each month, or is that side of things pretty much on autopilot?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://trailerwheel.com/",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:43:32.829-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 2,
+        "bySourceKind": {
+          "news": 0,
+          "web": 2,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 8,
+            "label": "Company Website",
+            "title": "Your trailer HQ since '72",
+            "url": "https://trailerwheel.com/",
+            "sourceKind": "web",
+            "source": "trailerwheel.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Your trailer HQ since '72",
+            "url": "https://trailerwheel.com/about-us",
+            "sourceKind": "web",
+            "source": "trailerwheel.com"
+          }
+        ]
+      },
+      "usedFallback": true,
+      "inferredCluster": "logistics"
+    }
+  },
+  {
+    "id": "perp-lead-002",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief refreshed.",
+      "brief": {
+        "signal_headline": "Bridor USA Grain-Based and Frozen Bakery Production Context",
+        "signal_detail": "Bridor USA is a prominent global manufacturer of premium frozen bakery products, including breads, Viennese pastries, and croissants. Their operations involve significant energy drivers such as mixing, milling, ovens, freezers, packaging, sanitation, and HVAC. These activities can create high-usage production windows, leading to potential demand spikes and increased electricity costs. Understanding the specific energy profile of these operations is crucial for managing electricity cost pressure and ensuring budget predictability.",
+        "opener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into Bridor USA's frozen bakery production, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Often times for frozen bakery production, it's hard to tell whether freezer banks, ovens, or mixing equipment are creating the highest usage moments. I'm curious, how do y'all tell whether the freezers, mixing and milling equipment, ovens, or HVAC are what pushed the bill, or is that side of things pretty much handled?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://www.bridor.com/en-uk/worldmap",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "Bridor USA website",
+        "source_domain": "bridor.com"
+      },
+      "account": {
+        "id": "perp-lead-002",
+        "intelligenceBriefHeadline": "Bridor USA Grain-Based and Frozen Bakery Production Context",
+        "intelligenceBriefDetail": "Bridor USA is a prominent global manufacturer of premium frozen bakery products, including breads, Viennese pastries, and croissants. Their operations involve significant energy drivers such as mixing, milling, ovens, freezers, packaging, sanitation, and HVAC. These activities can create high-usage production windows, leading to potential demand spikes and increased electricity costs. Understanding the specific energy profile of these operations is crucial for managing electricity cost pressure and ensuring budget predictability.",
+        "intelligenceBriefOpener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into Bridor USA's frozen bakery production, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Often times for frozen bakery production, it's hard to tell whether freezer banks, ovens, or mixing equipment are creating the highest usage moments. I'm curious, how do y'all tell whether the freezers, mixing and milling equipment, ovens, or HVAC are what pushed the bill, or is that side of things pretty much handled?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://www.bridor.com/en-uk/worldmap",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:43:39.598-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 1,
+        "bySourceKind": {
+          "news": 0,
+          "web": 1,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 8,
+            "label": "Company Website",
+            "title": "Bridor USA website",
+            "url": "https://www.bridor.com/en-uk/worldmap",
+            "sourceKind": "web",
+            "source": "bridor.com"
+          }
+        ]
+      },
+      "usedFallback": false,
+      "inferredCluster": "manufacturing"
+    }
+  },
+  {
+    "id": "756b18e7-8310-4671-87a8-47ec72cd89f7",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief refreshed.",
+      "brief": {
+        "signal_headline": "Gulf Coast Tool & Rental Facility and Billing Intel",
+        "signal_detail": "Gulf Coast Tool & Rental's operations include machining and fabrication, as well as designing and manufacturing hydrostatic test systems. Understanding how these operational drivers align with peak demand windows is key to managing their electricity cost pressure and ensuring budget predictability.",
+        "opener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your tool rental and machining operation out in Pasadena, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Running CNC machining equipment, hydrostatic test pumps, and fabrication machinery across multiple shop locations means those motors can all pull hard on the meter during the same busy window, and one heavy-use stretch can leave that meter carrying a higher charge on the bill longer than most folks expect. I'm curious, how do y'all keep an eye on whether the machining and pressure testing work is what moved the bill that month, or is that side of things pretty much on autopilot?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://gctr.com/",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "Gulf Coast Tool & Rental",
+        "source_domain": "gctr.com"
+      },
+      "account": {
+        "id": "756b18e7-8310-4671-87a8-47ec72cd89f7",
+        "intelligenceBriefHeadline": "Gulf Coast Tool & Rental Facility and Billing Intel",
+        "intelligenceBriefDetail": "Gulf Coast Tool & Rental's operations include machining and fabrication, as well as designing and manufacturing hydrostatic test systems. Understanding how these operational drivers align with peak demand windows is key to managing their electricity cost pressure and ensuring budget predictability.",
+        "intelligenceBriefOpener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your tool rental and machining operation out in Pasadena, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Running CNC machining equipment, hydrostatic test pumps, and fabrication machinery across multiple shop locations means those motors can all pull hard on the meter during the same busy window, and one heavy-use stretch can leave that meter carrying a higher charge on the bill longer than most folks expect. I'm curious, how do y'all keep an eye on whether the machining and pressure testing work is what moved the bill that month, or is that side of things pretty much on autopilot?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://gctr.com/",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:43:50.131-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 2,
+        "bySourceKind": {
+          "news": 0,
+          "web": 2,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 8,
+            "label": "Company Website",
+            "title": "Gulf Coast Tool & Rental",
+            "url": "https://gctr.com/",
+            "sourceKind": "web",
+            "source": "gctr.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Gulf Coast Tool & Rental",
+            "url": "https://gctr.com/products",
+            "sourceKind": "web",
+            "source": "gctr.com"
+          }
+        ]
+      },
+      "usedFallback": false,
+      "inferredCluster": "energy_intensive"
+    }
+  },
+  {
+    "id": "ed73cf19-0ef3-49d3-b4ad-ebcba530eded",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief generated from company profile and industry context.",
+      "brief": {
+        "signal_headline": "North American Plastics Distributor with Extensive Multi-Location Footprint",
+        "signal_detail": "Piedmont Plastics operates over 50 locations across North America, distributing plastic sheet, rod, tube, and film. Their operations involve significant warehousing, material handling, and potentially fabrication services, which contribute to a diverse energy load profile. Managing electricity costs across such a wide network, especially with varying local market conditions and equipment usage for cut-to-size capabilities, presents a challenge for portfolio optimization and budget predictability.",
+        "opener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your extensive plastics distribution network across North America, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Often times for a food production network, refrigeration, cooking lines, packaging, and sanitation can all hit the meter during the same busy window. I'm curious, how do y'all tell whether refrigeration, cooking lines, and packaging are what moved the bill that month, or is that side of things pretty much handled?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://www.piedmontplastics.com/",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "Plastic Sheet, Rod & Tube Distributor | Piedmont Plastics",
+        "source_domain": "piedmontplastics.com"
+      },
+      "account": {
+        "id": "ed73cf19-0ef3-49d3-b4ad-ebcba530eded",
+        "intelligenceBriefHeadline": "North American Plastics Distributor with Extensive Multi-Location Footprint",
+        "intelligenceBriefDetail": "Piedmont Plastics operates over 50 locations across North America, distributing plastic sheet, rod, tube, and film. Their operations involve significant warehousing, material handling, and potentially fabrication services, which contribute to a diverse energy load profile. Managing electricity costs across such a wide network, especially with varying local market conditions and equipment usage for cut-to-size capabilities, presents a challenge for portfolio optimization and budget predictability.",
+        "intelligenceBriefOpener": "Hey there, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your extensive plastics distribution network across North America, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Often times for a food production network, refrigeration, cooking lines, packaging, and sanitation can all hit the meter during the same busy window. I'm curious, how do y'all tell whether refrigeration, cooking lines, and packaging are what moved the bill that month, or is that side of things pretty much handled?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://www.piedmontplastics.com/",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:44:10.415-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 2,
+        "bySourceKind": {
+          "news": 0,
+          "web": 2,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 8,
+            "label": "Company Website",
+            "title": "Plastic Sheet, Rod & Tube Distributor | Piedmont Plastics",
+            "url": "https://www.piedmontplastics.com/",
+            "sourceKind": "web",
+            "source": "piedmontplastics.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Piedmont Plastics Locations | Find a Branch Near You",
+            "url": "https://www.piedmontplastics.com/locations",
+            "sourceKind": "web",
+            "source": "piedmontplastics.com"
+          }
+        ]
+      },
+      "usedFallback": true,
+      "inferredCluster": "manufacturing"
+    }
+  },
+  {
+    "id": "4f8285d0-e0a8-4ed3-bcc1-01227ac9b440",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief generated from company profile and industry context.",
+      "brief": {
+        "signal_headline": "Tadano Pan America Facility and Billing Intel",
+        "signal_detail": "Tadano Pan America is based in Houston, Texas and operates as a manufacturing operation. The relevant operating pieces are startup sequences, production ramps, shift-driven peaks, peak charges on the bill. The electricity angle is checking whether startup sequences, production ramps, shift-driven peaks, and peak charges on the bill are creating the highest usage moments before they quietly become part of the monthly bill.",
+        "opener": "Hey Marina, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your crane sales and service operation out of Houston, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Often times for a manufacturing operation, service bays, showroom ac, parts area, and lot lighting can all hit the meter during the same busy window. I'm curious, how do y'all tell whether startup sequences, production ramps, and shift-driven peaks are what moved the bill that month, or is that side of things pretty much handled?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "",
+        "confidence_level": "Medium",
+        "selected_priority": 9,
+        "source_title": "Industry Context",
+        "source_domain": ""
+      },
+      "account": {
+        "id": "4f8285d0-e0a8-4ed3-bcc1-01227ac9b440",
+        "intelligenceBriefHeadline": "Tadano Pan America Facility and Billing Intel",
+        "intelligenceBriefDetail": "Tadano Pan America is based in Houston, Texas and operates as a manufacturing operation. The relevant operating pieces are startup sequences, production ramps, shift-driven peaks, peak charges on the bill. The electricity angle is checking whether startup sequences, production ramps, shift-driven peaks, and peak charges on the bill are creating the highest usage moments before they quietly become part of the monthly bill.",
+        "intelligenceBriefOpener": "Hey Marina, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I was looking into your crane sales and service operation out of Houston, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Often times for a manufacturing operation, service bays, showroom ac, parts area, and lot lighting can all hit the meter during the same busy window. I'm curious, how do y'all tell whether startup sequences, production ramps, and shift-driven peaks are what moved the bill that month, or is that side of things pretty much handled?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": null,
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:44:26.764-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 0,
+        "bySourceKind": {
+          "news": 0,
+          "web": 0,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": []
+      },
+      "usedFallback": true,
+      "inferredCluster": "manufacturing"
+    }
+  },
+  {
+    "id": "f8ce0a54-23ec-4d37-b71d-a9052439e135",
+    "ok": true,
+    "response": {
+      "ok": true,
+      "message": "Intelligence brief refreshed.",
+      "brief": {
+        "signal_headline": "Page not found",
+        "signal_detail": "Houston Pilots is based in Deer Park, Texas and operates as a distribution and logistics operator. The relevant operating pieces are logistics, supply chain, distribution, warehouse. The electricity angle is checking whether dock activity, material handling, and HVAC are creating the highest usage moments before they quietly become part of the monthly bill.",
+        "opener": "Hey there, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I was looking into your distribution and logistics operator in Deer Park, and had a curious question about y'alls electricity agreements and contracts.",
+        "talk_track": "Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup. I'm curious, how do y'all keep track of whether the lift service work or equipment charging is what created the heavier bill, or is that pretty much handled?",
+        "signal_date": "2026-05-24",
+        "source_date": "2026-05-24",
+        "source_url": "https://houston-pilots.com/press",
+        "confidence_level": "Medium",
+        "selected_priority": 8,
+        "source_title": "Page not found",
+        "source_domain": "houston-pilots.com"
+      },
+      "account": {
+        "id": "f8ce0a54-23ec-4d37-b71d-a9052439e135",
+        "intelligenceBriefHeadline": "Page not found",
+        "intelligenceBriefDetail": "Houston Pilots is based in Deer Park, Texas and operates as a distribution and logistics operator. The relevant operating pieces are logistics, supply chain, distribution, warehouse. The electricity angle is checking whether dock activity, material handling, and HVAC are creating the highest usage moments before they quietly become part of the monthly bill.",
+        "intelligenceBriefOpener": "Hey there, it's Lewis with Nodal Point. I'm calling you out the blue here, so I'll be brief. I was looking into your distribution and logistics operator in Deer Park, and had a curious question about y'alls electricity agreements and contracts.",
+        "intelligenceBriefTalkTrack": "Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup. I'm curious, how do y'all keep track of whether the lift service work or equipment charging is what created the heavier bill, or is that pretty much handled?",
+        "intelligenceBriefSignalDate": "2026-05-24",
+        "intelligenceBriefReportedAt": "2026-05-24",
+        "intelligenceBriefSourceUrl": "https://houston-pilots.com/press",
+        "intelligenceBriefConfidenceLevel": "Medium",
+        "intelligenceBriefLastRefreshedAt": "2026-05-23T19:44:42.604-05:00",
+        "intelligenceBriefStatus": "ready"
+      },
+      "diagnostics": {
+        "total": 6,
+        "bySourceKind": {
+          "news": 0,
+          "web": 6,
+          "sec": 0,
+          "linkedin": 0
+        },
+        "topResults": [
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Page not found",
+            "url": "https://houston-pilots.com/press",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company Website",
+            "title": "Houston Pilots website Facility and Billing Intel",
+            "url": "https://houston-pilots.com/",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Page not found",
+            "url": "https://houston-pilots.com/about-us",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Houston Pilots website Facility and Billing Intel",
+            "url": "https://houston-pilots.com/about",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Page not found",
+            "url": "https://houston-pilots.com/company",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          },
+          {
+            "priority": 8,
+            "label": "Company About Page",
+            "title": "Page not found",
+            "url": "https://houston-pilots.com/our-company",
+            "sourceKind": "web",
+            "source": "houston-pilots.com"
+          }
+        ]
+      },
+      "usedFallback": false,
+      "inferredCluster": "logistics"
+    }
+  }
+]

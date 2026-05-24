@@ -685,7 +685,19 @@ function hasIndustrialSiteLogisticsSignals(text: string) {
 }
 
 function hasMaterialHandlingEquipmentSignals(text: string) {
-  return /(materials?\s+handling|forklifts?|fork\s*lifts?|komatsu|pallet (?:storage )?rack|racking systems?|interlake[-\s]?mecalux|aerial lifts?|jlg\b|scissor lifts?|boom lifts?|warehouse equipment|lift equipment|forklift charging|battery charging|conveyors?|hvls fans?|equipment service|parts and service|warehouse facilities|distribution centers?)/i.test(text)
+  return /(materials?\s+handling|forklifts?|fork\s*lifts?|komatsu|pallet (?:storage )?rack|racking systems?|interlake[-\s]?mecalux|aerial lifts?|jlg\b|scissor lifts?|boom lifts?|warehouse equipment|lift equipment|forklift charging|battery charging|hvls fans?)/i.test(text)
+}
+
+function hasPlasticsDistributionSignals(text: string) {
+  return /(plastics? distributor|wholesale distributor of plastic|plastic sheet|plastic sheets|plastic rod|plastic tube|plastic film|cut[-\s]?to[-\s]?size|local plastics? supplier|plastic materials distributor)/i.test(text)
+}
+
+function hasCraneSalesSupportSignals(text: string) {
+  return /(crane sales|crane service|crane parts|crane support|sales and support base|tadano|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?|crane dealer|crane distributor)/i.test(text)
+}
+
+function hasMaritimePilotSignals(text: string) {
+  return /(harbor pilots?|houston pilots?|ship pilots?|ship handlers?|vessels?|waterway|ship channel|port of houston|pilot boat|marine pilot|maritime pilots?)/i.test(text)
 }
 
 function hasStrongDmeSignals(text: string) {
@@ -709,6 +721,7 @@ function hasStrongPetrochemicalSignals(text: string) {
 function hasStrongLogisticsSignals(text: string) {
   if (hasPublicTransitSignals(text)) return false
   if (hasPrintFulfillmentSignals(text)) return false
+  if (hasMaritimePilotSignals(text)) return false
   return /(freight forwarder|nvo?cc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics|terminal|dock|yard|supply chain)/i.test(text)
 }
 
@@ -763,6 +776,18 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const manufacturingSignals = hasStrongManufacturingSignals(accountText)
   const petrochemicalSignals = hasStrongPetrochemicalSignals(accountText)
   const schoolSignals = hasStrongSchoolSignals(accountText)
+
+  if (hasPlasticsDistributionSignals(accountText) && /(food production|refrigeration|cooking lines?|sanitation|restaurant|bakery|manufacturing operation)/i.test(profileText)) {
+    return true
+  }
+
+  if (hasCraneSalesSupportSignals(accountText) && /(manufacturing operation|production lines?|startup sequence|shift-driven peaks|dealership|lot lighting)/i.test(profileText)) {
+    return true
+  }
+
+  if (hasMaritimePilotSignals(accountText) && /(materials?-handling|forklift|warehouse|distribution|dock activity|logistics operator|manufacturing operation)/i.test(profileText)) {
+    return true
+  }
 
   if (dmeSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)/i.test(profileText)) {
     return true
@@ -3049,6 +3074,30 @@ function extractStructuredBriefFacts(
     avoidAngles.add('manufacturing production')
   }
 
+  addIf(/plastics? distributor|plastic sheet|plastic rod|plastic tube|plastic film|cut[-\s]?to[-\s]?size/i, activities, ['plastic materials distribution', 'cut-to-size material support'])
+  addIf(/plastic sheet|plastic rod|plastic tube|plastic film|cut[-\s]?to[-\s]?size/i, equipment, ['plastic sheet inventory', 'cut-to-size equipment', 'warehouse handling'])
+  addIf(/plastic sheet|plastic rod|plastic tube|plastic film|cut[-\s]?to[-\s]?size|warehouse/i, energyDrivers, ['warehouse lighting', 'cut-to-size equipment', 'material handling'])
+  if (hasPlasticsDistributionSignals(text)) {
+    avoidAngles.add('food production')
+    avoidAngles.add('generic manufacturing')
+  }
+
+  addIf(/crane sales|crane service|crane parts|sales and support base|tadano|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?/i, activities, ['crane sales and support', 'equipment service', 'parts support'])
+  addIf(/crane service|crane parts|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?|service bays?/i, equipment, ['crane service bays', 'parts areas', 'shop equipment'])
+  addIf(/crane service|crane parts|service bays?|shop equipment/i, energyDrivers, ['service bays', 'parts areas', 'shop HVAC'])
+  if (hasCraneSalesSupportSignals(text)) {
+    avoidAngles.add('manufacturing production')
+    avoidAngles.add('auto dealership')
+  }
+
+  addIf(/harbor pilots?|houston pilots?|ship handlers?|vessels?|waterway|ship channel|pilot boat|marine pilot|maritime pilots?/i, activities, ['maritime pilot operations', 'dispatch and support operations'])
+  addIf(/pilot boat|dispatch|marine operations|ship channel|support buildings/i, equipment, ['dispatch systems', 'support buildings', 'boat operations'])
+  addIf(/pilot boat|dispatch|marine operations|support buildings|ship channel/i, energyDrivers, ['dispatch systems', 'support-building HVAC', 'marine operations support'])
+  if (hasMaritimePilotSignals(text)) {
+    avoidAngles.add('warehouse distribution')
+    avoidAngles.add('materials handling')
+  }
+
   addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
   addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
   addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
@@ -3457,6 +3506,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
   if (hasMaterialHandlingEquipmentSignals(text)) return 'logistics'
+  if (hasPlasticsDistributionSignals(text)) return 'logistics'
+  if (hasCraneSalesSupportSignals(text)) return 'logistics'
+  if (hasMaritimePilotSignals(text)) return 'public_transit'
   if (hasStrongCommercialRealEstateSignals(text)) return 'office_services'
   if (hasFurnitureManufacturingSignals(text)) return 'manufacturing'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
@@ -3527,9 +3579,12 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/i.test(coreText) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/i.test(coreText)) return 'manufacturing'
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
+  if (hasMaritimePilotSignals(coreText)) return 'public_transit'
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
   if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
+  if (hasPlasticsDistributionSignals(coreText)) return 'logistics'
+  if (hasCraneSalesSupportSignals(coreText)) return 'logistics'
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
   if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
 
@@ -4058,6 +4113,34 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup.`,
           ],
           focus: ['forklift charging', 'battery charging', 'lift service', 'parts areas', 'warehouse support', 'shop HVAC', 'warehouse equipment'],
+        }
+      }
+
+      if (hasCraneSalesSupportSignals(text)) {
+        return {
+          label: 'Crane sales and support',
+          angle: 'Crane service bays, parts areas, shop equipment, and support-building HVAC shaping the bill differently than a manufacturing plant.',
+          question: `I'm curious, how do y'all tell whether crane service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for crane sales and support operations, service bays, parts areas, shop equipment, and HVAC can all hit the meter during the same busy window.`,
+            `Often times for heavy-equipment support teams, it's hard to tell whether the service side, parts area, or shop cooling is what actually moved the bill that month.`,
+            `Often times with crane service and parts support, the bill can move from service timing and shop activity more than from a normal office setup.`,
+          ],
+          focus: ['crane service bays', 'parts areas', 'shop equipment', 'shop HVAC', 'equipment support'],
+        }
+      }
+
+      if (hasPlasticsDistributionSignals(text)) {
+        return {
+          label: 'Plastics distribution',
+          angle: 'Plastic sheet, rod, tube, film inventory, cut-to-size work, warehouse lighting, and material handling shaping the bill.',
+          question: `I'm curious, how do y'all tell whether cut-to-size work, warehouse handling, or branch HVAC is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for plastics distributors, cut-to-size work, warehouse handling, branch lighting, and HVAC can all hit the meter during the same busy window.`,
+            `Often times for plastic sheet and rod suppliers, it's hard to tell whether the warehouse side or cut-to-size work is what actually moved the bill that month.`,
+            `Often times in a materials distribution setup, the bill moves from inventory handling and cut-to-size activity more than from a normal office setup.`,
+          ],
+          focus: ['plastic sheet inventory', 'cut-to-size equipment', 'warehouse handling', 'branch HVAC', 'material handling'],
         }
       }
 
