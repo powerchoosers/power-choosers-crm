@@ -214,10 +214,12 @@ type ContactMetadata = {
 type AccountJoin = {
   name?: string | null
   domain?: string | null
+  website?: string | null
   logo_url?: string | null
   city?: string | null
   state?: string | null
   address?: string | null
+  zip?: string | null
   industry?: string | null
   electricity_supplier?: string | null
   annual_usage?: string | null
@@ -282,7 +284,8 @@ const PAGE_SIZE = 50
 const CONTACTS_QUERY_BUSTER = 'v6'
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
-const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
+const CONTACT_ACCOUNT_SELECT = 'id, name, domain, website, logo_url, city, state, address, zip, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, metadata'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, city, state, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, city, state, address, zip)'
 const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
 const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
@@ -395,6 +398,131 @@ function getContactSignals(metadata: ContactMetadata | null | undefined): Contac
   return normalizeSignalCollection(metadata.communicationSignals || metadata.importCommunicationSignals)
 }
 
+type ContactAccountRow = AccountJoin & { id: string }
+
+async function fetchContactAccountMap(
+  accountIds: Array<string | null | undefined>,
+  ownerScopeValues: string[],
+  role?: string | null,
+) {
+  const uniqueAccountIds = Array.from(
+    new Set(
+      accountIds
+        .map((value) => cleanText(value))
+        .filter(Boolean)
+    )
+  )
+
+  const accountMap = new Map<string, ContactAccountRow>()
+  if (uniqueAccountIds.length === 0) {
+    return accountMap
+  }
+
+  let query = supabase
+    .from('accounts')
+    .select(CONTACT_ACCOUNT_SELECT)
+    .in('id', uniqueAccountIds)
+
+  if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+    query = query.in('ownerId', ownerScopeValues)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+      return accountMap
+    }
+    console.error('Error fetching contact account matches:', error)
+    return accountMap
+  }
+
+  for (const row of (data ?? []) as ContactAccountRow[]) {
+    accountMap.set(row.id, row)
+  }
+
+  return accountMap
+}
+
+function mapContactRowToContact(item: ContactRow, account?: ContactAccountRow | null): Contact {
+  const metadata = normalizeMetadata(item.metadata)
+  const signals = getContactSignals(metadata)
+
+  const fName =
+    item.firstName
+    || item.first_name
+    || item.firstname
+    || item.FirstName
+    || metadata?.firstName
+    || metadata?.first_name
+    || metadata?.general?.firstName
+    || metadata?.general?.first_name
+    || metadata?.contact?.firstName
+    || metadata?.contact?.first_name
+
+  const lName =
+    item.lastName
+    || item.last_name
+    || item.lastname
+    || item.LastName
+    || metadata?.lastName
+    || metadata?.last_name
+    || metadata?.general?.lastName
+    || metadata?.general?.last_name
+    || metadata?.contact?.lastName
+    || metadata?.contact?.last_name
+
+  const companyName =
+    account?.name
+    || metadata?.company
+    || metadata?.companyName
+    || metadata?.general?.company
+    || metadata?.general?.companyName
+
+  const accountLocation = formatCityState(account?.city, account?.state)
+  const cityLocation = item.city ? `${item.city}, ${item.state || ''}`.trim().replace(/,\s*$/, '') : ''
+  const fallbackLocation = metadata?.city
+    ? `${metadata.city}, ${metadata.state || ''}`.trim().replace(/,\s*$/, '')
+    : (metadata?.address || account?.address || '')
+
+  return {
+    id: item.id,
+    name: buildContactName({
+      firstName: fName,
+      lastName: lName,
+      rawName: item.name,
+      email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email,
+      companyCandidate: companyName,
+    }),
+    firstName: fName as string,
+    lastName: lName as string,
+    ownerId: item.ownerId || metadata?.ownerId || null,
+    avatarUrl: resolveContactPhotoUrl(item, metadata),
+    email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
+    phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
+    mobile: item.mobile || metadata?.mobile || '',
+    workPhone: item.workPhone || metadata?.workDirectPhone || '',
+    workDirectPhone: item.workPhone || metadata?.workDirectPhone || '',
+    otherPhone: item.otherPhone || metadata?.otherPhone || '',
+    companyPhone: item.companyPhone || account?.phone || '',
+    primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
+    additionalPhones: extractAdditionalPhones(metadata, signals, [item.phone, item.mobile, item.workPhone, item.otherPhone, item.companyPhone]),
+    communicationSignals: signals,
+    address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
+    company: companyName || '',
+    accountLocation,
+    companyDomain: account?.domain || account?.website || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
+    logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
+    status: item.status || 'Lead',
+    lastContact: item.lastContactedAt || item.createdAt || item.created_at || new Date().toISOString(),
+    accountId: item.accountId || undefined,
+    industry: account?.industry || undefined,
+    title: item.title || metadata?.title || metadata?.job_title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
+    location: cityLocation || fallbackLocation || accountLocation,
+    website: account?.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
+    metadata,
+  } as Contact
+}
 
 
 function extractAdditionalPhones(
@@ -702,31 +830,34 @@ export function useSearchContacts(queryTerm: string) {
   return useQuery({
     queryKey: ['contacts-search', queryTerm, user?.id ?? user?.email ?? 'guest', role ?? 'unknown'],
     queryFn: async () => {
-      if (!queryTerm || queryTerm.length < 2) return []
+      const searchTerm = cleanText(queryTerm)
+      if (searchTerm.length < 2) return []
       if (loading || !user) return []
 
       try {
-        const searchDigits = normalizeSearchPhoneDigits(queryTerm)
+        const searchDigits = normalizeSearchPhoneDigits(searchTerm)
         const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
-        let query = supabase
-          .from('contacts')
-          .select(CONTACT_SEARCH_SELECT);
+        const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
 
-        // Admin and dev see all contacts; others filtered by ownerId
-        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
-          query = query.in('ownerId', ownerScopeValues);
-        }
-
-        // Search across multiple columns
-        query = query.or(`name.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,firstName.ilike.%${queryTerm}%,lastName.ilike.%${queryTerm}%,phone.ilike.%${queryTerm}%,mobile.ilike.%${queryTerm}%,workPhone.ilike.%${queryTerm}%,otherPhone.ilike.%${queryTerm}%`);
-
-        const { data, error } = await query.limit(10);
+        const { data, error } = await supabase
+          .rpc('get_contacts_by_list_filtered', {
+            p_list_id: null,
+            p_search: searchTerm || null,
+            p_industries: null,
+            p_statuses: null,
+            p_locations: null,
+            p_titles: null,
+            p_owner_ids: ownerIds,
+            p_limit: 25,
+            p_offset: 0,
+          })
+          .select(CONTACT_SEARCH_SELECT)
 
         if (error) {
-          // Only log if it's not a cancellation/abort error
-          if (error.message !== 'FetchUserError: Request was aborted') {
-            console.error("Search error:", error);
+          if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+            return []
           }
+          console.error("Search error:", error)
           return [];
         }
 
@@ -780,10 +911,14 @@ export function useSearchContacts(queryTerm: string) {
             email: item.email || '',
             avatarUrl: resolveContactPhotoUrl(item, metadata),
             company: account?.name || '',
+            accountLocation: formatCityState(account?.city, account?.state),
+            location: item.city
+              ? `${item.city}, ${item.state || ''}`.trim().replace(/,\s*$/, '')
+              : formatCityState(account?.city, account?.state) || account?.address || '',
             logoUrl: account?.logo_url || '',
             accountId: item.accountId || undefined,
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || item.companyPhone || '',
-            companyPhone: item.companyPhone || '',
+            companyPhone: item.companyPhone || account?.phone || '',
           };
         });
       } catch (err) {
@@ -815,81 +950,24 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         }
 
         const from = pageParam * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
-        let data: ContactRow[] | null = null
-        let error: any = null
+        const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
 
-        if (listId) {
-          const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
-          const response = await supabase
-            .rpc('get_contacts_by_list_filtered', {
-              p_list_id: listId,
-              p_search: cleanText(searchQuery) || null,
-              p_industries: toRpcTextArray(filters?.industry),
-              p_statuses: toRpcTextArray(filters?.status),
-              p_locations: toRpcTextArray(filters?.location),
-              p_titles: toRpcTextArray(filters?.title),
-              p_owner_ids: ownerIds,
-              p_limit: PAGE_SIZE,
-              p_offset: from,
-            })
-            .select(CONTACT_LIST_SELECT)
+        const response = await supabase
+          .rpc('get_contacts_by_list_filtered', {
+            p_list_id: listId ?? null,
+            p_search: cleanText(searchQuery) || null,
+            p_industries: toRpcTextArray(filters?.industry),
+            p_statuses: toRpcTextArray(filters?.status),
+            p_locations: toRpcTextArray(filters?.location),
+            p_titles: toRpcTextArray(filters?.title),
+            p_owner_ids: ownerIds,
+            p_limit: PAGE_SIZE,
+            p_offset: from,
+          })
+          .select(CONTACT_LIST_SELECT)
 
-          data = response.data as ContactRow[] | null
-          error = response.error
-        } else {
-          let query = supabase
-            .from('contacts')
-            .select(CONTACT_LIST_SELECT);
-
-          // Admin and dev see all contacts; others filtered by ownerId
-          if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
-            query = query.in('ownerId', ownerScopeValues);
-          }
-
-          if (searchQuery) {
-            query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
-          }
-
-          // Apply column filters
-          if (filters?.status && filters.status.length > 0) {
-            const statusConditions = buildStatusIlikeClauses(filters.status)
-            if (statusConditions.length > 0) {
-              query = query.or(statusConditions.join(','))
-            }
-          }
-
-          if (filters?.title && filters.title.length > 0) {
-            query = query.in('title', filters.title);
-          }
-
-          // Contact industry is resolved from the linked account in the list shape.
-          if (filters?.industry && filters.industry.length > 0) {
-            query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
-          }
-
-          if (filters?.location && filters.location.length > 0) {
-            // Filter by account location (city or state)
-            const conditions = filters.location.flatMap((loc: string) => [
-              `city.ilike.%${loc}%`,
-              `state.ilike.%${loc}%`
-            ]).join(',');
-            query = query.or(conditions, { foreignTable: 'accounts' });
-          }
-
-          const response = await query
-            .range(from, to)
-            .order('lastName', { ascending: true })
-            .order('firstName', { ascending: true })
-            .order('createdAt', { ascending: false });
-
-          data = Array.isArray(response.data)
-            ? response.data
-            : response.data
-              ? [response.data]
-              : null
-          error = response.error
-        }
+        const data = response.data as ContactRow[] | null
+        const error = response.error
 
         if (error) {
 
@@ -997,82 +1075,27 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       if (!enabled || loading) return 0
       if (!user) return 0
 
-      // For count with filters on joined tables, we need to select something from the joined table
-      // but only if industry or location filters are present.
-      const needsAccountJoin = (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
+      const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
+      const { data: filteredCount, error: filteredCountError } = await supabase
+        .rpc('get_contacts_count_by_list_filtered', {
+          p_list_id: listId ?? null,
+          p_search: cleanText(searchQuery) || null,
+          p_industries: toRpcTextArray(filters?.industry),
+          p_statuses: toRpcTextArray(filters?.status),
+          p_locations: toRpcTextArray(filters?.location),
+          p_titles: toRpcTextArray(filters?.title),
+          p_owner_ids: ownerIds,
+        })
 
-      let query = needsAccountJoin
-        ? supabase.from('contacts').select('id, accounts!contacts_accountId_fkey!inner(industry, city, state)', { count: 'exact', head: true })
-        : supabase.from('contacts').select('id', { count: 'exact', head: true });
-
-      if (listId) {
-        const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
-        const { data: filteredCount, error: filteredCountError } = await supabase
-          .rpc('get_contacts_count_by_list_filtered', {
-            p_list_id: listId,
-            p_search: cleanText(searchQuery) || null,
-            p_industries: toRpcTextArray(filters?.industry),
-            p_statuses: toRpcTextArray(filters?.status),
-            p_locations: toRpcTextArray(filters?.location),
-            p_titles: toRpcTextArray(filters?.title),
-            p_owner_ids: ownerIds,
-          })
-
-        if (filteredCountError) {
-          console.error("Error fetching filtered list members count via RPC:", filteredCountError);
-          return 0;
-        }
-
-        return Number(filteredCount || 0);
-      }
-
-      // Admin and dev see all contacts; others filtered by ownerId
-      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
-        query = query.in('ownerId', ownerScopeValues)
-      }
-
-      if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
-      }
-
-      // Apply column filters
-      if (filters?.status && filters.status.length > 0) {
-        const statusConditions = buildStatusIlikeClauses(filters.status)
-        if (statusConditions.length > 0) {
-          query = query.or(statusConditions.join(','))
-        }
-      }
-
-      if (filters?.title && filters.title.length > 0) {
-        query = query.in('title', filters.title);
-      }
-
-      if (filters?.industry && filters.industry.length > 0) {
-        query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
-      }
-
-      if (filters?.location && filters.location.length > 0) {
-        const conditions = filters.location.flatMap((loc: string) => [
-          `city.ilike.%${loc}%`,
-          `state.ilike.%${loc}%`
-        ]).join(',');
-        query = query.or(conditions, { foreignTable: 'accounts' });
-      }
-
-      const { count, error } = await query
-      if (error) {
-        if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+      if (filteredCountError) {
+        if (filteredCountError.message?.includes('Abort') || filteredCountError.message === 'FetchUserError: Request was aborted') {
           return 0
         }
-        console.error("Supabase error fetching contacts count:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        })
+        console.error("Error fetching filtered list members count via RPC:", filteredCountError)
         return 0
       }
-      return count || 0
+
+      return Number(filteredCount || 0)
     },
     enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,

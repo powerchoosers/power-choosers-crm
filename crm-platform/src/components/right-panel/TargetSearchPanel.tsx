@@ -189,7 +189,7 @@ export function TargetSearchPanel({ listId, listName, listKind }: TargetSearchPa
                         </div>
                         {contact.company && (
                           <div className="text-[10px] text-zinc-600 truncate mt-0.5">
-                            {contact.company}
+                            {[contact.company, contact.accountLocation || contact.location].filter(Boolean).join(' · ')}
                           </div>
                         )}
                       </div>
@@ -237,7 +237,7 @@ export function TargetSearchPanel({ listId, listName, listKind }: TargetSearchPa
                         )}
                         {account.industry && (
                           <div className="text-[10px] text-zinc-600 truncate mt-0.5">
-                            {account.industry}
+                            {[account.location || [account.city, account.state].filter(Boolean).join(', '), account.industry].filter(Boolean).join(' · ')}
                           </div>
                         )}
                       </div>

@@ -115,6 +115,16 @@ export function GlobalSearch() {
     }
   }
 
+  const handleViewAll = (path: '/network/people' | '/network/accounts') => {
+    const term = query.trim()
+    if (term.length < 2) return
+
+    setIsOpen(false)
+    setQuery('')
+    setDebouncedQuery('')
+    router.push(`${path}?q=${encodeURIComponent(term)}`)
+  }
+
   return (
     <div ref={containerRef} className="relative w-full z-50">
       <div className="relative group">
@@ -188,9 +198,18 @@ export function GlobalSearch() {
                 {/* People Section */}
                 {filteredContacts.length > 0 && (
                   <div className="mb-2">
-                    <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                    <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex items-center justify-between gap-3">
                       <span>People</span>
-                      <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredContacts.length} found</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredContacts.length} found</span>
+                        <button
+                          type="button"
+                          onClick={() => handleViewAll('/network/people')}
+                          className="text-[10px] uppercase tracking-wider rounded-md border border-[#002FA7]/30 bg-[#002FA7]/10 px-2 py-1 text-[#9bb3ff] hover:bg-[#002FA7]/20 hover:text-white transition-colors"
+                        >
+                          View all
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       {filteredContacts.map(contact => (
@@ -208,7 +227,11 @@ export function GlobalSearch() {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{contact.name}</div>
                             <div className="text-xs text-zinc-500 truncate">
-                              {isPhoneQuery ? ((contact as any).phone || (contact as any).companyPhone || contact.company) : contact.company}
+                              {[
+                                isPhoneQuery ? ((contact as any).phone || (contact as any).companyPhone) : null,
+                                contact.company,
+                                contact.accountLocation || contact.location,
+                              ].filter(Boolean).join(' · ') || 'Contact'}
                             </div>
                           </div>
                         </button>
@@ -220,9 +243,18 @@ export function GlobalSearch() {
                 {/* Accounts Section */}
                 {filteredAccounts.length > 0 && (
                   <div className="mb-2">
-                    <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex justify-between">
+                    <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex items-center justify-between gap-3">
                       <span>Accounts</span>
-                      <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredAccounts.length}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredAccounts.length} found</span>
+                        <button
+                          type="button"
+                          onClick={() => handleViewAll('/network/accounts')}
+                          className="text-[10px] uppercase tracking-wider rounded-md border border-[#002FA7]/30 bg-[#002FA7]/10 px-2 py-1 text-[#9bb3ff] hover:bg-[#002FA7]/20 hover:text-white transition-colors"
+                        >
+                          View all
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-1">
                       {filteredAccounts.map(account => (
@@ -241,7 +273,11 @@ export function GlobalSearch() {
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium text-zinc-200 group-hover:text-white truncate">{account.name}</div>
                             <div className="text-xs text-zinc-500 truncate">
-                              {isPhoneQuery ? ((account as any).companyPhone || account.industry) : account.industry}
+                              {[
+                                isPhoneQuery ? ((account as any).companyPhone || '') : null,
+                                account.location || [account.city, account.state].filter(Boolean).join(', '),
+                                account.industry,
+                              ].filter(Boolean).join(' · ') || 'Account'}
                             </div>
                           </div>
                         </button>
@@ -392,7 +428,7 @@ export function GlobalSearch() {
                       No results found for &quot;{query}&quot;
                     </div>
                     <div className="text-zinc-600 text-[10px] mt-1">
-                      Try searching for names, emails, company domains, or phone numbers
+                      Try searching for names, emails, company names, cities, states, addresses, zip codes, domains, or phone numbers
                     </div>
                   </div>
                 )}
