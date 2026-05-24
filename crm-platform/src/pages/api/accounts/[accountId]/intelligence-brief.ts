@@ -652,6 +652,10 @@ function hasStrongBakeryCafeSignals(text: string) {
   return /(bakery caf[eé]|bakery cafe|neighborhood bakery|bakery chain|fresh baked goods|pastries|warm breads|cakes|brewed drinks|bakery-caf[eé]|baked goods and beverages|\b(coffee|espresso|barista)\b|drive-thru coffee)/i.test(text)
 }
 
+function hasFrozenBakeryProductionSignals(text: string) {
+  return /\b(grain-based|frozen bakery|industrial bakery|bakery manufacturing|bakery production|bakery products|flour mill|biscuits?|muffins?|croissants?|viennese pastries|production facilities)\b/i.test(text)
+}
+
 function hasStrongAutoPartsDistributionSignals(text: string) {
   return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket parts|aftermarket collision parts|parts house|parts stores?|parts supplier|parts distribution|distribution centers?|same[-\s]?day parts|automotive service centers|repair centers|fleet and municipal)/i.test(text)
 }
@@ -705,6 +709,9 @@ function hasStrongDmeSignals(text: string) {
 }
 
 function hasStrongRestaurantSignals(text: string) {
+  if (hasFrozenBakeryProductionSignals(text) && !/(restaurant|dining|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging|drive-thru coffee)/i.test(text)) {
+    return false
+  }
   return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging|\b(coffee|espresso|barista)\b|drive-thru coffee)/i.test(text)
 }
 
@@ -2275,7 +2282,7 @@ function buildStructuredIdentityProfile(
   const isFoodProduction = /(food production|food manufacturing|food manufacturer|food processing|food processing facilities|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?|\bfoodservice\b)/i.test(text)
     && !/(fiberglass|conduit|strut|epoxy|resin|electrical|mechanical markets?|winding equipment|curing ovens?|phenolic|duct)/i.test(text)
   const isCoffeeRoaster = /\b(small-batch|custom)?\s*coffee roasting\b|\bcustom roasting\b|\broasting equipment\b|\bgreen beans\b|\bcoffee roaster\b/i.test(text)
-  const isGrainBakeryManufacturer = /\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)
+  const isGrainBakeryManufacturer = hasFrozenBakeryProductionSignals(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isFurnitureManufacturer = hasFurnitureManufacturingSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
@@ -3090,7 +3097,7 @@ function extractStructuredBriefFacts(
     avoidAngles.add('generic manufacturing')
   }
 
-  addIf(/crane sales|crane service|crane parts|sales and support base|tadano|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?/i, activities, ['crane sales and support', 'equipment service', 'parts support'])
+  addIf(/crane sales|crane service|crane parts|sales and support base|tadano|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?/i, activities, ['crane sales and support operation', 'equipment service', 'parts support'])
   addIf(/crane service|crane parts|mobile cranes?|rough terrain cranes?|all[-\s]?terrain cranes?|service bays?/i, equipment, ['crane service bays', 'parts areas', 'shop equipment'])
   addIf(/crane service|crane parts|service bays?|shop equipment/i, energyDrivers, ['service bays', 'parts areas', 'shop HVAC'])
   if (hasCraneSalesSupportSignals(text)) {
@@ -3130,9 +3137,23 @@ function extractStructuredBriefFacts(
     avoidAngles.add('generic manufacturing')
   }
 
-  addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
-  addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
-  addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
+  if (hasFrozenBakeryProductionSignals(text)) {
+    ;['frozen bakery production', 'bakery manufacturing'].forEach((term) => activities.add(term))
+    ;['mixing equipment', 'ovens', 'freezers', 'packaging lines', 'plant HVAC'].forEach((term) => equipment.add(term))
+    ;['mixing', 'ovens', 'freezers', 'packaging', 'sanitation', 'plant HVAC'].forEach((term) => energyDrivers.add(term))
+    avoidAngles.add('restaurant dining')
+    avoidAngles.add('customer cooling')
+  }
+
+  const isFoodProductionContext = hasFrozenBakeryProductionSignals(text) ||
+    /\b(food production|food manufacturing|food manufacturer|food processing|production plant|production facility|manufactures?|manufacturer|usda[-\s]?approved|custom proteins?|soups?|sauces?|side dishes?|salad dressings?|dehydrated beans|dry sausage|kettle soups?)\b/i.test(text)
+  const isRestaurantContext = !isFoodProductionContext &&
+    /\b(restaurant|barbe?cue|bbq|smokers?|commercial kitchen|fryers?|grills?|dining|cafe|café|bakery caf[eé]|bar\b|eatery|food service|service rushes?|drive-thru)\b/i.test(text)
+  if (isRestaurantContext) {
+    addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
+    addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
+    addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
+  }
 
   if (hasStrongAutomotiveSignals(text) || hasStrongAutomotiveDealerSignals(text)) {
     addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
@@ -4164,7 +4185,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
       if (hasCraneSalesSupportSignals(text)) {
         return {
-          label: 'Crane sales and support',
+          label: 'Crane sales and support operation',
           angle: 'Crane service bays, parts areas, shop equipment, and support-building HVAC shaping the bill differently than a manufacturing plant.',
           question: `I'm curious, how do y'all tell whether crane service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
           openers: [

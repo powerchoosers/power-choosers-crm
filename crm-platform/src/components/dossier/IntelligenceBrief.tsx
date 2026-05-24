@@ -507,12 +507,16 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
 
           {/* NEPQ Discovery Flow Section */}
           <section className={cn(
-            'rounded-2xl border border-white/5 bg-zinc-950/60 transition-all duration-300',
+            'mb-5 overflow-hidden rounded-2xl border border-white/5 bg-zinc-950/60 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+            showDiscoveryFlow ? 'shadow-[0_18px_45px_rgba(0,0,0,0.22)]' : 'shadow-none',
             'animate-in fade-in slide-in-from-top-2 duration-500 delay-200'
           )}>
-            <div className="flex items-center justify-between p-5 border-b border-white/5">
+            <div className={cn(
+              'flex items-center justify-between p-5 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+              showDiscoveryFlow ? 'border-b border-white/5 pb-4' : 'border-b border-transparent'
+            )}>
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#002FA7]" />
+                <Sparkles className="w-4 h-4 text-white" />
                 <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
                   NEPQ Discovery Flow
                 </div>
@@ -522,14 +526,24 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDiscoveryFlow(!showDiscoveryFlow)}
-                className="text-xs text-zinc-400 hover:text-white cursor-pointer"
+                className={cn(
+                  'overflow-hidden text-xs text-zinc-400 hover:text-white cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                  showDiscoveryFlow ? 'w-24 bg-white/[0.03]' : 'w-32'
+                )}
               >
                 {showDiscoveryFlow ? 'Collapse' : 'Expand Flow'}
               </Button>
             </div>
 
-            {showDiscoveryFlow && (
-              <div className="p-5 space-y-5 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className={cn(
+              'grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+              showDiscoveryFlow ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+            )}>
+              <div className="min-h-0 overflow-hidden">
+                <div className={cn(
+                  'p-5 space-y-5 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                  showDiscoveryFlow ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+                )}>
                 {/* Timeline Tabs */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 border-b border-white/5 pb-4">
                   {nepqPhases.map((phase, idx) => (
@@ -589,7 +603,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                             size="icon"
                             onClick={handleCopyQuestion}
                             className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
-                            title="Copy question"
+                            aria-label="Copy question"
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </Button>
@@ -599,7 +613,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                   })}
                 </div>
               </div>
-            )}
+              </div>
+            </div>
           </section>
 
           {/* Metadata Grid */}
