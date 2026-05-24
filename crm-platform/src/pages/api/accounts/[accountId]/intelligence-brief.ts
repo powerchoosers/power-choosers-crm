@@ -697,7 +697,7 @@ function hasCraneSalesSupportSignals(text: string) {
 }
 
 function hasMaritimePilotSignals(text: string) {
-  return /(harbor pilots?|houston pilots?|ship pilots?|ship handlers?|vessels?|waterway|ship channel|port of houston|pilot boat|marine pilot|maritime pilots?)/i.test(text)
+  return /(harbor pilots?|houston pilots?|ship pilots?|ship handlers?|(?:marine|maritime|cargo|shipping|naval|ocean-going|waterborne) vessels?|waterway|ship channel|port of houston|pilot boat|marine pilot|maritime pilots?)/i.test(text)
 }
 
 function hasStrongDmeSignals(text: string) {
@@ -3090,7 +3090,7 @@ function extractStructuredBriefFacts(
     avoidAngles.add('auto dealership')
   }
 
-  addIf(/harbor pilots?|houston pilots?|ship handlers?|vessels?|waterway|ship channel|pilot boat|marine pilot|maritime pilots?/i, activities, ['maritime pilot operations', 'dispatch and support operations'])
+  addIf(/harbor pilots?|houston pilots?|ship handlers?|(?:marine|maritime|cargo|shipping|naval|ocean-going|waterborne) vessels?|waterway|ship channel|pilot boat|marine pilot|maritime pilots?/i, activities, ['maritime pilot operations', 'dispatch and support operations'])
   addIf(/pilot boat|dispatch|marine operations|ship channel|support buildings/i, equipment, ['dispatch systems', 'support buildings', 'boat operations'])
   addIf(/pilot boat|dispatch|marine operations|support buildings|ship channel/i, energyDrivers, ['dispatch systems', 'support-building HVAC', 'marine operations support'])
   if (hasMaritimePilotSignals(text)) {
@@ -4257,6 +4257,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['print equipment', 'mailing equipment', 'fulfillment area', 'office HVAC', 'IT systems', 'billing clarity'],
       }
     case 'public_transit':
+      if (hasMaritimePilotSignals(text)) {
+        return {
+          label: 'Maritime pilot operations',
+          angle: 'Continuous dispatch systems, support buildings, pilot boat operations, and ship channel support shaping the energy profile.',
+          question: `I'm curious, how do y'all tell whether dispatch systems, support-building HVAC, or boat operations is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for maritime pilot operations, dispatch systems, support buildings, and boat operations can all hit the meter during the same busy window.`,
+            `Often times for ship channel pilot associations, it's hard to tell whether the dispatch center or the boat operations support is what actually moved the bill that month.`,
+            `Often times with marine pilot groups, the bill moves from dispatch reliability and support-building cooling more than from a standard office setup.`,
+          ],
+          focus: ['dispatch systems', 'support buildings', 'boat operations', 'marine operations', 'support-building HVAC', 'ship channel'],
+        }
+      }
+
       return {
         label: 'Public transit',
         angle: 'Transit reliability, vehicle maintenance, lighting, shop equipment, and public-service schedules shaping facility usage.',
