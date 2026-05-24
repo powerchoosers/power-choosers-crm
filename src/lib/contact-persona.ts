@@ -190,6 +190,21 @@ function getSourceLabel(source: AudienceSource): string {
   }
 }
 
+function getSourcePriorityNote(source: AudienceSource): string {
+  switch (source) {
+    case 'protocol_task':
+      return ' (active or pending task contact wins for this protocol)'
+    case 'sequence':
+      return ' (sequence contact is the primary writing target)'
+    case 'decision_maker_card':
+      return ' (supporting context only unless this person is the active task target)'
+    case 'account_primary':
+      return ' (account primary contact when there is no clearer active target)'
+    default:
+      return ''
+  }
+}
+
 function inferRoleFamily(title: string, industry: string, signals: string[]): AudienceRoleFamily {
   const combined = `${title} ${industry} ${signals.join(' ')}`.toLowerCase()
 
@@ -379,6 +394,13 @@ function buildGuardrails(profile: AudienceProfile): string[] {
     'Do not mention LinkedIn, profiles, or scraping in the output.',
     'Keep the note to one business problem and one question.',
   ]
+  if (profile.source === 'protocol_task') {
+    base.push('This is the active or pending task contact, so write to this person first.')
+  } else if (profile.source === 'sequence') {
+    base.push('This is the sequence contact, so treat this person as the primary writing target.')
+  } else if (profile.source === 'decision_maker_card') {
+    base.push('This is supporting context unless the step explicitly targets this person.')
+  }
   const automotiveBusiness = looksAutomotiveBusiness(`${profile.contactTitle} ${profile.companyName}`)
 
   const byRole: Record<AudienceRoleFamily, string[]> = {
@@ -562,7 +584,7 @@ export function buildAudienceProfileBlock(profile: AudienceProfile | null | unde
 
   const lines = [
     'AUDIENCE PROFILE:',
-    `- Source: ${profile.sourceLabel}${profile.source === 'sequence' ? ' (sequence wins over the decision-maker card if they differ)' : ''}`,
+    `- Source: ${profile.sourceLabel}${getSourcePriorityNote(profile.source)}`,
     profile.contactName ? `- Name: ${profile.contactName}` : null,
     profile.contactTitle ? `- Title: ${profile.contactTitle}` : null,
     profile.companyName ? `- Company: ${profile.companyName}` : null,
