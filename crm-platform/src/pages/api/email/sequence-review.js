@@ -97,7 +97,7 @@ function buildExecutionPromptOverlay({
       ? '1. If a usable intelligence brief exists, that brief is the main reason for the note. Start from the event, operating fact, or business question in the brief before generic industry language.'
       : '1. If no usable intelligence brief exists, use one concrete operating fact from the company description, notes, location, or related-company context.',
     '2. The first sentence should prove you know what the company actually does.',
-    '3. Do not default to stock wording like "short read", "budget drift", "rate vs delivery", or "one-page snapshot" unless the line still sounds natural and specific to this account.',
+    '3. Do not default to stock wording like "quick breakdown", "site cost check", "rate timing", or "quick note" unless the line still sounds natural and specific to this account.',
     organizationRole === 'subsidiary'
       ? '4. This account is a subsidiary or operating brand. Write to the operating company first and mention the parent once at most if it helps orientation.'
       : organizationRole === 'parent'
@@ -106,18 +106,21 @@ function buildExecutionPromptOverlay({
     hasAccountNotes
       ? '5. If account notes are present, you may use one note if it sharpens the email. Do not dump internal note text into the body.'
       : '5. Use the fewest facts needed to make the note feel researched and manual.',
+    audienceProfileBlock || decisionMakerProfileBlock
+      ? '6. Primary persona rule: the audience profile is the writing target. The decision-maker card is supporting context only unless the step explicitly targets that person. If this is an active protocol task, the task contact wins.'
+      : null,
   ];
 
   if (replyStage === 'first_touch') {
-    lines.push('6. First touch should earn a reply with a clear business question, not just an offer.');
+    lines.push('7. First touch should earn a reply with a clear business question, not just an offer.');
   }
 
   if (audienceProfileBlock) {
-    lines.push(`7. Audience profile (target person, internal use only):\n${audienceProfileBlock}`);
+    lines.push(`8. Audience profile (target person, internal use only):\n${audienceProfileBlock}`);
   }
 
   if (decisionMakerProfileBlock) {
-    lines.push(`8. Decision-maker card (supporting context only):\n${decisionMakerProfileBlock}`);
+    lines.push(`9. Decision-maker card (supporting context only):\n${decisionMakerProfileBlock}`);
   }
 
   return lines.join('\n');
@@ -353,14 +356,17 @@ function buildReplyFirstDirective(stage) {
     first_touch: [
       'REPLY-FIRST NOTE: Keep the body at 50-80 words in 2 short paragraphs.',
       'Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
-      'Lane selection by role: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/real estate/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement = renewal timing, vendor fit, or contract cleanup; owner/GM = leverage, timing, or simple cost check; school/church/nonprofit/healthcare = stewardship, comfort, reliability, or predictability; dental = practice flow, operatories, imaging, sterilization, and patient comfort.',
+      'Lane selection by role: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/real estate/warehouse/logistics/manufacturing = equipment timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement = renewal timing, vendor fit, or contract cleanup; owner/GM = leverage, timing, or simple cost check; school/church/nonprofit/healthcare = stewardship, comfort, reliability, or predictability; dental = practice flow, operatories, imaging, sterilization, and patient comfort.',
       'Do not choose delivery charges or demand charges unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       'Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
       'Use one concrete company, event, role, city, or location fact and make the payoff explicit without asking for a bill: a quick breakdown, short note on what you would check first, simple yes/no reply, routing reply, or plain comparison.',
       'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Want me to send what I\'d check first?", "Reply yes and I\'ll send the quick breakdown.", "Does this sit with you or someone else?", or "Am I off base?" Never ask for a bill in first touch.',
       'If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
+      'Treat stock labels in the original prompt as placeholders, not final copy. If it says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company\'s real business terms before writing.',
+      'If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
+      'If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
-      'Subject line: 1-4 words, plain, specific, and value-led. Do not keep reusing stock labels like budget drift, fixed cost check, or load timing when the company, city, issue, or timing would sound more natural.',
+      'Subject line: 1-4 words, plain, specific, and value-led. Do not keep reusing stock labels like site cost check, simple cost check, or equipment timing when the company, city, issue, or timing would sound more natural.',
       'Never mention LinkedIn, profiles, or how you found them.'
     ].join('\n'),
     follow_up: [
@@ -369,6 +375,9 @@ function buildReplyFirstDirective(stage) {
       'Reinforce one concrete output that does not require document sharing yet: a quick breakdown, a short note, a short call, or a routing reply.',
       'Follow-up tone should be more diagnostic and a little more direct than first touch. Prefer one direct CTA only, and do not ask for a bill unless this is clearly a later, high-intent step.',
       'If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
+      'Treat stock labels in the original prompt as placeholders, not final copy. If it says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company\'s real business terms before writing.',
+      'If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
+      'If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally. Keep it as a location cue, not jargon.',
       'Subject line: 1-4 words, specific and plain. Slightly more diagnostic than Day 1, but do not keep defaulting to the same 2-3 subject formulas.'
     ].join('\n'),
@@ -380,8 +389,11 @@ function buildReplyFirstDirective(stage) {
       'No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       'Never ask for a bill, statement, or invoice in this branch.',
       'If the account is outside Texas, keep the market framing broad enough for a deregulated market and do not imply Texas-only coverage.',
+      'Treat stock labels in the original prompt as placeholders, not final copy. If it says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company\'s real business terms before writing.',
+      'If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
+      'If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally, but keep the message short.',
-      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence, but do not keep defaulting to short read or quick yes/no.'
+      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence, but do not keep defaulting to quick breakdown or simple reply.'
     ].join('\n'),
     general: [
       'REPLY-FIRST NOTE: Use the shortest draft that still gives one real observation and a concrete reason to reply.',
@@ -389,6 +401,9 @@ function buildReplyFirstDirective(stage) {
       'One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
       'As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
       'Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
+      'Treat stock labels in the original prompt as placeholders, not final copy. If it says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company\'s real business terms before writing.',
+      'If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
+      'If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
       'Subject line: 1-4 words, but vary it by title and stage. Do not keep reusing the same cost-view phrasing.'
     ].join('\n')
   };
@@ -702,6 +717,8 @@ export default async function handler(req, res) {
       account?.website || accountDomain ? `Website: ${account.website || accountDomain}` : null,
       account?.linkedin_url ? 'LinkedIn: available' : null,
       siteState ? `Site state: ${siteState}` : null,
+      `Site rule: Use the service address or meter array as the operating site. Treat HQ as corporate context only unless the prompt explicitly says HQ is the site.`,
+      texasEnergy.isRegulated ? `Regulated territory: yes (${utilityTerritory || texasEnergy.regulatedUtility || 'unknown'})` : null,
       utilityTerritory ? `Utility territory: ${utilityTerritory}` : null,
       texasEnergy.tduDisplay ? `TDU: ${texasEnergy.tduDisplay}` : null,
       texasEnergy.tduCandidates.length ? `TDU candidates: ${texasEnergy.tduCandidates.join('; ')}` : null,
@@ -821,6 +838,7 @@ export default async function handler(req, res) {
           site_address: primarySiteAddress || null,
           site_state: siteState || null,
           site_city: siteCity || null,
+          is_regulated: texasEnergy.isRegulated,
           tdu: texasEnergy.tduDisplay || null,
           tdu_candidates: texasEnergy.tduCandidates || [],
           market_context: marketContext,

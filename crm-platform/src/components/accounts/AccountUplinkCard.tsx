@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Phone, Globe, MapPin, Building2, ArrowUpRight, Sparkles, Star, Satellite } from 'lucide-react'
+import { Phone, Globe, MapPin, Building2, ArrowUpRight, Sparkles, Star, Satellite, ShieldAlert } from 'lucide-react'
 import { Account } from '@/hooks/useAccounts'
 import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
@@ -60,11 +60,24 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
   const [justUpdated, setJustUpdated] = useState(false)
   const storedZone = (account.loadZone as ErcotZone | undefined)
   const locationZone = mapLocationToZone(account.city, account.state, account.location || account.address)
-  const resolvedZone = storedZone && LOAD_ZONE_COLOR_MAP[storedZone] ? storedZone : locationZone
+  const hasLocationSignals = Boolean(account.city || account.state || account.location || account.address)
+  const resolvedZone = hasLocationSignals
+    ? locationZone
+    : (storedZone && LOAD_ZONE_COLOR_MAP[storedZone] ? storedZone : locationZone)
   const texasEnergy = getTexasEnergyContext(account.city, account.state, account.location || account.address)
-  const resolvedTdu = account.tdu || texasEnergy.tduDisplay || (texasEnergy.isTexas ? 'Texas/ERCOT' : 'N/A')
-  const zoneColor = LOAD_ZONE_COLOR_MAP[resolvedZone] ?? LOAD_ZONE_COLOR_MAP[ERCOT_ZONES.NORTH]
+  const resolvedTdu = texasEnergy.isRegulated
+    ? texasEnergy.tduDisplay || account.tdu || 'Regulated utility'
+    : account.tdu || texasEnergy.tduDisplay || (texasEnergy.isTexas ? 'Texas/ERCOT' : 'N/A')
+  const marketType = texasEnergy.isRegulated ? 'REGULATED' : (texasEnergy.isTexas ? 'DEREGULATED' : 'N/A')
+  const zoneLabel = texasEnergy.isRegulated ? 'Utility Territory' : 'Load Zone'
+  const zoneValue = texasEnergy.isRegulated
+    ? texasEnergy.utilityTerritory || resolvedTdu || 'Regulated'
+    : resolvedZone
+  const zoneColor = texasEnergy.isRegulated
+    ? '#f59e0b'
+    : (LOAD_ZONE_COLOR_MAP[resolvedZone] ?? LOAD_ZONE_COLOR_MAP[ERCOT_ZONES.NORTH])
   const tduColor = '#002FA7'
+  const marketTypeColor = texasEnergy.isRegulated ? '#f59e0b' : '#002FA7'
   const zoneStyle = {
     color: zoneColor,
     backgroundColor: `${zoneColor}1f`,
@@ -74,6 +87,11 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
     color: tduColor,
     backgroundColor: `${tduColor}18`,
     borderColor: `${tduColor}2a`,
+  }
+  const marketTypeStyle = {
+    color: marketTypeColor,
+    backgroundColor: `${marketTypeColor}18`,
+    borderColor: `${marketTypeColor}2a`,
   }
 
   const handleCallClick = () => {
@@ -356,8 +374,9 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
 
         {/* Market Signals */}
         <div className="space-y-2">
-          <SignalBlock icon={Building2} label="Load Zone" value={resolvedZone} style={zoneStyle} />
+          <SignalBlock icon={Building2} label={zoneLabel} value={zoneValue} style={zoneStyle} />
           <SignalBlock icon={MapPin} label="TDU" value={resolvedTdu} style={tduStyle} />
+          <SignalBlock icon={ShieldAlert} label="Market Type" value={marketType} style={marketTypeStyle} />
         </div>
       </div>
     </div>

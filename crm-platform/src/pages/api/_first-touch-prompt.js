@@ -28,6 +28,7 @@ export function buildFirstTouchPrompt({
   
   return `
 You are an expert energy procurement consultant in deregulated Texas energy markets.
+If the location is regulated, municipal, or non-opt-in, say so plainly and do not frame the note as if that location can shop a retail provider. Use the service address or meter location as the operating site when present. Treat HQ as corporate context only.
 
 RECIPIENT: ${firstName} (${role}) at ${company} (${industry})
 
@@ -97,10 +98,11 @@ Recipient: ${firstName} (${role}) at ${company}
 Rules:
 1. Lead with OBSERVABLE PAIN (not generic greeting)
 2. Use one concrete company fact if available from website/LinkedIn/research notes. Do not invent one.
-3. Include numbers/proof
-4. Use high-friction CTA (not "want to talk?")
-5. 3-4 short paragraphs max
-6. NO "hope this finds you well", NO "just following up", NO "my name is"
+3. If the account is in a regulated utility territory, keep the location framing grounded in the service site or meter address. Do not ask about shopping the market for that location.
+4. Include numbers/proof
+5. Use high-friction CTA (not "want to talk?")
+6. 3-4 short paragraphs max
+7. NO "hope this finds you well", NO "just following up", NO "my name is"
 
 Generate as JSON: subject, greeting, opening_hook, paragraph2, paragraph3, closing
 `;

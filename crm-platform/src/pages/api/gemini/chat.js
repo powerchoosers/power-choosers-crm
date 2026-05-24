@@ -7,8 +7,10 @@ import logger from '../_logger.js';
 import { ZohoMailService } from '../email/zoho-service.js';
 import { APOLLO_BASE_URL, fetchWithRetry, getApiKey } from '../apollo/_utils.js';
 import { getErcotMarketData } from '../market/ercot.js';
+import { parseAddressParts } from '@/lib/address';
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes';
 import { buildUsableCallContextBlock, buildUsableCallContextEntries } from '@/lib/call-context';
+import { getTexasEnergyContext } from '@/lib/texas-territory';
 
 // Define the tools (functions) Gemini can call
 const tools = [
@@ -837,6 +839,41 @@ const toolHandlers = {
     data.city = data.city || metadata.city || metadata.general?.city || data.accounts?.city;
     data.state = data.state || metadata.state || metadata.general?.state || data.accounts?.state;
 
+    const contactServiceAddress = Array.isArray(data.service_addresses) && data.service_addresses.length > 0
+      ? data.service_addresses[0]
+      : null;
+    const contactServiceAddressText = typeof contactServiceAddress?.address === 'string' && contactServiceAddress.address.trim()
+      ? contactServiceAddress.address.trim()
+      : typeof contactServiceAddress?.service_address === 'string' && contactServiceAddress.service_address.trim()
+        ? contactServiceAddress.service_address.trim()
+        : typeof contactServiceAddress?.location === 'string' && contactServiceAddress.location.trim()
+          ? contactServiceAddress.location.trim()
+          : typeof data.accounts?.address === 'string' && data.accounts.address.trim()
+            ? data.accounts.address.trim()
+            : '';
+    const contactServiceParts = parseAddressParts(contactServiceAddressText);
+    const contactTexasEnergy = getTexasEnergyContext(
+      contactServiceParts.city || data.city || data.accounts?.city,
+      contactServiceParts.state || data.state || data.accounts?.state,
+      contactServiceAddressText || data.accounts?.address || data.city || ''
+    );
+    data.utilityTerritory = contactTexasEnergy.utilityTerritory;
+    data.marketContext = contactTexasEnergy.marketContext;
+    data.isRegulated = contactTexasEnergy.isRegulated;
+    data.regulatedUtility = contactTexasEnergy.regulatedUtility;
+    data.tdu = contactTexasEnergy.tduDisplay;
+    data.tduDisplay = contactTexasEnergy.tduDisplay;
+    data.tdu_candidates = contactTexasEnergy.tduCandidates;
+    if (data.accounts && typeof data.accounts === 'object') {
+      data.accounts.utilityTerritory = contactTexasEnergy.utilityTerritory;
+      data.accounts.marketContext = contactTexasEnergy.marketContext;
+      data.accounts.isRegulated = contactTexasEnergy.isRegulated;
+      data.accounts.regulatedUtility = contactTexasEnergy.regulatedUtility;
+      data.accounts.tdu = contactTexasEnergy.tduDisplay;
+      data.accounts.tduDisplay = contactTexasEnergy.tduDisplay;
+      data.accounts.tdu_candidates = contactTexasEnergy.tduCandidates;
+    }
+
     return data;
   },
   get_account_details: async ({ account_id }) => {
@@ -879,6 +916,32 @@ const toolHandlers = {
     data.state = data.state || metadata.state || metadata.billing_state || metadata.general?.state;
     data.zip = data.zip || metadata.zip || metadata.billing_zip || metadata.general?.zip;
     data.service_addresses = data.service_addresses || metadata.service_addresses || [];
+
+    const accountServiceAddress = Array.isArray(data.service_addresses) && data.service_addresses.length > 0
+      ? data.service_addresses[0]
+      : null;
+    const accountServiceAddressText = typeof accountServiceAddress?.address === 'string' && accountServiceAddress.address.trim()
+      ? accountServiceAddress.address.trim()
+      : typeof accountServiceAddress?.service_address === 'string' && accountServiceAddress.service_address.trim()
+        ? accountServiceAddress.service_address.trim()
+        : typeof accountServiceAddress?.location === 'string' && accountServiceAddress.location.trim()
+          ? accountServiceAddress.location.trim()
+          : typeof data.address === 'string' && data.address.trim()
+            ? data.address.trim()
+            : '';
+    const accountServiceParts = parseAddressParts(accountServiceAddressText);
+    const accountTexasEnergy = getTexasEnergyContext(
+      accountServiceParts.city || data.city,
+      accountServiceParts.state || data.state,
+      accountServiceAddressText || data.address || data.city || ''
+    );
+    data.utilityTerritory = accountTexasEnergy.utilityTerritory;
+    data.marketContext = accountTexasEnergy.marketContext;
+    data.isRegulated = accountTexasEnergy.isRegulated;
+    data.regulatedUtility = accountTexasEnergy.regulatedUtility;
+    data.tdu = accountTexasEnergy.tduDisplay;
+    data.tduDisplay = accountTexasEnergy.tduDisplay;
+    data.tdu_candidates = accountTexasEnergy.tduCandidates;
 
     return data;
   },
@@ -2102,6 +2165,7 @@ Output rules:
           const siteParts = [contextData.siteAddress, contextData.siteCity, contextData.siteState].filter(Boolean).join(', ');
           if (siteParts) lines.push(`Site: ${siteParts}`);
         }
+        if (contextData.isRegulated) lines.push('Regulated territory: yes');
         if (contextData.utilityTerritory) lines.push(`Utility territory: ${contextData.utilityTerritory}`);
         if (contextData.marketContext) lines.push(`Market context: ${contextData.marketContext}`);
         if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
@@ -2975,7 +3039,7 @@ Output rules:
         - Then give 1 short "next move" line.
         - Do NOT use long preambles like "I've compiled..." unless explicitly requested.
         DO NOT include bracketed citations like [1], [source.com], or markdown links to external sites.
-        TEXAS CONTEXT: We operate in the Texas deregulated energy market (ERCOT). Ensure all advice and terminology (4CP, TDSP, Load Zones) are relevant to Texas. Forbid UK references (e.g., Citizens Advice).
+        TEXAS CONTEXT: We operate in the Texas energy market. Ensure all advice and terminology (4CP, TDSP, Load Zones) are relevant to Texas. If the context says the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there. If service addresses or meter array locations are present, use those as the operating site and treat HQ as corporate context only unless the user explicitly asks about HQ. Forbid UK references (e.g., Citizens Advice).
 
         USER_IDENTITY:
         - The user's name is ${firstName}.

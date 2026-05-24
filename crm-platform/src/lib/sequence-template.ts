@@ -111,6 +111,8 @@ export function buildSequenceTemplateVariables(source: TemplateContext = {}): Re
   const website = firstText(account.website, account.domain, contact.website)
   const linkedinUrl = firstText(account.linkedin_url, account.linkedinUrl, contact.linkedinUrl)
   const loadZone = firstText(site.utilityTerritory, site.tdu, account.load_zone, contact.load_zone)
+  const marketContext = firstText(site.marketContext, account.marketContext, contact.marketContext)
+  const isRegulated = /\bregulated\b|\bmunicipal\b|\bnon[-\s]?opt[-\s]?in\b/i.test(marketContext)
 
   return {
     'contact.firstName': contactFirstName,
@@ -160,7 +162,9 @@ export function buildSequenceTemplateVariables(source: TemplateContext = {}): Re
     'site.address': toText(site.address || address),
     'site.utilityTerritory': toText(site.utilityTerritory),
     'site.tdu': toText(site.tdu),
-    'site.marketContext': toText(site.marketContext),
+    'site.marketContext': toText(site.marketContext || marketContext),
+    'site.isRegulated': isRegulated ? 'yes' : 'no',
+    'site.marketStructure': isRegulated ? 'REGULATED' : 'DEREGULATED',
     first_name: contactFirstName,
     last_name: contactLastName,
     company_name: companyName,

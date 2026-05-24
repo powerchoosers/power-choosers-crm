@@ -1,4 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { parseAddressParts } from '@/lib/address'
+import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildUsableCallContextEntries } from './call-context'
 
 export interface FoundryContext {
@@ -27,6 +29,11 @@ export interface FoundryContext {
         supplier: string
         loadZone: string
         serviceAddress: string
+        serviceCity: string
+        serviceState: string
+        utilityTerritory: string
+        marketContext: string
+        isRegulated: boolean
     }
     intelligence: {
         transcripts: string[]
@@ -122,7 +129,7 @@ export async function buildFoundryContext(
     const context: FoundryContext = {
         contact: { name: '', firstName: '', lastName: '', title: '', email: '', phone: '' },
         company: { name: '', domain: '', industry: '', description: '', city: '', state: '', website: '', linkedin: '' },
-        energy: { currentRate: '', contractEnd: '', annualUsage: '', supplier: '', loadZone: '', serviceAddress: '' },
+        energy: { currentRate: '', contractEnd: '', annualUsage: '', supplier: '', loadZone: '', serviceAddress: '', serviceCity: '', serviceState: '', utilityTerritory: '', marketContext: '', isRegulated: false },
         intelligence: { transcripts: [], summary: '', callHistory: [] }
     }
 
@@ -198,6 +205,18 @@ export async function buildFoundryContext(
 
         if (accountData) {
             const meta = accountData.metadata || {}
+            const firstServiceAddress = Array.isArray(accountData.service_addresses) ? accountData.service_addresses[0] : null
+            const serviceAddress = typeof firstServiceAddress?.address === 'string' && firstServiceAddress.address.trim()
+                ? firstServiceAddress.address.trim()
+                : typeof firstServiceAddress?.service_address === 'string' && firstServiceAddress.service_address.trim()
+                    ? firstServiceAddress.service_address.trim()
+                    : typeof firstServiceAddress?.location === 'string' && firstServiceAddress.location.trim()
+                        ? firstServiceAddress.location.trim()
+                        : ''
+            const parsedServiceAddress = parseAddressParts(serviceAddress)
+            const serviceCity = parsedServiceAddress.city || (typeof firstServiceAddress?.city === 'string' ? firstServiceAddress.city.trim() : '') || accountData.city || ''
+            const serviceState = parsedServiceAddress.state || (typeof firstServiceAddress?.state === 'string' ? firstServiceAddress.state.trim() : '') || accountData.state || ''
+            const texasEnergy = getTexasEnergyContext(serviceCity, serviceState, serviceAddress || accountData.address || serviceCity)
             context.company = {
                 name: accountData.name || '',
                 domain: accountData.domain || '',
@@ -213,8 +232,15 @@ export async function buildFoundryContext(
                 contractEnd: accountData.contract_end_date || '',
                 annualUsage: accountData.annual_usage || '',
                 supplier: accountData.electricity_supplier || '',
-                loadZone: accountData.load_zone || (meta.energy?.loadZone as string) || '',
-                serviceAddress: (accountData.service_addresses?.[0] as any)?.address || ''
+                loadZone: texasEnergy.isRegulated
+                    ? texasEnergy.utilityTerritory || 'regulated territory'
+                    : accountData.load_zone || texasEnergy.tduDisplay || (meta.energy?.loadZone as string) || '',
+                serviceAddress: serviceAddress || accountData.address || '',
+                serviceCity,
+                serviceState,
+                utilityTerritory: texasEnergy.utilityTerritory,
+                marketContext: texasEnergy.marketContext,
+                isRegulated: texasEnergy.isRegulated,
             }
             console.log('[FoundryContext] Account resolved:', context.company.name, 'Industry:', context.company.industry)
         }
@@ -271,11 +297,15 @@ export function generateSystemPrompt(
 
     const targetStr = `${contact.name}${contact.title ? ` (${contact.title})` : ''}${company.name ? ` @ ${company.name}` : ''}`
     const locStr = [company.city, company.state].filter(Boolean).join(', ')
+    const operatingSite = energy.serviceAddress || [energy.serviceCity, energy.serviceState].filter(Boolean).join(', ') || locStr
     const energyStr = [
         energy.currentRate ? `Rate ${energy.currentRate}/kWh` : '',
         energy.contractEnd ? `Exp ${energy.contractEnd}` : '',
         energy.annualUsage ? `Usage ${energy.annualUsage}` : '',
-        energy.supplier ? `Supplier ${energy.supplier}` : ''
+        energy.supplier ? `Supplier ${energy.supplier}` : '',
+        energy.utilityTerritory ? `Utility ${energy.utilityTerritory}` : '',
+        energy.marketContext ? `Market ${energy.marketContext}` : '',
+        energy.isRegulated ? 'Regulated territory' : '',
     ].filter(Boolean).join(', ') || 'No energy data available'
 
     const contextBlock = `
@@ -283,7 +313,8 @@ export function generateSystemPrompt(
     - Target: ${targetStr}
     - Industry: ${company.industry || 'Unknown'}
     - Company Description: ${(company.description || '').slice(0, 200)}
-    - Location: ${locStr}
+    - Corporate HQ: ${locStr || 'Unknown'}
+    - Operating Site: ${operatingSite || 'Unknown'}
     - Website: ${company.website || 'Unknown'}
     - LinkedIn: ${company.linkedin || 'Unknown'}
     - Energy Profile: ${energyStr}
@@ -305,8 +336,10 @@ export function generateSystemPrompt(
     6. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
     7. GREETINGS: If you include a greeting (e.g. "${greeting}"), it MUST be followed by EXACTLY TWO newline characters (\n\n). NEVER put a greeting on the same line as the body text.
     8. NO CITATIONS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
-    9. TEXAS MARKET (ERCOT): Nodal Point operates in the Texas deregulated energy market. Use Texas terminology (4CP, TDSP, Load Zones). Forbid UK references.
-    10. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
+    9. SITE RULE: If a service address, meter array, or other operating site is present, use that as the site context. Treat the corporate HQ as corporate context only unless the user explicitly asks about HQ.
+    10. REGULATED TERRITORY RULE: If the location or utility territory is regulated, municipal, or non-opt-in, say so plainly and do not write as though the site can shop a retail provider there.
+    11. TEXAS MARKET (ERCOT): Nodal Point operates in the Texas deregulated energy market. Use Texas terminology (4CP, TDSP, Load Zones). Forbid UK references.
+    12. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
 
     if (blockType === 'TEXT_MODULE' && (userPrompt.toLowerCase().includes('intro') || !userPrompt)) {
@@ -367,7 +400,7 @@ export function generateSystemPrompt(
 
     if (blockType === 'MARKET_BREADCRUMB') {
         return `
-        Rewrite this market news into a 2 - sentence impact assessment for a client in ${energy.loadZone || 'their zone'}.Focus on 'Liability' or 'Cost Leakage'.
+        Rewrite this market news into a 2 - sentence impact assessment for a client in ${energy.isRegulated ? (energy.utilityTerritory || 'their regulated territory') : (energy.loadZone || 'their zone')}.Focus on 'Liability' or 'Cost Leakage'.
             ${contextBlock}
         ${coreRules}
         USER INSTRUCTION: ${userPrompt}

@@ -404,14 +404,14 @@ function buildReplyStageDirective(stage) {
     first_touch: [
       '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
       '- Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
-      '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; school/church/nonprofit/healthcare = stewardship, predictability, comfort, or reliability; dental = practice flow, operatories, imaging, sterilization, and patient comfort.',
+      '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = equipment timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; school/church/nonprofit/healthcare = stewardship, predictability, comfort, or reliability; dental = practice flow, operatories, imaging, sterilization, and patient comfort.',
       '- Do not choose "delivery charges" or "demand charges" unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       '- Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
       '- Start with one concrete company, role, city, operating, or event fact. Make the first sentence sound like a real observation, not a template. Avoid the phrase "the useful question is."',
       '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a quick breakdown, a short note on what you would check first, a yes/no reply, a routing reply, or a plain comparison.',
       '- First-touch tone should be direct but calm. First-touch CTA must be easy to answer. Good patterns: "Want me to send what I\'d check first?" "Reply yes and I\'ll send the quick breakdown." "Does this sit with you or someone else?" "Am I off base?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
-      '- Subject line should match the persona and stage, but do not keep reusing stock labels like "budget drift", "load timing", or "fixed cost check". Use the company, city, issue, or timing when it sounds more natural.',
+      '- Subject line should match the persona and stage, but do not keep reusing stock labels like "site cost check", "equipment timing", or "simple cost check". Use the company, city, issue, or timing when it sounds more natural.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
@@ -430,7 +430,7 @@ function buildReplyStageDirective(stage) {
       '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a quick note.',
       '- No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       '- Never ask for a bill, statement, or invoice in this branch.',
-      '- Subject line should be the sharpest and simplest one in the sequence, but do not keep defaulting to "short read" or "quick yes/no".',
+      '- Subject line should be the sharpest and simplest one in the sequence, but do not keep defaulting to "quick breakdown" or "simple reply".',
     ].join('\n'),
     general: [
       '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
@@ -648,9 +648,11 @@ export default async function handler(req, res) {
         siteAddress ? `- SITE_ADDRESS: ${siteAddress}` : null,
         siteCity ? `- SITE_CITY: ${siteCity}` : null,
         siteState ? `- SITE_STATE: ${siteState}` : null,
+        `- SITE_RULE: Use the service address or meter array as the operating site. Treat HQ as corporate context only unless the prompt explicitly says HQ is the site.`,
         utilityTerritory ? `- UTILITY_TERRITORY: ${utilityTerritory}` : null,
         tduDisplay ? `- TDU_DISPLAY: ${tduDisplay}` : null,
         tduCandidates.length ? `- TDU_CANDIDATES: ${tduCandidates.join('; ')}` : null,
+        texasEnergy.isRegulated ? `- REGULATED_TERRITORY: yes (${utilityTerritory || texasEnergy.regulatedUtility || 'unknown'})` : null,
         `- MARKET_CONTEXT: ${marketContext}`,
         `- ORG_STRUCTURE: role=${organizationRole}; parent=${parentCompany || parentCompanyId || 'none'}; parent_id=${parentCompanyId || 'none'}; subsidiaries=${subsidiaryCompanies.length ? subsidiaryCompanies.join('; ') : parentCompanyCount ? `${parentCompanyCount} linked account(s)` : 'none'}`,
         hierarchySummary ? `- HIERARCHY_SUMMARY: ${hierarchySummary}` : null,
@@ -665,6 +667,13 @@ export default async function handler(req, res) {
         researchLinks.length ? `- RELATED_RESEARCH_LINKS: ${researchLinks.join('; ')}` : null,
         audienceProfileBlock ? `- AUDIENCE_PROFILE: ${audienceProfileBlock}` : null,
         decisionMakerProfileBlock ? `- DECISION_MAKER_PROFILE: ${decisionMakerProfileBlock}` : null,
+        `- PRIMARY_PERSONA: ${audienceProfile?.source === 'protocol_task'
+          ? 'Active or pending task contact wins for this protocol'
+          : audienceProfile?.source === 'sequence'
+            ? 'Sequence contact is the primary writing target'
+            : audienceProfile?.source === 'decision_maker_card'
+              ? 'Decision-maker card is supporting context only unless this person is the active task target'
+              : 'Audience profile is the primary writing target; decision-maker card is supporting context only'}`,
         callContext ? `- CALL_CONTEXT: ${callContext}` : null,
         employeeCount ? `- COMPANY_SCALE: ${employeeCount} employees` : null,
         `- ROLE: ${audienceProfile?.contactTitle || contactTitle}`,
@@ -712,30 +721,34 @@ export default async function handler(req, res) {
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
           8. TEXAS DEREGULATED MARKET (ERCOT): Keep context Texas/ERCOT and forbid UK references (like "Citizens Advice").
             - If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets. Do not imply Texas-only coverage.
-          9. HOOK RULE:
+          9. SITE RULE:
+            - If a service address, meter array, or other operating site is present, use that as the location context. Treat the corporate HQ as corporate context only unless the prompt explicitly says HQ is the site.
+          10. REGULATED TERRITORY RULE:
+            - If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.
+          11. HOOK RULE:
             - Sentence one must mention the specific site/location being discussed (address, city, or operating site) and tie that place to one SPECIFIC, concrete operational reality.
             - If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orient the reader. Never confuse the parent company with the site.
             - If the site is in Texas and a single TDU is clearly known, use that plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.
             - CRITICAL: City + industry alone is NOT a hook. "For logistics companies in Houston, costs can shift quite a bit" tells the recipient nothing specific about them and reads as a template. Use one fact from: account description, company scale, revenue, a known operational characteristic of that specific industry in that market, the parent/subsidiary structure, the site address, or a recent signal. If no specific data exists, make an observation about that industry's energy profile (e.g., "cold storage facilities in Dallas run 24/7 baseload which concentrates demand charge exposure" or "rail service yards carry high fixed-load hours that push peak billing hard") — never a generic "costs can shift" statement.
             - Avoid vague openers: "energy costs are tough", "costs can shift quite a bit", "utility charges are complex", "getting good value for electricity can be tricky."
             - FORBIDDEN OPENERS: Do not start with "I noticed on the website", "I came across your website", "Reviewing your website", "I was looking at your site", "Came across your", "Reviewing", or "many organizations in your sector". These sound templated and robotic.
-          10. SUBJECT RULE:
+          12. SUBJECT RULE:
             - Subject line must be 1–4 words.
             - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
             - If a Texas utility territory is known, it may appear once if it clarifies the subject, but do not force it.
             - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
             - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
             - Keep it problem-based and specific. Persona examples:
-              - Finance: "budget drift", "before renewal slips", "fixed cost check"
-              - Operations: "load timing", "delivery gap", "where demand adds cost"
+              - Finance: "site cost check", "before renewal slips", "simple cost check"
+              - Operations: "equipment timing", "delivery gap", "where demand adds cost"
               - Purchasing: "renewal timing", "vendor fit", "who owns contract timing?"
               - Owner/VP: "simple cost check", "timing before renewal", "where the extra cost sits"
             - Keep the subject line plain enough to feel manual, not clever enough to feel templated. Favor short, literal phrases over marketing language.
-          11. JARGON TRANSLATION RULE:
+          13. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
-          12. EMAIL LANE SELECTION RULE:
+          14. EMAIL LANE SELECTION RULE:
             - Before writing, choose exactly one lane and commit to it:
               real_event: verified opening, acquisition, leadership change, expansion, funding, or facility move.
               renewal_timing: contract timing, vendor review, getting ahead of market movement.
@@ -746,15 +759,16 @@ export default async function handler(req, res) {
             - If there is a verified real event, that wins. If not, use the best role/business lane. If the data is thin, use routing_owner or renewal_timing instead of pretending there is a news event.
             - One lane only. Do not mention market conditions unless market_timing is the chosen lane or it directly supports the chosen event.
             - The email must answer this in plain English: "Why am I emailing this person today, and what can they reply with?"
-          13. INTELLIGENCE BRIEF RULE:
+          15. INTELLIGENCE BRIEF RULE:
             - If INTELLIGENCE BRIEF is present and usable, it is the PRIMARY reason for the note unless the prompt explicitly says otherwise.
             - Start from the event, operating fact, or business question in the brief before you fall back to generic industry language.
-            - Use the brief to choose the lane, the first sentence, and the business question. Do not reduce a strong brief to generic "cost side", "short read", or "rate vs delivery" language.
+            - Use the brief to choose the lane, the first sentence, and the business question. Do not reduce a strong brief to generic "cost side", "quick breakdown", or "rate timing" language.
             - However, ensure the Talk Track follows the other rules (no "I noticed on your website" etc.). If the Talk Track contains forbidden openers, strip the filler and keep the diagnostic insight.
             - If the brief is missing, low confidence, empty, or fallback-like, ignore it and lean on account, notes, and call context instead.
             - Never say "I saw a report about..." unless the event itself is named in the same sentence.
             - Never mention the source URL in the email body.
-          14. CTA RULE:
+            - Treat stock labels in the original prompt as placeholders, not final copy. If the prompt says site cost check, quick breakdown, rate timing, or equipment timing, translate it into the company's real business terms and the current brief before writing.
+          16. CTA RULE:
             - First touch: ask for a low-friction reply with a concrete offer, not a bill request and not a generic meeting ask.
             - Early-sequence offer options: a quick breakdown, a short note on what you would check first, a plain comparison, a quick benchmark, or a simple routing reply.
             - First-touch and no-reply branches must NOT ask for a utility bill, statement, or invoice.
@@ -791,8 +805,9 @@ export default async function handler(req, res) {
             - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
           18A. PERSONA RULE:
-            - If AUDIENCE_PROFILE exists, it is the person you are writing to. Use their first name once in the opener and match the angle to their title and role family.
-            - If DECISION_MAKER_PROFILE also exists and it is a different person, treat it as supporting context only. The sequence contact wins over the decision-maker card.
+            - If AUDIENCE_PROFILE exists, it is the primary writing target. Use their first name once in the opener and match the angle to their title and role family.
+            - If the audience profile source is protocol_task, the active or pending task contact wins for this protocol.
+            - If DECISION_MAKER_PROFILE also exists and it is a different person, treat it as supporting context only.
             - LinkedIn/about/work-history signals are research only. Never mention scraping, LinkedIn, or profile data in the email.
           19. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, utility territory, TDU, or contract timing details.
@@ -1019,8 +1034,10 @@ export default async function handler(req, res) {
       - Name: ${contact.name}
       - Company: ${contact.company}
       - Site: ${legacyPrimarySiteDetails.address || legacySiteCity || 'Unknown'}
+      - Site Rule: Use the service address or meter array as the operating site. Treat HQ as corporate context only unless the prompt explicitly says HQ is the site.
       - Utility Territory: ${legacyUtilityTerritory || 'Unknown'}
       - TDU: ${legacyTduDisplay || 'Unknown'}
+      - Regulated Territory: ${legacyTexasEnergy.isRegulated ? `yes (${legacyUtilityTerritory || legacyTexasEnergy.regulatedUtility || 'unknown'})` : 'no'}
       - Market Context: ${legacyMarketContext}
     ` : '';
 
@@ -1036,6 +1053,8 @@ export default async function handler(req, res) {
       - Highlight the financial variance, market volatility, or technical risk.
       - NO CITATIONS OR LINKS: Forbid external URLs or bracketed sources.
       - TEXAS/ERCOT SPECIFIC: Avoid UK or non-US energy market references.
+      - If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.
+      - If a service address, meter array, or operating site is present, use that as the location context. Treat HQ as corporate context only unless the prompt explicitly says HQ is the site.
       - Use plain English for energy costs. Never repeat the exact same phrasing for cost buckets across sends. Vary between: supply rate / energy rate / cost per kWh // delivery charges / demand charges / transmission costs / peak-usage billing. Do not force both cost buckets into every email; choose the one that fits the lane.
       
       INSTRUCTIONS:
