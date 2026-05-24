@@ -21,6 +21,8 @@ export function buildTaskVariableMap(context: TaskVariableContext): Record<strin
   const contactMeta = (contact.metadata || {}) as LooseObject;
   const accountMeta = (account.metadata || {}) as LooseObject;
   const accountGeneral = (accountMeta.general || {}) as LooseObject;
+  const contactEnergy = (contactMeta.energy || {}) as LooseObject;
+  const accountEnergy = (accountMeta.energy || {}) as LooseObject;
 
   const firstName = clean(contact.firstName) || clean(contactMeta.firstName) || clean(contactMeta.first_name);
   const lastName = clean(contact.lastName) || clean(contactMeta.lastName) || clean(contactMeta.last_name);
@@ -47,12 +49,12 @@ export function buildTaskVariableMap(context: TaskVariableContext): Record<strin
     clean(accountMeta.description) ||
     clean(contact.accountDescription);
 
-  const contactUtilityTerritory = clean(contact.utilityTerritory || contactMeta.utilityTerritory || contactMeta.energy?.utilityTerritory);
-  const accountUtilityTerritory = clean(account.utilityTerritory || accountMeta.utilityTerritory || accountMeta.energy?.utilityTerritory);
-  const contactMarketContext = clean(contact.marketContext || contactMeta.marketContext || contactMeta.energy?.marketContext);
-  const accountMarketContext = clean(account.marketContext || accountMeta.marketContext || accountMeta.energy?.marketContext);
-  const contactIsRegulated = Boolean(contact.isRegulated ?? contactMeta.isRegulated ?? contactMeta.energy?.isRegulated);
-  const accountIsRegulated = Boolean(account.isRegulated ?? accountMeta.isRegulated ?? accountMeta.energy?.isRegulated);
+  const contactUtilityTerritory = clean(contact.utilityTerritory || contactMeta.utilityTerritory || contactEnergy.utilityTerritory);
+  const accountUtilityTerritory = clean(account.utilityTerritory || accountMeta.utilityTerritory || accountEnergy.utilityTerritory);
+  const contactMarketContext = clean(contact.marketContext || contactMeta.marketContext || contactEnergy.marketContext);
+  const accountMarketContext = clean(account.marketContext || accountMeta.marketContext || accountEnergy.marketContext);
+  const contactIsRegulated = Boolean(contact.isRegulated ?? contactMeta.isRegulated ?? contactEnergy.isRegulated);
+  const accountIsRegulated = Boolean(account.isRegulated ?? accountMeta.isRegulated ?? accountEnergy.isRegulated);
 
   return {
     'contact.firstName': fallback(firstName),
