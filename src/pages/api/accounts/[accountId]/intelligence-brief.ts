@@ -673,6 +673,10 @@ function hasIndustrialSiteLogisticsSignals(text: string) {
   return /(site store management|expendable and consumable materials|petrochemical or energy plant|inventory management|warehouse management|materials and delivery tracking|transportation management|purchase order processing|electronic receiving|third party integrator|low dollar value,? high usage materials)/i.test(text)
 }
 
+function hasMaterialHandlingEquipmentSignals(text: string) {
+  return /(materials?\s+handling|forklifts?|fork\s*lifts?|komatsu|pallet (?:storage )?rack|racking systems?|interlake[-\s]?mecalux|aerial lifts?|jlg\b|scissor lifts?|boom lifts?|warehouse equipment|lift equipment|forklift charging|battery charging|conveyors?|hvls fans?|equipment service|parts and service|warehouse facilities|distribution centers?)/i.test(text)
+}
+
 function hasStrongDmeSignals(text: string) {
   return /(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/i.test(text)
 }
@@ -825,6 +829,9 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     return true
   }
   if (manufacturingSignals && (profile.industryCluster === 'retail' || profile.industryCluster === 'logistics') && !/(retail store|customer-facing retail|dealership|auto dealer|parts distributor|distribution network|warehouse)/i.test(accountText)) {
+    return true
+  }
+  if (hasMaterialHandlingEquipmentSignals(accountText) && (profile.industryCluster === 'manufacturing' || /manufacturing operation|production lines?|process equipment|compressed air|startup sequence/i.test(profileText))) {
     return true
   }
   if (hasFurnitureManufacturingSignals(accountText) && (profile.industryCluster === 'retail' || /retail business|retail store|showroom-only/i.test(profileText))) {
@@ -2229,6 +2236,7 @@ function buildStructuredIdentityProfile(
   const isFurnitureManufacturer = hasFurnitureManufacturingSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text)
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
+  const isMaterialHandlingEquipment = hasMaterialHandlingEquipmentSignals(text)
   const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
   const isConvenienceStore = hasConvenienceStoreSignals(text)
   const isGameRetailer = hasGameRetailSignals(text)
@@ -2415,6 +2423,16 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['wholesale auto parts', 'automotive parts supplier', 'aftermarket parts', 'parts stores', 'distribution centers', 'same-day parts', 'repair centers'], ['wholesale auto parts', 'parts supplier', 'distribution network'])
         powerKeywords = selectIdentityKeywords(text, ['branch traffic', 'inventory turns', 'warehouse support', 'delivery timing', 'HVAC', 'parts counter'], ['branch traffic', 'inventory turns', 'delivery timing'])
         talkTrackGuardrails = ['No dealership language', 'No showroom/service-bay language unless the source confirms it', 'No lot-lighting language']
+        break
+      }
+
+      if (isMaterialHandlingEquipment) {
+        companyType = multiSiteInfo.isMultiSite ? 'materials-handling equipment and service network' : 'materials-handling equipment supplier and service company'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location equipment sales, parts, and service footprint' : 'equipment sales, parts, and service operation'
+        facilityType = 'equipment sales / parts / service facility'
+        identityKeywords = selectIdentityKeywords(text, ['materials handling', 'forklifts', 'Komatsu forklifts', 'pallet storage rack', 'JLG aerial lift equipment', 'warehouse equipment', 'equipment service'], ['materials handling', 'forklifts', 'warehouse equipment'])
+        powerKeywords = selectIdentityKeywords(text, ['forklift charging', 'battery charging', 'service bays', 'parts areas', 'warehouse support', 'shop HVAC', 'HVLS fans'], ['forklift charging', 'service bays', 'parts areas'])
+        talkTrackGuardrails = ['No manufacturing language', 'No production-line language', 'No compressed-air/process-load language unless source confirms their own plant']
         break
       }
 
@@ -2994,6 +3012,9 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   if (/medical equipment|medical supply|durable medical equipment|\bdme\b/.test(identity) || /medical supplies|equipment maintenance|inventory storage/i.test(driverText)) {
     return `Often times for a medical supply operation, warehouse cooling, equipment service, inventory storage, and delivery timing can all push the bill in different ways.`
   }
+  if (/materials? handling|warehouse equipment|forklift|lift equipment|equipment supplier|equipment service/.test(identity) || /forklift|pallet rack|aerial lift|battery charging|equipment service|warehouse equipment/i.test(driverText)) {
+    return `Often times for a materials-handling equipment company, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter in the same busy window.`
+  }
   if (/cooling products|refrigeration and cooling|chiller|industrial refrigeration/.test(identity) || /chillers?|air handling units?|industrial package units/i.test(driverText)) {
     return `Often times for a cooling-equipment manufacturer, test areas, production equipment, compressors, and plant HVAC can all hit the meter during the same window.`
   }
@@ -3075,6 +3096,9 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
   }
   if (/medical supplies|equipment maintenance|inventory storage|delivery turnaround|warehouse climate/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether storage cooling, equipment service, or delivery activity is what moved the bill that month, or is that side of things pretty much handled?`
+  }
+  if (/forklift|pallet rack|aerial lift|battery charging|equipment service|warehouse equipment|materials? handling/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`
   }
   if (/chillers?|air handling units?|industrial package units|cooling products|test areas/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether testing, compressors, production equipment, or plant HVAC is what created the heavier bill, or is that side of things pretty much handled?`
@@ -3297,6 +3321,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/.test(text) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
+  if (hasMaterialHandlingEquipmentSignals(text)) return 'logistics'
   if (hasStrongCommercialRealEstateSignals(text)) return 'office_services'
   if (hasFurnitureManufacturingSignals(text)) return 'manufacturing'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
@@ -3369,6 +3394,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
+  if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
   if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
 
@@ -3904,6 +3930,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `Often times for a parts supply business, it's hard to catch when a single branch sets a high billing floor during a summer peak because the corporate view is too summarized.`,
           ],
           focus: ['parts branches', 'distribution centers', 'inventory turns', 'delivery timing', 'warehouse support', 'branch-level bill spikes'],
+        }
+      }
+
+      if (hasMaterialHandlingEquipmentSignals(text)) {
+        return {
+          label: 'Materials-handling equipment and service',
+          angle: 'Forklift charging, lift service, parts areas, warehouse support, shop HVAC, and customer equipment support shaping the bill.',
+          question: `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for materials-handling equipment companies, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter during the same busy window.`,
+            `Often times for forklift and warehouse-equipment suppliers, it's hard to tell whether the service side, parts area, or equipment charging is what actually moved the bill that month.`,
+            `Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup.`,
+          ],
+          focus: ['forklift charging', 'battery charging', 'lift service', 'parts areas', 'warehouse support', 'shop HVAC', 'warehouse equipment'],
         }
       }
 
@@ -5258,6 +5298,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountIsDme = hasStrongDmeSignals(accountText)
   const accountIsRestaurant = hasStrongRestaurantSignals(accountText)
   const accountIsLogistics = hasStrongLogisticsSignals(accountText)
+  const accountIsMaterialHandlingEquipment = hasMaterialHandlingEquipmentSignals(accountText)
   const accountIsPetrochemical = hasStrongPetrochemicalSignals(accountText)
   const accountIsOfficeServices = hasStrongOfficeServicesSignals(accountText)
   const accountIsSchool = hasStrongSchoolSignals(accountText)
@@ -5295,6 +5336,10 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution)\b/i.test(lower)
   const accountLogisticsManufacturingJargon = accountIsLogistics &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|process equipment|assembly)\b/i.test(lower)
+  const accountMaterialHandlingManufacturingJargon = accountIsMaterialHandlingEquipment &&
+    /\b(manufacturing operation|production lines?|process loads?|compressed air|machine startup|startup sequence|plant|factory)\b/i.test(lower)
+  const accountMaterialHandlingGenericLogisticsJargon = accountIsMaterialHandlingEquipment &&
+    /\b(distribution operation|logistics operation|warehouse group|freight|cargo|dock activity|dock doors?|storage climate control)\b/i.test(lower)
   const accountOfficeIndustrialJargon = accountIsOfficeServices &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
   const accountRetailIndustrialJargon = accountIsRetail &&
@@ -5319,7 +5364,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   })
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
 
-  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 
   if (needsRewrite) {
     console.warn('[Intelligence Brief Rewrite Validation] Rejected talk track:', {
@@ -5340,6 +5385,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
         schoolManufacturingJargon: schoolManufacturingJargon || accountSchoolManufacturingJargon,
         accountSchoolPracticeJargon,
         accountSchoolRetailJargon,
+        accountMaterialHandlingManufacturingJargon,
+        accountMaterialHandlingGenericLogisticsJargon,
         residentialRestaurantJargon,
         hotelEventSpaceJargon,
         unexplainedJargon,
@@ -5574,6 +5621,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidateText}`)
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const variantSeed = `${context.seed}|${attempt}`
   const signalLineBySignal: Record<SignalFamily, string[]> = {
@@ -5642,6 +5690,23 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const questionSentence = context.signalFamily === 'industry_context'
     ? (shouldUseStructuredContext ? context.briefingContext.questionFrame : fallbackQuestion)
     : (shouldUseStructuredContext ? context.briefingContext.questionFrame : context.question)
+
+  if (hasMaterialHandlingEquipmentSignals(accountText)) {
+    const materialHandlingProblems = [
+      `Often times for a materials-handling equipment company, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter in the same busy window.`,
+      `Often times for forklift and warehouse-equipment suppliers, the service side, parts area, equipment charging, and shop cooling can all move the bill differently.`,
+      `Often times with lift equipment and warehouse support, the bill can move from service timing and charging activity more than from a normal office setup.`,
+    ]
+    const materialHandlingQuestions = [
+      `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`,
+      `I'm curious, how do y'all separate the service side, parts area, and equipment charging on the bill, or is that side of things pretty much on autopilot?`,
+      `I'm curious, how do y'all keep track of whether the lift service work or equipment charging is what created the heavier bill, or is that pretty much handled?`,
+    ]
+    return buildTwoSentenceTalkTrack(
+      pickVariant(materialHandlingProblems, variantSeed) || materialHandlingProblems[0],
+      pickVariant(materialHandlingQuestions, variantSeed) || materialHandlingQuestions[0],
+    )
+  }
 
   return buildTwoSentenceTalkTrack(problemSentence, questionSentence)
 }
