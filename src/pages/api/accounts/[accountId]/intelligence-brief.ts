@@ -688,6 +688,10 @@ function hasIndustrialSiteLogisticsSignals(text: string) {
   return /(site store management|expendable and consumable materials|petrochemical or energy plant|inventory management|warehouse management|materials and delivery tracking|transportation management|purchase order processing|electronic receiving|third party integrator|low dollar value,? high usage materials)/i.test(text)
 }
 
+function hasPalletManagementSignals(text: string) {
+  return /(pallet management|pallet services?|pallet repair|pallet recycling|pallet retrieval|pallet sortation|pallet redistribution|total pallet management|reverse logistics|wood packaging|remanufactur(?:ing|ed)? pallets?)/i.test(text)
+}
+
 function hasMaterialHandlingEquipmentSignals(text: string) {
   return /(materials?\s+handling|forklifts?|fork\s*lifts?|komatsu|pallet (?:storage )?rack|racking systems?|interlake[-\s]?mecalux|aerial lifts?|jlg\b|scissor lifts?|boom lifts?|warehouse equipment|lift equipment|forklift charging|battery charging|hvls fans?)/i.test(text)
 }
@@ -783,6 +787,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const manufacturersRepSignals = hasStrongManufacturersRepSignals(accountText)
   const bakeryCafeSignals = hasStrongBakeryCafeSignals(accountText)
   const logisticsSignals = hasStrongLogisticsSignals(accountText)
+  const palletManagementSignals = hasPalletManagementSignals(accountText)
   const printFulfillmentSignals = hasPrintFulfillmentSignals(accountText)
   const publicTransitSignals = hasPublicTransitSignals(accountText)
   const movingStorageSignals = hasMovingStorageSignals(accountText)
@@ -862,6 +867,13 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
 
   if (logisticsSignals && /(healthcare|hospital|clinic|medical|behavioral health|mental health|patient care|counseling|therapy|crisis spaces?)/i.test(profileText)) {
     return true
+  }
+
+  if (palletManagementSignals) {
+    const palletProfile = /(pallet management|reverse logistics|pallet retrieval|pallet repair|pallet sortation|wood packaging|managed inventory)/i.test(profileText)
+    if (!palletProfile && /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment|warehouse|logistics|distribution)/i.test(profileText)) {
+      return true
+    }
   }
 
   if (printFulfillmentSignals && /(manufacturing|industrial manufacturing|plant|factory|heavy industrial|dock door timing|logistics \/ warehouse|distribution and logistics)/i.test(profileText)) {
@@ -2469,6 +2481,24 @@ function buildStructuredIdentityProfile(
       break
 
     case 'logistics':
+      if (hasPalletManagementSignals(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'pallet management and reverse logistics network' : 'pallet management and reverse logistics operation'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site pallet retrieval, repair, and sortation network' : 'pallet retrieval, repair, and sortation operation'
+        facilityType = 'pallet management / reverse logistics facility'
+        identityKeywords = selectIdentityKeywords(
+          text,
+          ['pallet management', 'reverse logistics', 'pallet retrieval', 'pallet repair', 'pallet recycling', 'pallet sortation', 'wood packaging', 'managed inventory'],
+          ['pallet management', 'reverse logistics', 'pallet retrieval']
+        )
+        powerKeywords = selectIdentityKeywords(
+          text,
+          ['pallet repair bays', 'sortation equipment', 'warehouse support', 'inventory cycles', 'yard lighting', 'dock activity'],
+          ['repair bays', 'sortation equipment', 'warehouse support']
+        )
+        talkTrackGuardrails = ['No manufacturing language', 'No factory language', 'No generic logistics language unless the source confirms it']
+        break
+      }
+
       if (isManufacturersRepAgency) {
         companyType = 'manufacturers representative agency'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-state sales and specification network' : 'office and showroom sales agency'
@@ -3156,6 +3186,14 @@ function extractStructuredBriefFacts(
     avoidAngles.add('generic manufacturing')
   }
 
+  addIf(/(pallet management|pallet services?|pallet repair|pallet recycling|pallet retrieval|pallet sortation|pallet redistribution|total pallet management|reverse logistics|wood packaging|remanufactur(?:ing|ed)? pallets?)/i, activities, ['pallet management services', 'reverse logistics', 'warehouse support'])
+  addIf(/(pallet management|pallet services?|pallet repair|pallet recycling|pallet retrieval|pallet sortation|pallet redistribution|total pallet management|reverse logistics|wood packaging|remanufactur(?:ing|ed)? pallets?)/i, equipment, ['pallet repair areas', 'sortation equipment', 'warehouse support'])
+  addIf(/(pallet management|pallet services?|pallet repair|pallet recycling|pallet retrieval|pallet sortation|pallet redistribution|total pallet management|reverse logistics|wood packaging|remanufactur(?:ing|ed)? pallets?)/i, energyDrivers, ['warehouse support', 'repair bays', 'inventory cycles'])
+  if (hasPalletManagementSignals(text)) {
+    avoidAngles.add('generic manufacturing')
+    avoidAngles.add('generic logistics')
+  }
+
   if (hasFrozenBakeryProductionSignals(text)) {
     ;['frozen bakery production', 'bakery manufacturing'].forEach((term) => activities.add(term))
     ;['mixing equipment', 'ovens', 'freezers', 'packaging lines', 'plant HVAC'].forEach((term) => equipment.add(term))
@@ -3191,6 +3229,11 @@ function extractStructuredBriefFacts(
   addIf(/manufactur|production|fabricat|assembly|plant/i, activities, ['production work'])
   addIf(/production lines?|process equipment|compressed air|motors?|packaging|assembly/i, equipment, ['production equipment', 'process equipment', 'plant HVAC'])
   addIf(/production lines?|process equipment|compressed air|motors?|packaging|assembly/i, energyDrivers, ['production equipment', 'process timing', 'plant HVAC'])
+  if (hasPalletManagementSignals(text)) {
+    ;['production work'].forEach((term) => activities.delete(term))
+    ;['production equipment', 'process equipment', 'plant HVAC'].forEach((term) => equipment.delete(term))
+    ;['production equipment', 'process timing', 'plant HVAC'].forEach((term) => energyDrivers.delete(term))
+  }
 
   const businessModel = cleanText(profile?.companyType || industryGuidance.label || account.industry || 'commercial account')
   const cleanList = (items: Set<string>, limit: number) => uniqueStrings(Array.from(items).map(simplifyTalkTrackLanguage), limit)
@@ -3247,6 +3290,9 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   }
   if (/medical equipment|medical supply|durable medical equipment|\bdme\b/.test(identity) || /medical supplies|equipment maintenance|inventory storage/i.test(driverText)) {
     return `Often times for a medical supply operation, warehouse cooling, equipment service, inventory storage, and delivery timing can all push the bill in different ways.`
+  }
+  if (/pallet management|pallet services?|pallet repair|pallet recycling|reverse logistics|wood packaging|total pallet management/.test(identity) || /pallet|reverse logistics|sortation|recycling|repair bays?|warehouse support/i.test(driverText)) {
+    return `Often times for a pallet management operation, pallet retrieval, repair, recycling, and warehouse support can all hit the meter in the same busy window.`
   }
   if (/materials? handling|warehouse equipment|forklift|lift equipment|equipment supplier|equipment service/.test(identity) || /forklift|pallet rack|aerial lift|battery charging|equipment service|warehouse equipment/i.test(driverText)) {
     return `Often times for a materials-handling equipment company, forklift charging, lift service, parts areas, warehouse support, and shop HVAC can all hit the meter in the same busy window.`
@@ -3584,6 +3630,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasPlasticsDistributionSignals(text)) return 'logistics'
   if (hasCraneSalesSupportSignals(text)) return 'logistics'
   if (hasIndustrialSiteLogisticsSignals(text)) return 'logistics'
+  if (hasPalletManagementSignals(text)) return 'logistics'
   if (hasMaritimePilotSignals(text)) return 'public_transit'
   if (hasReadyMixConcreteSignals(text)) return 'manufacturing'
   if (hasFiberglassConduitSignals(text)) return 'manufacturing'
@@ -4159,18 +4206,90 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
       
-      return {
-        label: 'Manufacturing operation',
-        angle: 'Machine startup timing and production ramps creating usage spikes that can stay on the bill.',
-        question: `I'm curious, how do y'all manage the startup sequence of your heavy machinery, or is that side of things pretty much on autopilot?`,
-        openers: [
-          `Often times in a manufacturing facility, it's hard to prevent heavy machine startups and process heating from hitting the meter at the same time because of production shift changes.`,
-          `Often times for an industrial plant, it's difficult to manage the demand spikes from compressors and motors without triggering a permanent demand ratchet floor because of constant operational needs.`,
-          `Often times for a manufacturer, it's hard to tell whether the main production line or the facility HVAC is setting the monthly peak because they share the same utility service.`,
-        ],
-        focus: ['startup sequences', 'production ramps', 'shift-driven peaks', 'billing floors', 'demand ratchets', 'transmission liability'],
-      }
+        return {
+          label: 'Manufacturing operation',
+          angle: 'Machine startup timing and production ramps creating usage spikes that can stay on the bill.',
+          question: `I'm curious, how do y'all manage the startup sequence of your heavy machinery, or is that side of things pretty much on autopilot?`,
+          openers: [
+            `Often times in a manufacturing facility, it's hard to prevent heavy machine startups and process heating from hitting the meter at the same time because of production shift changes.`,
+            `Often times for an industrial plant, it's difficult to manage the demand spikes from compressors and motors without triggering a permanent demand ratchet floor because of constant operational needs.`,
+            `Often times for a manufacturer, it's hard to tell whether the main production line or the facility HVAC is setting the monthly peak because they share the same utility service.`,
+          ],
+          focus: ['startup sequences', 'production ramps', 'shift-driven peaks', 'billing floors', 'demand ratchets', 'transmission liability'],
+        }
     case 'logistics':
+      if (hasPalletManagementSignals(text)) {
+        const palletMultiSite = detectMultiSiteScale(account, candidate)
+        if (palletMultiSite.isMultiSite && palletMultiSite.locationCount && palletMultiSite.locationCount >= 3) {
+          const locationDesc = palletMultiSite.locationCount >= 10
+            ? `${palletMultiSite.locationCount}+ facilities`
+            : `${palletMultiSite.locationCount} facilities`
+          const regionDesc = palletMultiSite.regions.length > 1
+            ? ` across ${palletMultiSite.regions.length} states`
+            : ''
+
+          return {
+            label: 'Pallet management and reverse logistics network',
+            angle: `Pallet retrieval, repair, recycling, sortation, inventory handling, and warehouse support across ${locationDesc}${regionDesc}.`,
+            question: `I'm curious, how do y'all tell which sites are carrying the biggest peaks, or is that side of things pretty much handled?`,
+            openers: [
+              `Often times for a pallet management network, pallet retrieval, repair, recycling, sortation, and warehouse support can all hit the meter during the same busy window.`,
+              `Often times for reverse-logistics operations, it's hard to tell whether the repair bays or the warehouse support side is what actually moved the bill that month.`,
+              `Often times with pallet services, the bill moves more from warehouse support and inventory cycles than from a standard office setup.`,
+            ],
+            focus: ['pallet retrieval', 'repair bays', 'sortation equipment', 'warehouse support', 'inventory cycles', 'reverse logistics'],
+          }
+        }
+
+        return {
+          label: 'Pallet management and reverse logistics',
+          angle: 'Pallet retrieval, repair, recycling, sortation, inventory handling, and warehouse support shaping the bill.',
+          question: `I'm curious, how do y'all tell which parts of the operation are driving the highest usage, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for a pallet management operation, pallet retrieval, repair, recycling, sortation, and warehouse support can all hit the meter during the same busy window.`,
+            `Often times for reverse-logistics work, it's hard to tell whether the repair bays or the warehouse support side is what actually moved the bill that month.`,
+            `Often times with pallet services, the bill moves more from warehouse support and inventory cycles than from a standard office setup.`,
+          ],
+          focus: ['pallet retrieval', 'repair bays', 'sortation equipment', 'warehouse support', 'inventory cycles', 'reverse logistics'],
+        }
+      }
+
+      if (hasPalletManagementSignals(text)) {
+        const palletMultiSite = detectMultiSiteScale(account, candidate)
+        if (palletMultiSite.isMultiSite && palletMultiSite.locationCount && palletMultiSite.locationCount >= 3) {
+          const locationDesc = palletMultiSite.locationCount >= 10
+            ? `${palletMultiSite.locationCount}+ facilities`
+            : `${palletMultiSite.locationCount} facilities`
+          const regionDesc = palletMultiSite.regions.length > 1
+            ? ` across ${palletMultiSite.regions.length} states`
+            : ''
+
+          return {
+            label: 'Pallet management and reverse logistics network',
+            angle: `Pallet retrieval, repair, recycling, sortation, inventory handling, and warehouse support across ${locationDesc}${regionDesc}.`,
+            question: `I'm curious, how do y'all tell which sites are carrying the biggest peaks, or is that side of things pretty much handled?`,
+            openers: [
+              `Often times for a pallet management network, pallet retrieval, repair, recycling, sortation, and warehouse support can all hit the meter during the same busy window.`,
+              `Often times for reverse-logistics operations, it's hard to tell whether the repair bays or the warehouse support side is what actually moved the bill that month.`,
+              `Often times with pallet services, the bill moves more from warehouse support and inventory cycles than from a standard office setup.`,
+            ],
+            focus: ['pallet retrieval', 'repair bays', 'sortation equipment', 'warehouse support', 'inventory cycles', 'reverse logistics'],
+          }
+        }
+
+        return {
+          label: 'Pallet management and reverse logistics',
+          angle: 'Pallet retrieval, repair, recycling, sortation, inventory handling, and warehouse support shaping the bill.',
+          question: `I'm curious, how do y'all tell which parts of the operation are driving the highest usage, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for a pallet management operation, pallet retrieval, repair, recycling, sortation, and warehouse support can all hit the meter during the same busy window.`,
+            `Often times for reverse-logistics work, it's hard to tell whether the repair bays or the warehouse support side is what actually moved the bill that month.`,
+            `Often times with pallet services, the bill moves more from warehouse support and inventory cycles than from a standard office setup.`,
+          ],
+          focus: ['pallet retrieval', 'repair bays', 'sortation equipment', 'warehouse support', 'inventory cycles', 'reverse logistics'],
+        }
+      }
+
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
       const logisticsAcquisitionHeavy = /\b(acquisition|acquisitions|acquired|rollup|distribution|building materials|wholesale|lumber|yards?|branches?)\b/i.test(text)
 
@@ -5376,6 +5495,7 @@ OPENER RULES (Exactly two sentences):
 - Greeting (for the first sentence) must use the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
 - If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
@@ -5773,11 +5893,14 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const city = cleanText(account.city)
   const state = cleanText(account.state)
   const descriptionText = getPublicAccountDescription(account)
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${descriptionText}`)
   const nonTexasDescriptor = !/\b(texas|tx|ercot|dfw|dallas|houston|austin|san antonio|fort worth|el paso|arlington|plano|irving|pasadena|spring|euless|weatherford|texarkana|colleyville)\b/i.test(descriptionText)
     && /\b(indiana|florida|california|new york|new jersey|ohio|illinois|alabama|georgia|tennessee|oklahoma|louisiana|arkansas|missouri|kansas|colorado|arizona|nevada)\b/i.test(descriptionText)
   const locationClause = nonTexasDescriptor
     ? ''
     : city && state ? `in ${city}` : state ? `in ${state}` : 'in Texas'
+  const multiSiteInfo = detectMultiSiteScale(account, null)
+  const palletManagementSignals = hasPalletManagementSignals(accountText)
   const profile = getAccountIdentityProfile(account)
   const companyType = cleanText(profile?.companyType || '')
   const facilityType = cleanText(profile?.facilityType || '')
@@ -5802,6 +5925,11 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const operationDescriptor = (() => {
     if (hasIndustrialSiteLogisticsSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))) {
       return `a petrochemical site-store logistics operation${locationClause ? ` ${locationClause}` : ''}`
+    }
+    if (palletManagementSignals) {
+      return `${multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount > 1
+        ? 'a pallet management and reverse-logistics network'
+        : 'a pallet management and reverse-logistics operation'}${locationClause ? ` ${locationClause}` : ''}`
     }
     if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
       const typeStr = companyType.toLowerCase()
@@ -5910,12 +6038,17 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
   return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
 }
 
-function openerNeedsRewrite(opener: string) {
+function openerNeedsRewrite(opener: string, account: AccountRow | null = null) {
   const text = cleanText(opener)
   if (!text) return true
+  const accountText = account
+    ? cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`)
+    : ''
+  const palletSignals = accountText ? hasPalletManagementSignals(accountText) : false
   return /\b(?:i'?ve been researching|i'?ve been doing some research on)\s+(?:an?|the)\b/i.test(text) ||
     /\bi came across\b[\s\S]{0,90}\bwhile looking at\b/i.test(text) ||
-    /\b(?:a|an)\s+(?:manufacturing operation|retail operation|logistics network|office-style footprint|commercial account)\b/i.test(text)
+    /\b(?:a|an)\s+(?:manufacturing operation|retail operation|logistics network|logistics and distribution operation|office-style footprint|commercial account)\b/i.test(text) ||
+    (palletSignals && !/\b(pallet|reverse logistics|pallet retrieval|pallet repair|pallet sortation)\b/i.test(text))
 }
 
 function splitTalkTrackSentences(value: string) {
@@ -6085,6 +6218,8 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/\b(performing|checking)\s+(security|site connection)\s+verification\b/i.test(t)) return true
   if (/\bsecurity service to protect against malicious bots\b/i.test(t)) return true
   if (/\brequires cookies to be enabled\b/i.test(t)) return true
+  if (/\bcookies?\b.*\b(computer|browser|experience|analytics|metrics|remember|customize|privacy)\b/i.test(t)) return true
+  if (/^this website stores cookies/i.test(t)) return true
   if (/\baudioeye\b/i.test(t)) return true
   if (/you don't have permission to access/i.test(t)) return true
 
@@ -6780,6 +6915,16 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     return shortenText(detail, 560)
   }
 
+  if (hasPalletManagementSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates a pallet management and reverse-logistics business serving warehouses, manufacturers, and distribution customers.`,
+      `The relevant operating pieces are pallet retrieval, repair, recycling, sortation, inventory handling, and warehouse support, not a generic production plant.`,
+      `The electricity angle is checking whether repair bays, warehouse support, and inventory cycles are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   if (hasIndustrialSiteLogisticsSignals(detailText)) {
     const detail = [
       verifiedFact,
@@ -6875,6 +7020,10 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
 
   if (hasIndustrialSiteLogisticsSignals(text)) {
     return `${companyName} Petrochemical Site-Store Logistics Operating Context`
+  }
+
+  if (hasPalletManagementSignals(text)) {
+    return `${companyName} Pallet Management and Reverse Logistics Operating Context`
   }
 
   if (/\bcoffee roasting|custom roasting|green beans|roasting equipment\b/i.test(text)) {
@@ -7518,6 +7667,7 @@ OPENER RULES (Exactly two sentences):
 - Greeting (for the first sentence) must use the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
 - If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 - Do NOT repeat words or phrases redundantly.
@@ -8303,7 +8453,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate)
       validated = {
         ...validated,
-        opener: openerNeedsRewrite(validated.opener || '') ? generatedOpener : cleanText(validated.opener),
+        opener: openerNeedsRewrite(validated.opener || '', briefingAccount) ? generatedOpener : cleanText(validated.opener),
       }
 
       validated = normalizeBriefSections(validated)
@@ -8320,21 +8470,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       intelligence_brief_last_refreshed_at: new Date().toISOString(),
     }
 
-    updatePayload.metadata = {
+    const nextMetadata = {
       ...getAccountMetadata(briefingAccount),
-      ...(identityProfile ? { intelligenceProfile: identityProfile } : {}),
-      intelligenceBriefingContext: talkTrackRewriteContext.briefingContext,
-      intelligenceAudienceProfile: audienceProfile ? {
-        source: audienceProfile.source,
-        sourceLabel: audienceProfile.sourceLabel,
-        contactId: audienceProfile.contactId,
-        contactName: audienceProfile.contactName,
-        contactFirstName: audienceProfile.contactFirstName,
-        contactTitle: audienceProfile.contactTitle,
-        roleFamily: audienceProfile.roleFamily,
-        roleSummary: audienceProfile.roleSummary,
-      } : null,
     }
+    if (identityProfile) {
+      nextMetadata.intelligenceProfile = identityProfile
+    } else {
+      delete (nextMetadata as Record<string, unknown>).intelligenceProfile
+    }
+    nextMetadata.intelligenceBriefingContext = talkTrackRewriteContext.briefingContext
+    nextMetadata.intelligenceAudienceProfile = audienceProfile ? {
+      source: audienceProfile.source,
+      sourceLabel: audienceProfile.sourceLabel,
+      contactId: audienceProfile.contactId,
+      contactName: audienceProfile.contactName,
+      contactFirstName: audienceProfile.contactFirstName,
+      contactTitle: audienceProfile.contactTitle,
+      roleFamily: audienceProfile.roleFamily,
+      roleSummary: audienceProfile.roleSummary,
+    } : null
+    updatePayload.metadata = nextMetadata
 
     if (validated) {
       updatePayload.intelligence_brief_headline = validated.signal_headline
