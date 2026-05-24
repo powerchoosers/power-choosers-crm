@@ -237,7 +237,7 @@ export function TargetSearchPanel({ listId, listName, listKind }: TargetSearchPa
                         )}
                         {account.industry && (
                           <div className="text-[10px] text-zinc-600 truncate mt-0.5">
-                            {[account.location || [account.city, account.state].filter(Boolean).join(', '), account.industry].filter(Boolean).join(' · ')}
+                            {[account.contractEnd || null, account.location || [account.city, account.state].filter(Boolean).join(', '), account.industry].filter(Boolean).join(' · ')}
                           </div>
                         )}
                       </div>

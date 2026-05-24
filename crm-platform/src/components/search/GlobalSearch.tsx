@@ -3,8 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Search, X, Building2, Users, Plus, Sparkles, Loader2, GitMerge, CheckCircle2, Phone, Mail, Radar } from 'lucide-react'
 import { ForensicClose } from '@/components/ui/ForensicClose'
-import { useSearchContacts } from '@/hooks/useContacts'
-import { useSearchAccounts } from '@/hooks/useAccounts'
+import { useSearchContacts, useContactsCount } from '@/hooks/useContacts'
+import { useSearchAccounts, useAccountsCount } from '@/hooks/useAccounts'
 import { useSearchProtocols, type Protocol } from '@/hooks/useProtocols'
 import { useSearchTasks } from '@/hooks/useTasks'
 import { useSearchCalls } from '@/hooks/useCalls'
@@ -37,6 +37,8 @@ export function GlobalSearch() {
 
   const { data: filteredContacts = [], isLoading: isSearchingContacts } = useSearchContacts(debouncedQuery)
   const { data: filteredAccounts = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedQuery)
+  const { data: contactCount, isLoading: isCountingContacts } = useContactsCount(debouncedQuery, undefined, undefined, debouncedQuery.trim().length >= 2)
+  const { data: accountCount, isLoading: isCountingAccounts } = useAccountsCount(debouncedQuery, undefined, undefined, debouncedQuery.trim().length >= 2)
   const { data: filteredProtocols = [], isLoading: isSearchingProtocols } = useSearchProtocols(debouncedQuery)
   const { data: filteredTargets = [], isLoading: isSearchingTargets } = useSearchTargets(debouncedQuery)
   const { data: filteredTasks = [], isLoading: isSearchingTasks } = useSearchTasks(debouncedQuery)
@@ -78,6 +80,8 @@ export function GlobalSearch() {
     (filteredEmails?.length || 0) > 0
   const shouldShowResults = query.length >= 2
   const shouldShowSkeletons = shouldShowResults && isSearching && !hasResults
+  const contactTotal = contactCount ?? filteredContacts.length
+  const accountTotal = accountCount ?? filteredAccounts.length
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -201,7 +205,9 @@ export function GlobalSearch() {
                     <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex items-center justify-between gap-3">
                       <span>People</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredContacts.length} found</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">
+                          {isCountingContacts ? '...' : `${contactTotal} found`}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleViewAll('/network/people')}
@@ -246,7 +252,9 @@ export function GlobalSearch() {
                     <div className="text-xs font-semibold text-zinc-500 px-3 py-2 uppercase tracking-wider flex items-center justify-between gap-3">
                       <span>Accounts</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">{filteredAccounts.length} found</span>
+                        <span className="text-[10px] bg-white/5 px-1.5 py-0.5 rounded text-zinc-400">
+                          {isCountingAccounts ? '...' : `${accountTotal} found`}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleViewAll('/network/accounts')}
@@ -275,6 +283,7 @@ export function GlobalSearch() {
                             <div className="text-xs text-zinc-500 truncate">
                               {[
                                 isPhoneQuery ? ((account as any).companyPhone || '') : null,
+                                account.contractEnd || null,
                                 account.location || [account.city, account.state].filter(Boolean).join(', '),
                                 account.industry,
                               ].filter(Boolean).join(' · ') || 'Account'}
