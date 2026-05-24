@@ -592,7 +592,7 @@ function buildReplyStageDirective(stage: string): string {
         first_touch: [
             '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
             '- Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
-            '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = equipment timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship, comfort, reliability, or predictability.',
+            '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = equipment timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; school/church/nonprofit = stewardship, predictability, campus overhead, or reliability; healthcare/blood center/clinic = refrigerated storage, lab processing, donor collection, or clinical uptime; dental = practice flow, operatories, imaging, sterilization, and keeping the office comfortable.',
             '- Keep the opener and the talk track separate. The opener is one permission-based sentence that sounds natural. The talk track is separate and should not repeat the opener word-for-word.',
             '- If you write a talk track, keep it to 2 sentences max: sentence 1 = a specific problem or observation, sentence 2 = a plain question.',
             '- Write to the company\'s actual business model. If the account is a hotel owner, school district, hospital, clinic, restaurant, manufacturer, distributor, or pallet-management network, stay in that lane and do not drift into generic industry filler.',
@@ -678,8 +678,8 @@ function pickValueLane(member: any): string {
         return 'operatories, imaging, sterilization, patient flow, and keeping the office comfortable';
     }
 
-    if (/(health|clinic|medical|home health|healthcare)/.test(combined)) {
-        return 'reliability, comfort cooling, and steady daily operating hours';
+    if (/(blood|blood center|blood bank|hospital|clinic|medical|home health|healthcare)/.test(combined)) {
+        return 'refrigerated storage, lab processing, donor collection, and clinical uptime';
     }
 
     if (/(cold storage|refrigerat|warehouse|logistics|distribution|freight|3pl)/.test(combined)) {
