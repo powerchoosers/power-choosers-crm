@@ -629,7 +629,7 @@ function hasStrongDentalSignals(text: string) {
 }
 
 function hasStrongAutomotiveSignals(text: string) {
-  return /\b(auto group|automotive|dealerships?|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|showrooms?|showroom|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text)
+  return /\b(auto group|automotive|dealerships?|car dealer|auto dealer|vehicle inventory|service bays?|service department|parts department|parts store|certified pre-owned|new vehicles?|used vehicles?|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text) || /\b(?:car|auto|vehicle)\s+showrooms?\b/i.test(text) || /\b(?:pre-owned\s+(?:cars?|vehicles?|trucks?))\b/i.test(text)
 }
 
 function hasStrongRetailStoreSignals(text: string) {
@@ -669,7 +669,7 @@ function hasMovingStorageSignals(text: string) {
 }
 
 function hasReadyMixConcreteSignals(text: string) {
-  return /(ready[-\s]?mixed concrete|ready mix concrete|concrete batch(?:ing)?|batch plants?|concrete plants?|aggregate products?|construction aggregates?|crushed stone|sand and gravel|volumetric mixer|mixer trucks?|concrete delivery|cementitious|asphalt and ready[-\s]?mixed concrete)/i.test(text)
+  return /(ready[-\s]?mix(?:ed)? concrete|concrete batch(?:ing)?|batch plants?|concrete plants?|aggregate products?|construction aggregates?|crushed stone|sand and gravel|volumetric mixer|mixer trucks?|concrete delivery|cementitious|asphalt and ready[-\s]?mix(?:ed)? concrete)/i.test(text)
 }
 
 function hasFiberglassConduitSignals(text: string) {
@@ -738,7 +738,7 @@ function hasStrongSchoolSignals(text: string) {
 }
 
 function hasStrongAutomotiveDealerSignals(text: string) {
-  return /\b(dealerships?|car dealer|auto dealer|vehicle inventory|showrooms?|certified pre-owned|new vehicles?|used vehicles?|pre-owned|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text)
+  return /\b(dealerships?|car dealer|auto dealer|vehicle inventory|certified pre-owned|new vehicles?|used vehicles?|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text) || /\b(?:car|auto|vehicle)\s+showrooms?\b/i.test(text) || /\b(?:pre-owned\s+(?:cars?|vehicles?|trucks?))\b/i.test(text)
 }
 
 function getIndefiniteArticle(word: string): string {
@@ -778,6 +778,14 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   const schoolSignals = hasStrongSchoolSignals(accountText)
 
   if (hasPlasticsDistributionSignals(accountText) && /(food production|refrigeration|cooking lines?|sanitation|restaurant|bakery|manufacturing operation)/i.test(profileText)) {
+    return true
+  }
+
+  if (hasReadyMixConcreteSignals(accountText) && (profile.industryCluster === 'logistics' || profile.industryCluster === 'retail' || /(logistics|warehouse|distribution|retail)/i.test(profileText))) {
+    return true
+  }
+
+  if (hasFiberglassConduitSignals(accountText) && (profile.industryCluster === 'logistics' || profile.industryCluster === 'retail' || /(logistics|warehouse|distribution|retail)/i.test(profileText))) {
     return true
   }
 
@@ -3091,20 +3099,46 @@ function extractStructuredBriefFacts(
   }
 
   addIf(/harbor pilots?|houston pilots?|ship handlers?|(?:marine|maritime|cargo|shipping|naval|ocean-going|waterborne) vessels?|waterway|ship channel|pilot boat|marine pilot|maritime pilots?/i, activities, ['maritime pilot operations', 'dispatch and support operations'])
-  addIf(/pilot boat|dispatch|marine operations|ship channel|support buildings/i, equipment, ['dispatch systems', 'support buildings', 'boat operations'])
-  addIf(/pilot boat|dispatch|marine operations|support buildings|ship channel/i, energyDrivers, ['dispatch systems', 'support-building HVAC', 'marine operations support'])
+  addIf(/pilot boat|\bdispatch\b|marine operations|ship channel|support buildings/i, equipment, ['dispatch systems', 'support buildings', 'boat operations'])
+  addIf(/pilot boat|\bdispatch\b|marine operations|support buildings|ship channel/i, energyDrivers, ['dispatch systems', 'support-building HVAC', 'marine operations support'])
   if (hasMaritimePilotSignals(text)) {
     avoidAngles.add('warehouse distribution')
     avoidAngles.add('materials handling')
+  }
+
+  addIf(/(ready[-\s]?mix(?:ed)? concrete|concrete batch(?:ing)?|batch plants?|mixer trucks?)/i, activities, ['ready-mix concrete production', 'concrete delivery', 'batch plant operations'])
+  addIf(/(ready[-\s]?mix(?:ed)? concrete|concrete batch(?:ing)?|batch plants?|mixer trucks?)/i, equipment, ['batching equipment', 'mixer trucks', 'aggregate handling systems', 'washout/reclaim systems'])
+  addIf(/(ready[-\s]?mix(?:ed)? concrete|concrete batch(?:ing)?|batch plants?|mixer trucks?)/i, energyDrivers, ['batching equipment', 'aggregate handling', 'mixer truck dispatch', 'yard lighting'])
+  if (hasReadyMixConcreteSignals(text)) {
+    avoidAngles.add('generic logistics')
+    avoidAngles.add('generic manufacturing')
+  }
+
+  addIf(/(fiberglass conduit|fiberglass strut|epoxy fiberglass|curing ovens?)/i, activities, ['fiberglass conduit manufacturing', 'infrastructure product manufacturing'])
+  addIf(/(fiberglass conduit|fiberglass strut|epoxy fiberglass|curing ovens?)/i, equipment, ['winding equipment', 'curing ovens', 'resin process areas', 'plant HVAC'])
+  addIf(/(fiberglass conduit|fiberglass strut|epoxy fiberglass|curing ovens?)/i, energyDrivers, ['winding equipment', 'curing ovens', 'finishing operations'])
+  if (hasFiberglassConduitSignals(text)) {
+    avoidAngles.add('generic manufacturing')
+    avoidAngles.add('food production')
+  }
+
+  addIf(/(site store management|inventory management|petrochemical or energy plant support)/i, activities, ['site-store logistics', 'inventory management', 'receiving operations'])
+  addIf(/(site store management|inventory management|petrochemical or energy plant support)/i, equipment, ['site store facilities', 'receiving systems', 'materials tracking systems'])
+  addIf(/(site store management|inventory management|petrochemical or energy plant support)/i, energyDrivers, ['site-store HVAC', 'inventory handling', 'receiving timing'])
+  if (hasIndustrialSiteLogisticsSignals(text)) {
+    avoidAngles.add('generic logistics')
+    avoidAngles.add('generic manufacturing')
   }
 
   addIf(/restaurant|barbe?cue|bbq|smokers?|kitchen|fryers?|grills?|dining|cafe|café|bar\b|eatery/i, activities, ['restaurant service', 'kitchen prep'])
   addIf(/smokers?|fryers?|grills?|restaurant|barbe?cue|bbq|kitchen|dining|ice machines?/i, equipment, ['kitchen equipment', 'refrigeration', 'customer cooling'])
   addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
 
-  addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
-  addIf(/service bays?|lifts?|compressors?|showroom|lot lighting|parts department/i, equipment, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
-  addIf(/service bays?|showroom ac|lot lighting|parts department/i, energyDrivers, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
+  if (hasStrongAutomotiveSignals(text) || hasStrongAutomotiveDealerSignals(text)) {
+    addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
+    addIf(/service bays?|lifts?|compressors?|showroom|lot lighting|parts department/i, equipment, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
+    addIf(/service bays?|showroom ac|lot lighting|parts department/i, energyDrivers, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
+  }
 
   addIf(/clinic|medical practice|dental|operatories|imaging|lab|patient/i, activities, ['patient care', 'clinical operations'])
   addIf(/operatories|imaging|lab|treatment rooms?|sterilization|patient rooms?/i, equipment, ['treatment rooms', 'clinical equipment', 'patient-hour HVAC'])
@@ -3253,7 +3287,7 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side of things pretty much on autopilot?`
   }
 
-  if (/lot lighting|service bays?|vehicle inventory|showroom/i.test(driverText)) {
+  if (/service bays?|vehicle inventory|lot lighting/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether the service bays, showroom AC, parts area, or lot lighting is what pushed the bill, or is that side of things pretty much handled?`
   }
   if (/medical supplies|equipment maintenance|inventory storage|delivery turnaround|warehouse climate/i.test(driverText)) {
@@ -3497,6 +3531,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   const text = cleanText(`${account.industry || ''} ${account.name || ''} ${getPublicAccountDescription(account)} ${notes} ${cleanCandidate?.title || ''} ${cleanCandidate?.snippet || ''}`).toLowerCase()
   const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
+  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/i.test(text) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(text)) return 'religious'
   // Energy brokers and consultants — do not classify as any operational cluster
   if (isCompetitorEnergyBroker(account)) return 'office_services'
   if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
@@ -3508,7 +3543,10 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasMaterialHandlingEquipmentSignals(text)) return 'logistics'
   if (hasPlasticsDistributionSignals(text)) return 'logistics'
   if (hasCraneSalesSupportSignals(text)) return 'logistics'
+  if (hasIndustrialSiteLogisticsSignals(text)) return 'logistics'
   if (hasMaritimePilotSignals(text)) return 'public_transit'
+  if (hasReadyMixConcreteSignals(text)) return 'manufacturing'
+  if (hasFiberglassConduitSignals(text)) return 'manufacturing'
   if (hasStrongCommercialRealEstateSignals(text)) return 'office_services'
   if (hasFurnitureManufacturingSignals(text)) return 'manufacturing'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
@@ -3570,12 +3608,15 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
+  if (/(church|synagogue|mosque|congregation|parish|worship|ministry|religious|faith)/i.test(coreText) || /\btemples?\b(?!\s*(?:,\s*)?(?:tx|texas)\b)/i.test(coreText)) return 'religious'
   if (/(hospital|medical center|regional hospital|health system|emergency room|acute care)/i.test(coreText)) return 'healthcare'
   if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/i.test(coreText)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/i.test(coreText)) return 'education_nonprofit'
   if (hasStrongCommercialRealEstateSignals(coreText)) return 'office_services'
   if (hasFurnitureManufacturingSignals(coreText)) return 'manufacturing'
+  if (hasReadyMixConcreteSignals(coreText)) return 'manufacturing'
+  if (hasFiberglassConduitSignals(coreText)) return 'manufacturing'
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/i.test(coreText) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/i.test(coreText)) return 'manufacturing'
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
@@ -3585,6 +3626,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
   if (hasPlasticsDistributionSignals(coreText)) return 'logistics'
   if (hasCraneSalesSupportSignals(coreText)) return 'logistics'
+  if (hasIndustrialSiteLogisticsSignals(coreText)) return 'logistics'
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
   if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
 
@@ -5999,6 +6041,8 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (/\b(performing|checking)\s+(security|site connection)\s+verification\b/i.test(t)) return true
   if (/\bsecurity service to protect against malicious bots\b/i.test(t)) return true
   if (/\brequires cookies to be enabled\b/i.test(t)) return true
+  if (/\baudioeye\b/i.test(t)) return true
+  if (/you don't have permission to access/i.test(t)) return true
 
   // Pure homepage title patterns
   if (/^home\s*[-|–]\s*/i.test(t)) return true
