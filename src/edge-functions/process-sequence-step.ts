@@ -346,13 +346,15 @@ function buildExecutionPromptOverlay({
     decisionMakerProfileBlock?: string
     sequenceHistoryBlock?: string
 }): string {
-    const lines = [
-        'EXECUTION OVERLAY:',
-        hasBrief
-            ? '1. If a usable intelligence brief exists, that brief is the main reason for the note. Start from the event, operating fact, or business question in the brief before generic industry language.'
-            : '1. If no usable intelligence brief exists, use one concrete operating fact from the company description, notes, location, or related-company context.',
-        '2. The first sentence should prove you know what the company actually does.',
-        '3. Do not default to stock wording like "site cost check", "rate timing", or "short note" unless the line still sounds natural and specific to this account.',
+        const lines = [
+            'EXECUTION OVERLAY:',
+            hasBrief
+                ? '1. If a usable intelligence brief exists, that brief is the main reason for the note. Start from the event, operating fact, or business question in the brief before generic industry language.'
+                : '1. If no usable intelligence brief exists, use one concrete operating fact from the company description, notes, location, or related-company context.',
+            '2. The opener and the talk track are different jobs. The opener is one permission-based sentence that sounds natural. The talk track is separate and should not repeat the opener word-for-word.',
+            '2A. If you write a talk track, keep it to 2 sentences max: sentence 1 = a specific problem or observation, sentence 2 = a plain question.',
+            '2B. Write to the company\'s actual business model. If the account is a hotel owner, school district, hospital, clinic, restaurant, manufacturer, distributor, or pallet-management network, stay in that lane and do not drift into generic industry filler.',
+            '3. Do not default to stock wording or generic industry filler unless the line still sounds natural and specific to this account.',
         organizationRole === 'subsidiary'
             ? '4. This account is a subsidiary or operating brand. Write to the operating company first and mention the parent once at most if it helps orientation.'
             : organizationRole === 'parent'
@@ -591,6 +593,9 @@ function buildReplyStageDirective(stage: string): string {
             '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
             '- Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
             '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = equipment timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship, comfort, reliability, or predictability.',
+            '- Keep the opener and the talk track separate. The opener is one permission-based sentence that sounds natural. The talk track is separate and should not repeat the opener word-for-word.',
+            '- If you write a talk track, keep it to 2 sentences max: sentence 1 = a specific problem or observation, sentence 2 = a plain question.',
+            '- Write to the company\'s actual business model. If the account is a hotel owner, school district, hospital, clinic, restaurant, manufacturer, distributor, or pallet-management network, stay in that lane and do not drift into generic industry filler.',
             '- Do not choose delivery charges or demand charges unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
             '- Start with one concrete company, role, city, operating, or event fact.',
             '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short note, a plain yes/no reply, a routing reply, or a plain comparison.',
