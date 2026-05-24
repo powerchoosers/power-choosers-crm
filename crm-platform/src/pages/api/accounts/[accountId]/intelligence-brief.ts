@@ -3556,6 +3556,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
       return 'energy_intensive'
     }
   }
+  // Core manufacturing signals — must come before healthcare and other services to prevent manufacturers serving clinics/hospitals from drifting
+  if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
+
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (hasPublicTransitSignals(text)) return 'public_transit'
   if (hasPrintFulfillmentSignals(text)) return 'print_fulfillment'
@@ -3574,8 +3577,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b)/.test(text) &&
       !/(manufactur|fabricat|weld|metal|steel|machine|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
-  // Core manufacturing signals — must come before logistics to prevent metal fabricators / crane makers from being classed as logistics
-  if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
+  // Core manufacturing signals were moved to higher priority position above healthcare
   if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
   if (/(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/.test(text)) return 'logistics'
   // Tile / flooring / surface distributors — showroom + distribution, NOT manufacturing
@@ -3585,7 +3587,9 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   // Logistics check — exclude accounts that are primarily manufacturers (have fabrication/welding/industrial signals)
   if (/(building materials|lumber|wholesale distribution|specialty building materials|\bdistributor\b|distribution center|distribution centers|distribution network|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|\bfreight\b|nvo?cc|\btrucking\b|supply chain|\btransport\b|\bshipping\b|\bcargo\b|auto logistics|freight forwarder)/.test(text) &&
       !/(manufactur|fabricat|weld|foundry|machine shop|precision metal|metal fabricat|industrial compressor|compressed air)/.test(text)) return 'logistics'
-  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
+  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) &&
+      (!/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text) ||
+       /(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text))) return 'manufacturing'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
