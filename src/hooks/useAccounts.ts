@@ -165,7 +165,7 @@ export interface AccountFilters {
 }
 
 const PAGE_SIZE = 50
-const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url, phone'
+const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, website, logo_url, phone, city, state, address, zip'
 const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
 const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_opener, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
@@ -312,11 +312,12 @@ export function useSearchAccounts(queryTerm: string) {
   return useQuery({
     queryKey: ['accounts-search', queryTerm, user?.id ?? user?.email ?? 'guest', role ?? 'unknown'],
     queryFn: async () => {
-      if (!queryTerm || queryTerm.length < 2) return []
+      const searchTerm = String(queryTerm).trim()
+      if (searchTerm.length < 2) return []
       if (loading || !user) return []
 
       try {
-        const searchDigits = normalizeSearchPhoneDigits(queryTerm)
+        const searchDigits = normalizeSearchPhoneDigits(searchTerm)
         const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
         let query = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT);
 
@@ -325,7 +326,7 @@ export function useSearchAccounts(queryTerm: string) {
           query = query.in('ownerId', ownerScopeValues);
         }
 
-        query = query.or(`name.ilike.%${queryTerm}%,domain.ilike.%${queryTerm}%,industry.ilike.%${queryTerm}%`);
+        query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%`);
 
         const { data, error } = await query.limit(10);
 
@@ -364,14 +365,7 @@ export function useSearchAccounts(queryTerm: string) {
           }
         }
 
-        return Array.from(byId.values()).slice(0, 10).map(item => ({
-          id: item.id,
-          name: item.name || 'Unknown Account',
-          industry: item.industry || '',
-          domain: item.domain || '',
-          logoUrl: item.logo_url || '',
-          companyPhone: item.phone || '',
-        }));
+        return Array.from(byId.values()).slice(0, 10).map(item => mapAccountRow(item));
       } catch (error: any) {
         if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
           return [];
@@ -408,7 +402,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             p_list_id: listId,
             p_limit: PAGE_SIZE,
             p_offset: from,
-            p_search: searchQuery ?? null,
+            p_search: searchQuery?.trim() || null,
             p_industries: industryTerms.length > 0 ? industryTerms : null,
             p_statuses: statusTerms.length > 0 ? statusTerms : null,
             p_locations: locationTerms.length > 0 ? locationTerms : null,
@@ -438,7 +432,10 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         }
 
         if (searchQuery) {
-          query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+          const searchTerm = searchQuery.trim()
+          if (searchTerm) {
+            query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+          }
         }
 
         // Apply column filters
@@ -452,7 +449,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           }
         }
         if (locationTerms.length > 0) {
-          const locConditions = locationTerms.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+          const locConditions = locationTerms.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%,zip.ilike.%${loc}%`).join(',');
           query = query.or(locConditions);
         }
 
@@ -645,7 +642,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         const { data: countData, error: countError } = await supabase
           .rpc('get_accounts_count_by_list', {
             p_list_id: listId,
-            p_search: searchQuery ?? null,
+            p_search: searchQuery?.trim() || null,
             p_industries: industryTerms.length > 0 ? industryTerms : null,
             p_statuses: statusTerms.length > 0 ? statusTerms : null,
             p_locations: locationTerms.length > 0 ? locationTerms : null,
@@ -666,7 +663,10 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       }
 
       if (searchQuery) {
-        query = query.or(`name.ilike.%${searchQuery}%,domain.ilike.%${searchQuery}%,industry.ilike.%${searchQuery}%`);
+        const searchTerm = searchQuery.trim()
+        if (searchTerm) {
+          query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+        }
       }
 
       // Apply column filters
@@ -680,7 +680,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         }
       }
       if (filters?.location && filters.location.length > 0) {
-        const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+        const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%,zip.ilike.%${loc}%`).join(',');
         query = query.or(locConditions);
       }
 
