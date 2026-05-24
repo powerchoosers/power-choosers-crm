@@ -298,6 +298,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
         lens: 'CONNECTION LENS: Keep it low-pressure, confirm how they think about the bill, and get them talking instead of defending.',
         questions: [
           `Just so I’m not making assumptions, when does y'all's current electricity contract come up, or is that date not really on the radar yet?`,
+          `On average, rates typically go up 5-10 percent every year. Do you have any idea what they’re making y'all pay per kWh lately?`,
           `When y'all signed the current agreement for ${company}, was the focus mostly the rate, or did anyone look at how ${primaryDriver} and ${secondaryDriver} could move the full bill?`,
           `I know y'all are running a tight ship at ${company}. How does your team usually catch a weird bill month, or does it usually just get processed and moved on?`,
         ]
@@ -307,6 +308,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
         label: '02 DISRUPTION',
         lens: 'DISRUPTION LENS: Tie their real daily operation to the bill without turning it into a technical lecture.',
         questions: [
+          `What does a normal monthly electric bill look like for ${company} these days, roughly speaking?`,
           `What’s been your experience budgeting the summer bills for ${facility} in ${locationName}? Does it stay pretty predictable, or do certain months come in heavier than expected?`,
           `When ${primaryDriver} and ${secondaryDriver} are both running hard, does anyone know how that shows up on the bill, or is that not something the invoice makes easy to see?`,
           `What was the thinking behind the contract structure y'all have now? Was it built around ${opModel}, or was it more of a standard agreement?`,
