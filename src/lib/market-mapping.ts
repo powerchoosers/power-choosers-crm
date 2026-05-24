@@ -11,6 +11,31 @@ export const ERCOT_ZONES = {
 
 export type ErcotZone = typeof ERCOT_ZONES[keyof typeof ERCOT_ZONES];
 
+function normalizeLocationText(value?: string): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_/]+/g, ' ')
+    .replace(/&/g, 'and')
+    .replace(/’/g, "'")
+    .replace(/‘/g, "'")
+    .replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function containsWholePhrase(text: string, phrase: string): boolean {
+  const normalizedText = normalizeLocationText(text);
+  const normalizedPhrase = normalizeLocationText(phrase);
+  if (!normalizedText || !normalizedPhrase) return false;
+  const escaped = normalizedPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(^|\\s)${escaped}(?=$|\\s)`).test(normalizedText);
+}
+
+function matchesAnyPhrase(text: string, phrases: string[]): boolean {
+  return phrases.some((phrase) => containsWholePhrase(text, phrase));
+}
+
 // City definitions for easier management
 const CITIES_HOUSTON = [
   'houston', 'katy', 'sugar land', 'the woodlands', 'conroe', 'cypress', 'humble',
@@ -62,27 +87,27 @@ const CITIES_NORTH = [
  * Primarily focused on Texas cities.
  */
 export function mapLocationToZone(city?: string, state?: string, rawLocation?: string): ErcotZone {
-  const c = city?.toLowerCase().trim() || '';
-  const s = state?.toLowerCase().trim() || '';
-  const r = rawLocation?.toLowerCase().trim() || '';
+  const c = normalizeLocationText(city);
+  const s = normalizeLocationText(state);
+  const r = normalizeLocationText(rawLocation);
 
   // If state is not Texas, default to North (most generic) or handle accordingly
-  if (s && s !== 'tx' && s !== 'texas' && !r.includes('tx') && !r.includes('texas')) {
+  if (s && s !== 'tx' && s !== 'texas' && !containsWholePhrase(r, 'tx') && !containsWholePhrase(r, 'texas')) {
     return ERCOT_ZONES.NORTH;
   }
 
   // Check Houston
-  if (CITIES_HOUSTON.some(city => c.includes(city)) || r.includes('houston') || r.includes('lz_houston')) {
+  if (matchesAnyPhrase(c, CITIES_HOUSTON) || containsWholePhrase(r, 'houston') || containsWholePhrase(r, 'lz houston')) {
     return ERCOT_ZONES.HOUSTON;
   }
 
   // Check West
-  if (CITIES_WEST.some(city => c.includes(city)) || r.includes('west') || r.includes('lz_west')) {
+  if (matchesAnyPhrase(c, CITIES_WEST) || containsWholePhrase(r, 'west') || containsWholePhrase(r, 'lz west')) {
     return ERCOT_ZONES.WEST;
   }
 
   // Check South
-  if (CITIES_SOUTH.some(city => c.includes(city)) || r.includes('south') || r.includes('lz_south')) {
+  if (matchesAnyPhrase(c, CITIES_SOUTH) || containsWholePhrase(r, 'south') || containsWholePhrase(r, 'lz south')) {
     return ERCOT_ZONES.SOUTH;
   }
 

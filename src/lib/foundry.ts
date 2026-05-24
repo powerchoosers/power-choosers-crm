@@ -29,6 +29,9 @@ export interface ContactVariableSource {
   currentRate?: string | null
   contractEnd?: string | null
   accountDescription?: string | null
+  utilityTerritory?: string | null
+  marketContext?: string | null
+  isRegulated?: boolean | null
   metadata?: { general?: { company?: string }; energy?: { loadZone?: string } } | null
 }
 
@@ -42,6 +45,10 @@ export function contactToVariableMap(contact: ContactVariableSource | null | und
   if (!contact) return {}
   const meta = contact.metadata
   const companyName = contact.company ?? contact.companyName ?? (meta?.general?.company as string)
+  const utilityTerritory = contact.utilityTerritory ?? (meta as any)?.energy?.utilityTerritory
+  const marketContext = contact.marketContext ?? (meta as any)?.energy?.marketContext
+  const isRegulated = contact.isRegulated ?? (meta as any)?.energy?.isRegulated
+  const regulatedFlag = isRegulated === true || String(isRegulated).toLowerCase() === 'true' ? 'yes' : 'no'
 
   const contactKeys: Record<string, string> = {
     'contact.firstName': fallback(contact.firstName),
@@ -70,6 +77,9 @@ export function contactToVariableMap(contact: ContactVariableSource | null | und
     'contact.contractEnd': fallback(contact.contractEnd),
     'contact.accountDescription': fallback(contact.accountDescription),
     'contact.load_zone': fallback(meta?.energy?.loadZone as string),
+    'contact.utilityTerritory': fallback(utilityTerritory),
+    'contact.marketContext': fallback(marketContext),
+    'contact.isRegulated': regulatedFlag,
   }
 
   const accountKeys: Record<string, string> = {
@@ -87,6 +97,9 @@ export function contactToVariableMap(contact: ContactVariableSource | null | und
     'account.annualUsage': fallback(contact.annualUsage),
     'account.electricitySupplier': fallback(contact.electricitySupplier),
     'account.currentRate': fallback(contact.currentRate),
+    'account.utilityTerritory': fallback(utilityTerritory),
+    'account.marketContext': fallback(marketContext),
+    'account.isRegulated': regulatedFlag,
     'account.revenue': '',
     'account.employees': '',
   }
@@ -100,6 +113,9 @@ export function contactToVariableMap(contact: ContactVariableSource | null | und
     industry: fallback(contact.industry),
     contract_end: fallback(contact.contractEnd),
     load_zone: fallback(meta?.energy?.loadZone as string),
+    utility_territory: fallback(utilityTerritory),
+    market_context: fallback(marketContext),
+    is_regulated: regulatedFlag,
     scarcity_risk: 'HIGH',
     date: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
     context_id: contact.id ? `CONTACT_${contact.id.slice(0, 8).toUpperCase()}` : 'TX_001',
