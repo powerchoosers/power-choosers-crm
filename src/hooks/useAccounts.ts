@@ -165,8 +165,8 @@ export interface AccountFilters {
 }
 
 const PAGE_SIZE = 50
-const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, website, logo_url, phone, city, state, address, zip'
-const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
+const ACCOUNT_SEARCH_SELECT = 'id, name, description, industry, domain, website, linkedin_url, logo_url, phone, contract_end_date, city, state, address, zip'
+const ACCOUNT_LIST_SELECT = 'id, name, description, industry, domain, website, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
 const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_opener, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
 function normalizeLocationTerms(values?: string[]) {
@@ -212,6 +212,14 @@ function normalizeAccountSort(sorting?: SortingState, defaultColumn = 'name') {
 
 function normalizeSearchPhoneDigits(value: unknown) {
   return String(value ?? '').replace(/\D/g, '')
+}
+
+function buildContractEndYearClause(searchTerm: string) {
+  const year = String(searchTerm ?? '').trim()
+  if (!/^\d{4}$/.test(year)) return ''
+
+  const nextYear = Number(year) + 1
+  return `and(contract_end_date.gte.${year}-01-01,contract_end_date.lt.${nextYear}-01-01)`
 }
 
 function accountMatchesPhoneDigits(account: { phone?: string | null }, searchDigits: string) {
@@ -319,6 +327,7 @@ export function useSearchAccounts(queryTerm: string) {
       try {
         const searchDigits = normalizeSearchPhoneDigits(searchTerm)
         const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
+        const contractEndClause = buildContractEndYearClause(searchTerm)
         let query = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT);
 
         // Admin and dev see all accounts; others filtered by ownerId
@@ -326,7 +335,7 @@ export function useSearchAccounts(queryTerm: string) {
           query = query.in('ownerId', ownerScopeValues);
         }
 
-        query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%`);
+        query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,linkedin_url.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,${contractEndClause ? `${contractEndClause},` : ''}city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%`);
 
         const { data, error } = await query.limit(10);
 
@@ -396,6 +405,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         if (!user && !loading) return { accounts: [], nextCursor: null };
 
         const from = pageParam * PAGE_SIZE;
+        const contractEndClause = buildContractEndYearClause(searchQuery || '')
 
         if (listId) {
           const { data, error } = await supabase.rpc('get_accounts_by_list', {
@@ -434,7 +444,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         if (searchQuery) {
           const searchTerm = searchQuery.trim()
           if (searchTerm) {
-            query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+            query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,linkedin_url.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,${contractEndClause ? `${contractEndClause},` : ''}city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
           }
         }
 
@@ -665,7 +675,8 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       if (searchQuery) {
         const searchTerm = searchQuery.trim()
         if (searchTerm) {
-          query = query.or(`name.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
+          const contractEndClause = buildContractEndYearClause(searchTerm)
+          query = query.or(`name.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%,domain.ilike.%${searchTerm}%,website.ilike.%${searchTerm}%,linkedin_url.ilike.%${searchTerm}%,industry.ilike.%${searchTerm}%,${contractEndClause ? `${contractEndClause},` : ''}city.ilike.%${searchTerm}%,state.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,zip.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%`);
         }
       }
 
