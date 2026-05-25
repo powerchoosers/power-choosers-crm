@@ -19,6 +19,131 @@ function cleanText(value) {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '';
 }
 
+function normalizeSubject(input) {
+  const value = cleanText(input);
+  if (!value) return 'Message from Nodal Point';
+  return value.replace(/\s+/g, ' ').slice(0, 140);
+}
+
+function subjectLooksGeneric(input) {
+  const value = cleanText(input).toLowerCase();
+  if (!value) return true;
+  if (value === 'message from nodal point') return true;
+  if (/^(quick question|one question|site costs?|site load|site energy|site usage|production costs?|production load|campus load|campus costs?|pallet usage|pallet costs?|service sites?|service costs?|memphis site costs|houston site costs|humble production costs|southlake site energy|kinkaid campus load|tag truck center sites?)$/.test(value)) return true;
+  if (/^(site|city|company|campus|service|production|pallet|blood|hospital|office|hotel)\s+(costs?|load|energy|usage|sites?)$/.test(value)) return true;
+  if (/^(costs?|load|energy|usage|sites?)$/.test(value)) return true;
+  return false;
+}
+
+function inferSubjectThemeFromContext(contextText = '', replyStage = 'general') {
+  const combined = cleanText(contextText).toLowerCase();
+  if (/(blood center|blood bank|donor|blood products?|blood components?|blood storage|biotherap|blood collection|blood processing)/.test(combined)) return 'Blood storage';
+  if (/(school|campus|classroom|athletics|cafeteria|student|k-12|academy|education|school district)/.test(combined)) return 'Campus peaks';
+  if (/(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|service bays|parts areas|dealer network|parts ordering|customer assistance|equipment support)/.test(combined)) return 'Parts and service';
+  if (/(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|auto|automotive)/.test(combined)) return 'Service bays';
+  if (/(pallet|reverse logistics|sortation|pallet network|warehouse support|pallet management)/.test(combined)) return 'Pallet network';
+  if (/(dessert|food production|baking|bakery|refrigerat|packaging|cheesecake|pies?)/.test(combined)) return 'Production load';
+  if (/(restaurant|seafood|kitchen|food service|dining|menu)/.test(combined)) return 'Kitchen load';
+  if (/(hospital|clinic|medical|behavioral|substance use|healthcare|blood center|patient|lab)/.test(combined)) return 'Clinical uptime';
+  if (/(office solutions|managed it|print|information technology|office|showroom|controls displays|lighting reps?)/.test(combined)) return 'Office load';
+  if (/(government|municipal|city|county|public|nonprofit|church)/.test(combined)) return 'Facility overhead';
+  if (/(manufacturing|industrial|plant|production|machining|fabrication|equipment|machinery)/.test(combined)) return 'Production load';
+  if (/(hotel|hospitality|collection|inn|resort|guest)/.test(combined)) return 'Hotel load';
+  if (/(real estate|facilities|property|lease|building)/.test(combined)) return 'Site load';
+  if (replyStage === 'no_reply') return 'Quick reply';
+  if (replyStage === 'follow_up') return 'Quick check';
+  return 'Renewal timing';
+}
+
+function subjectMatchesTheme(subject, theme) {
+  const value = normalizeSubject(subject).toLowerCase();
+  if (!value || !theme) return false;
+
+  switch (theme) {
+    case 'Blood storage':
+      return /(blood|storage|donor|biotherap)/.test(value);
+    case 'Campus peaks':
+      return /(campus|school|athletics|cafeteria|classroom|k-12|education|student)/.test(value);
+    case 'Parts and service':
+      return /(parts|service|equipment|construction|mixer|pump|access|lift|support)/.test(value);
+    case 'Service bays':
+      return /(service|bay|bays|dealership|showroom|parts|auto|vehicle|lot lighting|shop)/.test(value);
+    case 'Pallet network':
+      return /(pallet|reverse logistics|sortation|warehouse|repair|retrieval)/.test(value);
+    case 'Production load':
+      return /(production|bake|bakery|refrigerat|packaging|food|dessert|load)/.test(value);
+    case 'Kitchen load':
+      return /(kitchen|restaurant|food|dining|menu|seafood|grill)/.test(value);
+    case 'Clinical uptime':
+      return /(clinical|health|medical|hospital|clinic|patient|lab|surgery|behavioral)/.test(value);
+    case 'Office load':
+      return /(office|showroom|it|technology|lighting|print)/.test(value);
+    case 'Facility overhead':
+      return /(facility|municipal|public|government|nonprofit|overhead|ops|operations)/.test(value);
+    case 'Hotel load':
+      return /(hotel|hospitality|guest|lobby|laundry|resort|inn|lodging)/.test(value);
+    case 'Site load':
+      return /(site|building|property|lease)/.test(value);
+    case 'Quick reply':
+    case 'Quick check':
+    case 'Renewal timing':
+      return /(renewal|contract|timing|reply|check)/.test(value);
+    default:
+      return false;
+  }
+}
+
+function inferThemeFromBriefText(contextText = '', replyStage = 'general') {
+  const combined = cleanText(contextText).toLowerCase();
+  if (/(pallet management|reverse logistics|pallet repair|sortation|pallet retrieval)/.test(combined)) return 'Pallet network';
+  if (/(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|dealer network|parts ordering|customer assistance|equipment support|service bays|parts areas)/.test(combined)) return 'Parts and service';
+  if (/(blood center|blood bank|donor|blood products?|blood components?|blood storage|biotherap|blood collection|blood processing)/.test(combined)) return 'Blood storage';
+  if (/(school|campus|classroom|athletics|cafeteria|student|k-12|academy|education|school district)/.test(combined)) return 'Campus peaks';
+  if (/(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|auto|automotive)/.test(combined)) return 'Service bays';
+  if (/(dessert|food production|baking|bakery|refrigerat|packaging|cheesecake|pies?)/.test(combined)) return 'Production load';
+  if (/(restaurant|seafood|kitchen|food service|dining|menu)/.test(combined)) return 'Kitchen load';
+  if (/(hospital|clinic|medical|behavioral|substance use|healthcare|blood center|patient|lab)/.test(combined)) return 'Clinical uptime';
+  if (/(office solutions|managed it|print|information technology|office|showroom|controls displays|lighting reps?)/.test(combined)) return 'Office load';
+  if (/(government|municipal|city|county|public|nonprofit|church)/.test(combined)) return 'Facility overhead';
+  if (/(manufacturing|industrial|plant|production|machining|fabrication|equipment|machinery)/.test(combined)) return 'Production load';
+  if (/(hotel|hospitality|collection|inn|resort|guest)/.test(combined)) return 'Hotel load';
+  if (/(real estate|facilities|property|lease|building)/.test(combined)) return 'Site load';
+  if (replyStage === 'no_reply') return 'Quick reply';
+  if (replyStage === 'follow_up') return 'Quick check';
+  return 'Renewal timing';
+}
+
+function resolveBriefThemeOverride(contextText = '') {
+  const combined = cleanText(contextText).toLowerCase();
+  if (combined.includes('pallet management') || combined.includes('reverse logistics') || combined.includes('pallet repair') || combined.includes('pallet retrieval') || combined.includes('sortation')) return 'Pallet network';
+  if (combined.includes('construction machinery') || combined.includes('construction equipment') || combined.includes('concrete mixers') || combined.includes('mortar pumps') || combined.includes('access equipment') || combined.includes('dealer network') || combined.includes('parts ordering') || combined.includes('customer assistance') || combined.includes('equipment support') || combined.includes('service bays') || combined.includes('parts areas')) return 'Parts and service';
+  if (combined.includes('blood center') || combined.includes('blood bank') || combined.includes('blood storage') || combined.includes('blood products') || combined.includes('blood components') || combined.includes('blood collection') || combined.includes('blood processing') || combined.includes('donor')) return 'Blood storage';
+  if (combined.includes('dessert') || combined.includes('food production') || combined.includes('food manufacturing') || combined.includes('baking') || combined.includes('bakery') || combined.includes('cheesecake') || combined.includes('pies') || combined.includes('pie') || combined.includes('packaging')) return 'Production load';
+  if (combined.includes('school') || combined.includes('campus') || combined.includes('classroom') || combined.includes('athletics') || combined.includes('cafeteria') || combined.includes('student') || combined.includes('k-12') || combined.includes('academy') || combined.includes('education') || combined.includes('school district')) return 'Campus peaks';
+  if (combined.includes('truck') || combined.includes('dealership') || combined.includes('service bay') || combined.includes('service department') || combined.includes('body shop') || combined.includes('rv center') || combined.includes('lot lighting') || combined.includes('automotive') || combined.includes('auto')) return 'Service bays';
+  if (combined.includes('restaurant') || combined.includes('seafood') || combined.includes('kitchen') || combined.includes('food service') || combined.includes('dining') || combined.includes('menu')) return 'Kitchen load';
+  if (combined.includes('hospital') || combined.includes('clinic') || combined.includes('medical') || combined.includes('behavioral') || combined.includes('substance use') || combined.includes('healthcare') || combined.includes('patient') || combined.includes('lab')) return 'Clinical uptime';
+  if (combined.includes('office solutions') || combined.includes('managed it') || combined.includes('print') || combined.includes('information technology') || combined.includes('office') || combined.includes('showroom') || combined.includes('controls displays') || combined.includes('lighting reps')) return 'Office load';
+  if (combined.includes('government') || combined.includes('municipal') || combined.includes('city') || combined.includes('county') || combined.includes('public') || combined.includes('nonprofit') || combined.includes('church')) return 'Facility overhead';
+  if (combined.includes('manufacturing') || combined.includes('industrial') || combined.includes('plant') || combined.includes('production') || combined.includes('machining') || combined.includes('fabrication') || combined.includes('equipment') || combined.includes('machinery')) return 'Production load';
+  if (combined.includes('hotel') || combined.includes('hospitality') || combined.includes('collection') || combined.includes('inn') || combined.includes('resort') || combined.includes('guest')) return 'Hotel load';
+  if (combined.includes('real estate') || combined.includes('facilities') || combined.includes('property') || combined.includes('lease') || combined.includes('building')) return 'Site load';
+  return null;
+}
+
+function refineSequenceSubjectLine(rawSubject, contextText = '', replyStage = 'general') {
+  const normalized = normalizeSubject(rawSubject);
+  const explicitTheme = resolveBriefThemeOverride(contextText);
+  if (explicitTheme) {
+    return normalizeSubject(explicitTheme);
+  }
+  const inferredTheme = inferThemeFromBriefText(contextText, replyStage) || inferSubjectThemeFromContext(contextText, replyStage);
+  if (!subjectLooksGeneric(normalized) && subjectMatchesTheme(normalized, inferredTheme)) {
+    return normalized;
+  }
+  return normalizeSubject(inferredTheme);
+}
+
 function buildSourceTruthLine(linkedInUrl, website) {
   if (website) return 'SOURCE_TRUTH: Company website/public company info is available. You may reference the website or public company facts once. LinkedIn is research-only and must never be mentioned.';
   if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn is available as a research signal only. Do NOT mention LinkedIn, profiles, or how you found them in the email copy.';
@@ -382,7 +507,7 @@ function buildReplyFirstDirective(stage) {
       'If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
       'If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
-      'Subject line: 1-4 words, plain, specific, and value-led. Do not keep reusing stock labels like site cost check, simple cost check, or equipment timing when the company, city, issue, or timing would sound more natural.',
+      'Subject line: 1-4 words, plain, specific, and value-led. Do not keep reusing stock labels like site cost check, simple cost check, or equipment timing when the company, city, issue, or timing would sound more natural. The subject should name the operating thing, not just the city plus costs.',
       'Never mention LinkedIn, profiles, or how you found them.'
     ].join('\n'),
     follow_up: [
@@ -985,6 +1110,18 @@ export default async function handler(req, res) {
 
     const renderedBody = renderSequenceTemplate(generatedBody, templateVariables);
     const renderedSubject = renderSequenceTemplate(generatedSubject, templateVariables);
+    const subjectContextText = [
+      account?.intelligence_brief_headline,
+      account?.intelligence_brief_detail,
+      account?.intelligence_brief_talk_track,
+      account?.name,
+      account?.industry,
+      account?.description,
+      contact?.title,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const finalSubject = refineSequenceSubjectLine(renderedSubject, subjectContextText, replyStage);
 
     if (/\{\{\s*[^}]+\s*\}\}/.test(renderedBody) || /\{\{\s*[^}]+\s*\}\}/.test(renderedSubject)) {
       throw new Error('Sequence template still contains unresolved variables after rendering');
@@ -1027,7 +1164,7 @@ export default async function handler(req, res) {
     const nextExecutionMeta = {
       ...executionMeta,
       body: finalBody,
-      subject: renderedSubject,
+      subject: finalSubject,
       from: fromEmail,
       senderEmail: fromEmail,
       senderDomain,
@@ -1070,7 +1207,7 @@ export default async function handler(req, res) {
       sentAt: null,
       aiPrompt: String(executionMeta?.prompt || '').trim() || null,
       generatedBody: renderedBody,
-      generatedSubject: renderedSubject
+      generatedSubject: finalSubject
     };
     // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
     // Keep the ownership metadata, but do not let an older placeholder `from` win here.
@@ -1082,7 +1219,7 @@ export default async function handler(req, res) {
       accountId: contact.accountId || null,
       from: fromEmail,
       to: contact.email ? [contact.email] : [],
-      subject: renderedSubject,
+      subject: finalSubject,
       html: finalBody,
       text: finalBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
       aiPrompt: String(executionMeta?.prompt || '').trim() || null,
@@ -1118,7 +1255,7 @@ export default async function handler(req, res) {
     res.status(200).json({
       success: true,
       action: normalizedAction,
-      subject: renderedSubject,
+      subject: finalSubject,
       generated: !!generatedBody
     });
   } catch (error) {

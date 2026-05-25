@@ -606,7 +606,7 @@ function buildReplyStageDirective(stage: string): string {
             '- If a service address or meter array exists, use that as the operating site and treat HQ as corporate context only unless the prompt explicitly says HQ is the site.',
             '- If the location is regulated, municipal, or non-opt-in, say so plainly and do not write as though the customer can shop a retail provider there.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. Do not use market shorthand.',
-            '- Subject line should match the persona and stage, but do not keep reusing stock labels like "site cost check", "simple cost check", or "equipment timing" when the company, city, issue, or timing would sound more natural.',
+            '- Subject line should match the persona and stage, but do not keep reusing stock labels like "site cost check", "simple cost check", or "equipment timing" when the company, city, issue, or timing would sound more natural. The subject should name the operating thing, not just the city plus costs.',
             '- Never mention LinkedIn, a profile, or how you found them.',
         ].join('\n'),
         follow_up: [
