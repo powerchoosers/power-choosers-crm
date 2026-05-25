@@ -764,6 +764,14 @@ function hasStrongAutomotiveDealerSignals(text: string) {
   return /\b(dealerships?|car dealer|auto dealer|vehicle inventory|certified pre-owned|new vehicles?|used vehicles?|lot lighting|amg|mercedes|bmw|audi|lexus|toyota|honda|ford|chevrolet|cadillac|hyundai|kia|volkswagen|nissan|jeep|dodge|ram|gmc|subaru)\b/i.test(text) || /\b(?:car|auto|vehicle)\s+showrooms?\b/i.test(text) || /\b(?:pre-owned\s+(?:cars?|vehicles?|trucks?))\b/i.test(text)
 }
 
+function hasStrongTruckDealerSignals(text: string) {
+  return /(heavy[-\s]?duty commercial truck|commercial truck dealership|truck dealership|truck center|truck sales|truck service|truck parts|diesel technician training|diesel technician|freightliner|western star|mitsubishi fuso|mercedes-benz trucks|peterbilt|kenworth|mack trucks|volvo trucks|diesel bays?|body shop|technical institute)/i.test(text)
+}
+
+function hasStrongRVDealerSignals(text: string) {
+  return /(rv dealership|rv dealer|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicle(?:s)?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts|motorhome sales|motorhome service)/i.test(text)
+}
+
 function getIndefiniteArticle(word: string): string {
   const cleanWord = word.trim().toLowerCase()
   if (!cleanWord) return ''
@@ -1905,6 +1913,12 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'restaurant':
       return `${prefix}, the biggest risk is usually kitchen load and HVAC hitting during peak hours and driving up transmission fees.`
     case 'retail':
+      if (hasStrongTruckDealerSignals(accountText)) {
+        return `${prefix}, the main factor is usually how service bays, body shop work, parts support, and training spaces are landing on that truck dealership meter.`
+      }
+      if (hasStrongRVDealerSignals(accountText)) {
+        return `${prefix}, the main factor is usually how service bays, parts support, and showroom HVAC are landing on that RV dealer meter.`
+      }
       if (hasStrongAutomotiveSignals(accountText)) {
         return `${prefix}, the main factor is usually how showroom traffic, service bays, parts, and lot lighting are landing on that dealership meter.`
       }
@@ -1917,14 +1931,6 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
         return `${prefix}, the main factor is usually how equipment deliveries, inventory, service turnaround, and storage are landing on that location.`
       }
       return `${prefix}, the focus is usually on whether dock activity, automation, and HVAC are creating expensive usage spikes.`
-    case 'retail':
-      if (hasConstructionMachinerySupportSignals(accountText)) {
-        return `${prefix}, the main factor is usually how service bays, parts areas, and equipment testing are showing up on the bill.`
-      }
-      if (hasStrongAutomotiveSignals(accountText)) {
-        return `${prefix}, the main factor is usually how showroom traffic, service bays, parts, and lot lighting are landing on that dealership meter.`
-      }
-      return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'office_services':
       return `${prefix}, the concern is usually whether occupancy and HVAC are creating summer spikes that stay on the bill.`
     case 'food_storage':
@@ -1994,6 +2000,14 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (cluster === 'retail' && hasStrongAutomotiveSignals(text)) {
     return `Often times for a dealership, it's hard to prevent the service bays and showroom AC from running wide open at the exact same time because of constant customer and vehicle traffic.`
+  }
+
+  if (cluster === 'retail' && hasStrongTruckDealerSignals(text)) {
+    return `Often times for a heavy-duty truck dealership, it's hard to keep service bays, body shop work, and parts support from running at the same time because those repair windows overlap.`
+  }
+
+  if (cluster === 'retail' && hasStrongRVDealerSignals(text)) {
+    return `Often times for an RV dealership, it's hard to keep service bays, parts support, and customer waiting areas from driving the bill at the same time because of constant service traffic.`
   }
 
   if (cluster === 'retail' && hasConvenienceStoreSignals(text)) {
@@ -2336,7 +2350,9 @@ function buildStructuredIdentityProfile(
   const isGrainBakeryManufacturer = hasFrozenBakeryProductionSignals(text)
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isFurnitureManufacturer = hasFurnitureManufacturingSignals(text)
-  const isAutoGroup = hasStrongAutomotiveSignals(text)
+  const isTruckDealer = hasStrongTruckDealerSignals(text)
+  const isRVDealer = hasStrongRVDealerSignals(text)
+  const isAutoGroup = hasStrongAutomotiveSignals(text) && !isTruckDealer && !isRVDealer
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isMaterialHandlingEquipment = hasMaterialHandlingEquipmentSignals(text)
   const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
@@ -2621,6 +2637,42 @@ function buildStructuredIdentityProfile(
       break
 
     case 'retail':
+      if (isTruckDealer) {
+        companyType = multiSiteInfo.isMultiSite ? 'heavy-duty truck dealership group' : 'heavy-duty truck dealership'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site truck sales, service, and parts portfolio' : 'truck sales, service, and parts operation'
+        facilityType = 'truck showroom / service bay / body shop'
+        identityKeywords = selectIdentityKeywords(
+          text,
+          ['heavy-duty truck dealership', 'truck sales', 'truck service', 'truck parts', 'Freightliner', 'Western Star', 'Mitsubishi Fuso', 'Mercedes-Benz trucks', 'diesel technician training'],
+          ['heavy-duty truck dealership', 'truck service', 'truck parts', 'diesel technician training']
+        )
+        powerKeywords = selectIdentityKeywords(
+          text,
+          ['service bays', 'body shop', 'training institute', 'shop HVAC', 'lot lighting', 'customer waiting area'],
+          ['service bays', 'body shop', 'training institute']
+        )
+        talkTrackGuardrails = ['No car dealership language', 'No passenger-auto language', 'No logistics language', 'No freight-hauling language']
+        break
+      }
+
+      if (isRVDealer) {
+        companyType = multiSiteInfo.isMultiSite ? 'RV dealership group' : 'RV dealership'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site RV sales, service, and parts portfolio' : 'RV sales, service, and parts operation'
+        facilityType = 'RV showroom / service bay / parts center'
+        identityKeywords = selectIdentityKeywords(
+          text,
+          ['RV dealership', 'motorhomes', 'motor coaches', 'recreational vehicles', 'motorhome sales', 'RV service', 'RV parts'],
+          ['RV dealership', 'motorhome sales', 'RV service', 'RV parts']
+        )
+        powerKeywords = selectIdentityKeywords(
+          text,
+          ['service bays', 'parts center', 'customer waiting area', 'shop HVAC', 'lot lighting'],
+          ['service bays', 'parts center', 'shop HVAC']
+        )
+        talkTrackGuardrails = ['No hotel language', 'No hospitality language', 'No passenger-car dealership language', 'No logistics language']
+        break
+      }
+
       if (isAutoGroup) {
         companyType = multiSiteInfo.isMultiSite ? 'auto dealership group' : 'auto dealership'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-site dealership portfolio' : 'dealership property'
@@ -3249,7 +3301,23 @@ function extractStructuredBriefFacts(
     addIf(/smokers?|kitchen|dining-room|customer cooling|service rush|restaurant|barbe?cue|bbq/i, energyDrivers, ['kitchen timing', 'refrigeration', 'customer cooling'])
   }
 
-  if (hasStrongAutomotiveSignals(text) || hasStrongAutomotiveDealerSignals(text)) {
+  if (hasStrongTruckDealerSignals(text)) {
+    addIf(/heavy[-\s]?duty commercial truck|truck dealership|truck center|truck sales|truck service|truck parts|diesel technician training|freightliner|western star|mitsubishi fuso|mercedes-benz trucks|peterbilt|kenworth|mack trucks|volvo trucks/i, activities, ['heavy-duty truck sales', 'truck service', 'parts support'])
+    addIf(/heavy[-\s]?duty commercial truck|truck dealership|truck center|truck sales|truck service|truck parts|diesel technician training|freightliner|western star|mitsubishi fuso|mercedes-benz trucks|peterbilt|kenworth|mack trucks|volvo trucks/i, equipment, ['service bays', 'body shop', 'training institute', 'diesel service equipment'])
+    addIf(/heavy[-\s]?duty commercial truck|truck dealership|truck center|truck sales|truck service|truck parts|diesel technician training|freightliner|western star|mitsubishi fuso|mercedes-benz trucks|peterbilt|kenworth|mack trucks|volvo trucks/i, energyDrivers, ['service bays', 'body shop', 'training institute', 'shop HVAC', 'lot lighting'])
+    avoidAngles.add('car dealership')
+    avoidAngles.add('logistics hauling')
+  }
+
+  if (hasStrongRVDealerSignals(text)) {
+    addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, activities, ['RV sales', 'RV service', 'parts support'])
+    addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, equipment, ['service bays', 'parts center', 'customer waiting area'])
+    addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, energyDrivers, ['service bays', 'parts center', 'shop HVAC', 'lot lighting'])
+    avoidAngles.add('hotel')
+    avoidAngles.add('hospitality')
+  }
+
+  if ((hasStrongAutomotiveSignals(text) || hasStrongAutomotiveDealerSignals(text)) && !hasStrongTruckDealerSignals(text) && !hasStrongRVDealerSignals(text)) {
     addIf(/dealership|auto dealer|service bays?|showroom|lot lighting|vehicle inventory/i, activities, ['dealership sales', 'service department'])
     addIf(/service bays?|lifts?|compressors?|showroom|lot lighting|parts department/i, equipment, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
     addIf(/service bays?|showroom ac|lot lighting|parts department/i, energyDrivers, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
@@ -4966,6 +5034,52 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
+      if (hasStrongTruckDealerSignals(text)) {
+        const locationDesc = retailMultiSite.locationCount
+          ? retailMultiSite.locationCount >= 10
+            ? `${retailMultiSite.locationCount}+ truck locations`
+            : `${retailMultiSite.locationCount} truck locations`
+          : 'the truck network'
+        const regionDesc = retailMultiSite.regions.length > 1
+          ? ` across ${retailMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'Heavy-duty truck dealership',
+          angle: `Service bays, body shop work, parts support, and diesel technician training shaping the bill across ${locationDesc}${regionDesc}.`,
+          question: `I'm curious, how do y'all compare the truck service and body shop bills to see which locations are spiking, or is that side of things pretty much on autopilot?`,
+          openers: [
+            `Often times for a heavy-duty truck dealership, it's hard to keep service bays, body shop work, parts support, and training spaces from pushing the meter during the same busy window.`,
+            `Often times for a truck center, it's difficult to separate the diesel service side from the parts counter and driver-support spaces because those hours all overlap.`,
+            `Often times in truck sales and service, a single busy repair cycle can set a high bill on that site even when the rest of the month looks normal.`,
+          ],
+          focus: ['service bays', 'body shop', 'parts support', 'diesel technician training', 'shop HVAC', 'truck service'],
+        }
+      }
+
+      if (hasStrongRVDealerSignals(text)) {
+        const locationDesc = retailMultiSite.locationCount
+          ? retailMultiSite.locationCount >= 10
+            ? `${retailMultiSite.locationCount}+ RV locations`
+            : `${retailMultiSite.locationCount} RV locations`
+          : 'the RV network'
+        const regionDesc = retailMultiSite.regions.length > 1
+          ? ` across ${retailMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'RV dealership',
+          angle: `Service bays, parts counters, customer waiting areas, and showroom HVAC shaping the bill across ${locationDesc}${regionDesc}.`,
+          question: `I'm curious, how do y'all compare the RV service bills to see which locations are spiking, or is that side of things pretty much on autopilot?`,
+          openers: [
+            `Often times for an RV dealership, it's hard to keep service bays, parts counters, and customer comfort from pushing the meter during the same busy window.`,
+            `Often times for a motorhome dealer, it's difficult to separate service work from showroom comfort cooling because the same property handles both.`,
+            `Often times in RV sales and service, a single busy repair cycle can set a high bill on that site even when the rest of the month looks normal.`,
+          ],
+          focus: ['service bays', 'parts counter', 'showroom HVAC', 'customer waiting area', 'RV service'],
+        }
+      }
+
       if (hasConvenienceStoreSignals(text)) {
         const locationDesc = retailMultiSite.locationCount
           ? `${retailMultiSite.locationCount}+ stores`
@@ -5411,6 +5525,77 @@ function buildTalkTrackContext(
   const problemFrame = simplifyTalkTrackLanguage(factProblemFrame || buildPlainProblemFrame(industryCluster, companyIdentity, operationalDrivers))
   const questionFrame = simplifyTalkTrackLanguage(factQuestionFrame || buildPlainQuestionFrame(industryCluster, operationalDrivers, audienceProfile))
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
+  if (hasStrongTruckDealerSignals(accountText)) {
+    const truckProblems = [
+      `Often times for a heavy-duty truck dealership, service bays, body shop work, parts support, and training spaces can all hit the meter during the same busy window.`,
+      `Often times for a truck center, the diesel service side and the parts counter can move the bill more than a normal showroom because the repair windows overlap.`,
+      `Often times in truck sales and service, a single busy repair cycle can set the highest usage moment on that site even when the rest of the month looks normal.`,
+    ]
+    const truckQuestions = [
+      `I'm curious, how do y'all tell whether the truck service side, body shop, or parts support is what moved the bill that month, or is that side of things pretty much handled?`,
+      `I'm curious, how do y'all compare the truck service bills to see which locations are spiking, or is that side of things pretty much on autopilot?`,
+      `I'm curious, how do y'all separate service bays, body shop work, and the training institute on the bill, or is that already handled?`,
+    ]
+    return {
+      signalFamily,
+      signalLabel: signalGuidance.label,
+      signalAngle: simplifyTalkTrackLanguage(signalGuidance.angle),
+      signalOpeners: simplifyList(signalGuidance.openers),
+      industryCluster,
+      industryLabel: 'Heavy-duty truck dealership',
+      industryAngle: 'Service bays, body shop work, parts support, and diesel technician training shaping the bill.',
+      industryOpeners: simplifyList(truckProblems),
+      marketSeason: marketGuidance.marketSeason,
+      marketLabel: marketGuidance.marketLabel,
+      marketAngle: simplifyTalkTrackLanguage(marketGuidance.marketAngle),
+      marketQuestion: simplifyTalkTrackLanguage(marketGuidance.marketQuestion),
+      marketOpeners: simplifyList(marketGuidance.marketOpeners),
+      marketFocus: simplifyList(['service bays', 'body shop', 'parts support', 'diesel technician training', 'shop HVAC']),
+      openingPattern,
+      openingStyle: 'Open with a short permission-based cold-call opener, then use a concrete truck-dealership detail as the hook, not a generic retail line.',
+      question: simplifyTalkTrackLanguage(pickVariant(truckQuestions, seed) || truckQuestions[0]),
+      ercotFocus: Array.from(new Set(simplifyList(['service bays', 'body shop', 'parts support', 'diesel technician training', 'shop HVAC']))),
+      seed,
+      avoidPhrases: [
+        'site by site',
+        'load profile',
+        'energy load',
+        'operating footprint',
+        'industry angle',
+        'from an industry angle',
+        'current setup',
+        'electricity side starts behaving differently',
+        'structured in a way that does not match',
+        'one location at a time',
+        'most companies',
+        'rate looks fine',
+        'the note about',
+        'i saw the note',
+        'saw the note',
+        'i was looking at',
+        'i took a look at',
+        'utility side',
+        'responsible for electricity',
+        'support ticket',
+        'for sale',
+        'pre-owned',
+        'inventory',
+        'cars, trucks, & suvs',
+      ],
+      briefingContext: {
+        companyIdentity: 'Heavy-duty truck dealership',
+        signalReason: simplifyTalkTrackLanguage(signalReason),
+        problemFrame: simplifyTalkTrackLanguage(truckProblems[0]),
+        questionFrame: simplifyTalkTrackLanguage(truckQuestions[0]),
+        structuredFacts,
+        operationalDrivers,
+        forbiddenLanguage,
+        personaLens,
+        confidence: identity?.confidence || (industryCluster === 'unknown' ? 'low' : 'medium'),
+      },
+    }
+  }
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Open with a short permission-based cold-call opener, then move into a concrete company fact or operating detail.',
     question: 'Open with a short permission-based cold-call opener, then the company fact, then one direct question.',
@@ -6207,6 +6392,40 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const questionSentence = context.signalFamily === 'industry_context'
     ? (shouldUseStructuredContext ? context.briefingContext.questionFrame : fallbackQuestion)
     : (shouldUseStructuredContext ? context.briefingContext.questionFrame : context.question)
+
+  if (hasStrongTruckDealerSignals(accountText)) {
+    const truckProblems = [
+      `Often times for a heavy-duty truck dealership, service bays, body shop work, parts support, and training spaces can all hit the meter in the same busy window.`,
+      `Often times for a truck center, diesel service and the parts counter can move the bill more than a normal showroom because the repair windows overlap.`,
+      `Often times in truck sales and service, a single busy repair cycle can set the highest usage moment on that site even when the rest of the month looks normal.`,
+    ]
+    const truckQuestions = [
+      `I'm curious, how do y'all tell whether the truck service side, body shop, or parts support is what moved the bill that month, or is that side of things pretty much handled?`,
+      `I'm curious, how do y'all compare the truck service bills to see which locations are spiking, or is that side of things pretty much on autopilot?`,
+      `I'm curious, how do y'all separate service bays, body shop work, and the training institute on the bill, or is that already handled?`,
+    ]
+    return buildTwoSentenceTalkTrack(
+      pickVariant(truckProblems, variantSeed) || truckProblems[0],
+      pickVariant(truckQuestions, variantSeed) || truckQuestions[0],
+    )
+  }
+
+  if (hasStrongRVDealerSignals(accountText)) {
+    const rvProblems = [
+      `Often times for an RV dealership, service bays, parts support, and customer waiting areas can all hit the meter in the same busy window.`,
+      `Often times for a motorhome dealer, service work and showroom comfort cooling can move the bill more than a normal retail setup because the repair windows overlap.`,
+      `Often times in RV sales and service, a single busy repair cycle can set the highest usage moment on that site even when the rest of the month looks normal.`,
+    ]
+    const rvQuestions = [
+      `I'm curious, how do y'all tell whether the RV service side or parts support is what moved the bill that month, or is that side of things pretty much handled?`,
+      `I'm curious, how do y'all compare the RV service bills to see which locations are spiking, or is that side of things pretty much on autopilot?`,
+      `I'm curious, how do y'all separate service bays, parts support, and showroom HVAC on the bill, or is that already handled?`,
+    ]
+    return buildTwoSentenceTalkTrack(
+      pickVariant(rvProblems, variantSeed) || rvProblems[0],
+      pickVariant(rvQuestions, variantSeed) || rvQuestions[0],
+    )
+  }
 
   if (hasConstructionMachinerySupportSignals(accountText)) {
     const constructionProblems = [
@@ -7138,6 +7357,8 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
     if (/(grocery|supermarket|market|food market)/i.test(text)) return `${companyName} Manages Grocery Store and Refrigerated Retail Load`
     if (hasConvenienceStoreSignals(text)) return `${companyName} Operates Multi-Store Convenience Retail Footprint`
     if (hasGameRetailSignals(text)) return `${companyName} Runs Specialty Game Retail and Online Order Operations`
+    if (hasStrongTruckDealerSignals(text)) return `${companyName} Runs Heavy-Duty Truck Sales and Service Operations`
+    if (hasStrongRVDealerSignals(text)) return `${companyName} Runs RV Sales and Service Operations`
     if (hasStrongAutomotiveSignals(text)) return `${companyName} Manages Dealership Retail and Service Operations`
     return `${companyName} Manages Retail Store and Customer-Facing Facility Load`
   }
