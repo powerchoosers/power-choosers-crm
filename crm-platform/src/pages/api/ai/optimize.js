@@ -43,6 +43,110 @@ function normalizeSubject(input) {
   return value.replace(/\s+/g, ' ').slice(0, 140);
 }
 
+function subjectLooksGeneric(input) {
+  const value = String(input || '').trim().toLowerCase();
+  if (!value) return true;
+  if (value === 'message from nodal point') return true;
+  if (/^(quick question|one question|site costs?|site load|site energy|site usage|production costs?|production load|campus load|campus costs?|pallet usage|pallet costs?|service sites?|service costs?|memphis site costs|houston site costs|humble production costs|southlake site energy|kinkaid campus load|tag truck center sites?)$/.test(value)) return true;
+  if (/^(site|city|company|campus|service|production|pallet|blood|hospital|office|hotel)\s+(costs?|load|energy|usage|sites?)$/.test(value)) return true;
+  if (/^(costs?|load|energy|usage|sites?)$/.test(value)) return true;
+  return false;
+}
+
+function inferSubjectTheme(contact = {}, prompt = '', replyStage = 'general') {
+  const combined = [
+    contact?.company,
+    contact?.company_name,
+    contact?.industry,
+    contact?.title,
+    contact?.company_description,
+    contact?.research_summary,
+    contact?.intelligenceBriefHeadline,
+    contact?.intelligenceBriefDetail,
+    prompt,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/(blood center|blood bank|donor|blood products?|blood components?|blood storage|biotherap|blood collection|blood processing)/.test(combined)) return 'Blood storage';
+  if (/(school|campus|classroom|athletics|cafeteria|student|k-12|academy|education|school district)/.test(combined)) return 'Campus peaks';
+  if (/(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|service bays|parts areas|dealer network|parts ordering|customer assistance|equipment support)/.test(combined)) return 'Parts and service';
+  if (/(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|auto|automotive)/.test(combined)) return 'Service bays';
+  if (/(pallet|reverse logistics|sortation|pallet network|warehouse support|pallet management)/.test(combined)) return 'Pallet network';
+  if (/(dessert|food production|baking|bakery|refrigerat|packaging|cheesecake|pies?)/.test(combined)) return 'Production load';
+  if (/(restaurant|seafood|kitchen|food service|dining|menu)/.test(combined)) return 'Kitchen load';
+  if (/(hospital|clinic|medical|behavioral|substance use|healthcare|blood center|patient|lab)/.test(combined)) return 'Clinical uptime';
+  if (/(office solutions|managed it|print|information technology|office|showroom|controls displays|lighting reps?)/.test(combined)) return 'Office load';
+  if (/(government|municipal|city|county|public|nonprofit|church)/.test(combined)) return 'Facility overhead';
+  if (/(manufacturing|industrial|plant|production|machining|fabrication|equipment|machinery)/.test(combined)) return 'Production load';
+  if (/(hotel|hospitality|collection|inn|resort|guest)/.test(combined)) return 'Hotel load';
+  if (/(real estate|facilities|property|lease|building)/.test(combined)) return 'Site load';
+
+  if (replyStage === 'no_reply') return 'Quick reply';
+  if (replyStage === 'follow_up') return 'Quick check';
+  return 'Renewal timing';
+}
+
+function subjectMatchesTheme(subject, theme) {
+  const value = normalizeSubject(subject).toLowerCase();
+  if (!value || !theme) return false;
+
+  switch (theme) {
+    case 'Blood storage':
+      return /(blood|storage|donor|biotherap)/.test(value);
+    case 'Campus peaks':
+      return /(campus|school|athletics|cafeteria|classroom|k-12|education|student)/.test(value);
+    case 'Parts and service':
+      return /(parts|service|equipment|construction|mixer|pump|access|lift|support)/.test(value);
+    case 'Service bays':
+      return /(service|bay|bays|dealership|showroom|parts|auto|vehicle|lot lighting|shop)/.test(value);
+    case 'Pallet network':
+      return /(pallet|reverse logistics|sortation|warehouse|repair|retrieval)/.test(value);
+    case 'Production load':
+      return /(production|bake|bakery|refrigerat|packaging|food|dessert|load)/.test(value);
+    case 'Kitchen load':
+      return /(kitchen|restaurant|food|dining|menu|seafood|grill)/.test(value);
+    case 'Clinical uptime':
+      return /(clinical|health|medical|hospital|clinic|patient|lab|surgery|behavioral)/.test(value);
+    case 'Office load':
+      return /(office|showroom|it|technology|lighting|print)/.test(value);
+    case 'Facility overhead':
+      return /(facility|municipal|public|government|nonprofit|overhead|ops|operations)/.test(value);
+    case 'Hotel load':
+      return /(hotel|hospitality|guest|lobby|laundry|resort|inn|lodging)/.test(value);
+    case 'Site load':
+      return /(site|building|property|lease)/.test(value);
+    case 'Quick reply':
+    case 'Quick check':
+    case 'Renewal timing':
+      return /(renewal|contract|timing|reply|check)/.test(value);
+    default:
+      return false;
+  }
+}
+
+function refineSubjectLine(rawSubject, contact = {}, prompt = '', replyStage = 'general') {
+  const normalized = normalizeSubject(rawSubject);
+  const companyName = normalizeSubject(contact?.company || contact?.company_name || '');
+  const normalizedCompany = companyName.toLowerCase();
+  const inferredTheme = inferSubjectTheme(contact, prompt, replyStage);
+  if (normalized && normalizedCompany) {
+    const lowered = normalized.toLowerCase();
+    if (lowered.startsWith(normalizedCompany) && /(?:\s+(?:costs?|load|energy|usage|site(?:s)?))+$/.test(lowered)) {
+      return normalizeSubject(inferredTheme);
+    }
+  }
+  if (!subjectLooksGeneric(normalized)) {
+    if (subjectMatchesTheme(normalized, inferredTheme)) {
+      return normalized;
+    }
+    return normalizeSubject(inferredTheme);
+  }
+
+  return normalizeSubject(inferredTheme);
+}
+
 function normalizeAudienceProfilePayload(value, fallbackSource = 'fallback', fallbackSourceLabel = 'Fallback contact') {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
 
@@ -744,6 +848,7 @@ export default async function handler(req, res) {
               - Purchasing: "renewal timing", "vendor fit", "who owns contract timing?"
               - Owner/VP: "budget timing", "timing before renewal", "where the extra cost sits"
             - Keep the subject line plain enough to feel manual, not clever enough to feel templated. Favor short, literal phrases over marketing language.
+            - The subject should name the real operating thing, not just the city or "site costs". Use the campus, service bays, blood storage, pallet network, refrigeration load, production load, office load, or renewal timing when that fits.
           13. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
@@ -959,7 +1064,7 @@ export default async function handler(req, res) {
               ),
               contact?.sender_first_name
             ),
-            subject: normalizeSubject(parsed.subject_line || parsed.subject),
+            subject: refineSubjectLine(parsed.subject_line || parsed.subject, contact, prompt, replyStage),
             logic: parsed.logic_reasoning || parsed.reasoning || null
           };
         } else {
@@ -977,7 +1082,7 @@ export default async function handler(req, res) {
               ),
               contact?.sender_first_name
             ),
-            subject: normalizeSubject(null)
+            subject: refineSubjectLine(null, contact, prompt, replyStage)
           };
         }
       }

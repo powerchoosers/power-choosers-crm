@@ -696,6 +696,10 @@ function hasMaterialHandlingEquipmentSignals(text: string) {
   return /(materials?\s+handling|forklifts?|fork\s*lifts?|komatsu|pallet (?:storage )?rack|racking systems?|interlake[-\s]?mecalux|aerial lifts?|jlg\b|scissor lifts?|boom lifts?|warehouse equipment|lift equipment|forklift charging|battery charging|hvls fans?)/i.test(text)
 }
 
+function hasConstructionMachinerySupportSignals(text: string) {
+  return /(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|aerial platforms?|scissor lifts?|tracked buggies?|dealer network|parts ordering|customer assistance|equipment support|concrete and mortar|mixers and pumps)/i.test(text)
+}
+
 function hasPlasticsDistributionSignals(text: string) {
   return /(plastics? distributor|wholesale distributor of plastic|plastic sheet|plastic sheets|plastic rod|plastic tube|plastic film|cut[-\s]?to[-\s]?size|local plastics? supplier|plastic materials distributor)/i.test(text)
 }
@@ -937,6 +941,14 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     }
   }
 
+  return false
+}
+
+function isPhoneLikeHeadline(title: string): boolean {
+  const t = cleanText(title).replace(/\s+/g, ' ').trim()
+  if (!t) return false
+  if (/^[+()\-.\s\d*xextEXT]+$/.test(t) && /\d{3}/.test(t) && /\d{4}/.test(t)) return true
+  if (/^\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?:\s*(?:x|ext\.?)\s*\d+)?$/i.test(t)) return true
   return false
 }
 
@@ -1898,10 +1910,21 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
       }
       return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'logistics':
+      if (hasConstructionMachinerySupportSignals(accountText)) {
+        return `${prefix}, the main factor is usually how service bays, parts areas, and equipment testing are showing up on the bill.`
+      }
       if (hasStrongDmeSignals(accountText)) {
         return `${prefix}, the main factor is usually how equipment deliveries, inventory, service turnaround, and storage are landing on that location.`
       }
       return `${prefix}, the focus is usually on whether dock activity, automation, and HVAC are creating expensive usage spikes.`
+    case 'retail':
+      if (hasConstructionMachinerySupportSignals(accountText)) {
+        return `${prefix}, the main factor is usually how service bays, parts areas, and equipment testing are showing up on the bill.`
+      }
+      if (hasStrongAutomotiveSignals(accountText)) {
+        return `${prefix}, the main factor is usually how showroom traffic, service bays, parts, and lot lighting are landing on that dealership meter.`
+      }
+      return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'office_services':
       return `${prefix}, the concern is usually whether occupancy and HVAC are creating summer spikes that stay on the bill.`
     case 'food_storage':
@@ -1947,6 +1970,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (cluster === 'school_district' && /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
     return 'Often times for a school district, it\'s difficult to keep classroom HVAC and sports lighting from spiking the meter during seasonal occupancy shifts because of varying extracurricular calendars.'
+  }
+
+  if (hasConstructionMachinerySupportSignals(text)) {
+    return 'Often times for a construction equipment sales and service business, it\'s hard to separate service bays, parts areas, equipment testing, and shop HVAC from a normal office load because those service windows overlap.'
   }
 
   if (/\b(cooling|coolers?|heating|heaters?|hvac|evaporative|portable ac|air conditioning)\b/.test(text)) {
@@ -2516,6 +2543,16 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['materials handling', 'forklifts', 'Komatsu forklifts', 'pallet storage rack', 'JLG aerial lift equipment', 'warehouse equipment', 'equipment service'], ['materials handling', 'forklifts', 'warehouse equipment'])
         powerKeywords = selectIdentityKeywords(text, ['forklift charging', 'battery charging', 'service bays', 'parts areas', 'warehouse support', 'shop HVAC', 'HVLS fans'], ['forklift charging', 'service bays', 'parts areas'])
         talkTrackGuardrails = ['No manufacturing language', 'No production-line language', 'No compressed-air/process-load language unless source confirms their own plant', 'No auto-parts branch language']
+        break
+      }
+
+      if (hasConstructionMachinerySupportSignals(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'construction equipment sales and service network' : 'construction equipment sales and service company'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-location equipment sales, parts, and service footprint' : 'equipment sales, parts, and service operation'
+        facilityType = 'equipment sales / parts / service facility'
+        identityKeywords = selectIdentityKeywords(text, ['construction machinery', 'concrete mixers', 'mortar pumps', 'access equipment', 'dealer network', 'parts ordering', 'customer assistance'], ['construction machinery', 'concrete mixers', 'access equipment'])
+        powerKeywords = selectIdentityKeywords(text, ['service bays', 'parts areas', 'equipment testing', 'shop HVAC', 'support space lighting'], ['service bays', 'parts areas', 'shop HVAC'])
+        talkTrackGuardrails = ['No manufacturing plant language', 'No production-line language', 'No warehouse-only language unless source confirms it', 'No process-load language unless source confirms a plant']
         break
       }
 
@@ -4307,6 +4344,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
+      if (hasConstructionMachinerySupportSignals(text)) {
+        return {
+          label: 'Construction equipment sales and support',
+          angle: 'Concrete mixers, mortar pumps, access equipment, parts areas, service bays, and support-space HVAC shaping the bill differently than a plant floor.',
+          question: `I'm curious, how do y'all tell whether service work, parts areas, or equipment testing is what moved the bill that month, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for construction equipment support, the parts area, service bays, equipment testing, and shop HVAC can all hit the meter during the same busy window.`,
+            `Often times for a construction equipment sales and service operation, the support side, parts room, and service work can move the bill differently than a normal office setup.`,
+            `Often times with construction machinery support, the bill can move more from service timing and parts handling than from a typical storefront or office load.`,
+          ],
+          focus: ['concrete mixers', 'mortar pumps', 'access equipment', 'service bays', 'parts areas', 'shop HVAC'],
+        }
+      }
+
       if (hasMaterialHandlingEquipmentSignals(text)) {
         return {
           label: 'Materials-handling equipment and service',
@@ -5926,16 +5977,19 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
     if (hasIndustrialSiteLogisticsSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))) {
       return `a petrochemical site-store logistics operation${locationClause ? ` ${locationClause}` : ''}`
     }
-    if (palletManagementSignals) {
-      return `${multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount > 1
+  if (palletManagementSignals) {
+    return `${multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount > 1
         ? 'a pallet management and reverse-logistics network'
         : 'a pallet management and reverse-logistics operation'}${locationClause ? ` ${locationClause}` : ''}`
-    }
-    if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
-      const typeStr = companyType.toLowerCase()
-      const article = getIndefiniteArticle(typeStr)
-      const articleSpace = article ? `${article} ` : ''
-      return `${articleSpace}${typeStr}${locationClause ? ` ${locationClause}` : ''}`
+  }
+  if (hasConstructionMachinerySupportSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))) {
+    return `${multiSiteInfo.isMultiSite ? 'a construction equipment sales and service network' : 'a construction equipment sales and service operation'}${locationClause ? ` ${locationClause}` : ''}`
+  }
+  if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
+    const typeStr = companyType.toLowerCase()
+    const article = getIndefiniteArticle(typeStr)
+    const articleSpace = article ? `${article} ` : ''
+    return `${articleSpace}${typeStr}${locationClause ? ` ${locationClause}` : ''}`
     }
     if (cluster === 'manufacturing') return `a manufacturing operation${locationClause ? ` ${locationClause}` : ''}`
     if (cluster === 'logistics') return `a logistics and distribution operation${locationClause ? ` ${locationClause}` : ''}`
@@ -6153,6 +6207,23 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const questionSentence = context.signalFamily === 'industry_context'
     ? (shouldUseStructuredContext ? context.briefingContext.questionFrame : fallbackQuestion)
     : (shouldUseStructuredContext ? context.briefingContext.questionFrame : context.question)
+
+  if (hasConstructionMachinerySupportSignals(accountText)) {
+    const constructionProblems = [
+      `Often times for a construction equipment sales and service business, the service bays, parts areas, equipment testing, and shop HVAC can all hit the meter in the same busy window.`,
+      `Often times with construction equipment support, the bill moves more from service timing and parts handling than from a normal office setup.`,
+      `Often times for a dealer-style support network, the parts room, service work, and support-space cooling can move the bill differently than a standard storefront.`,
+    ]
+    const constructionQuestions = [
+      `I'm curious, how do y'all tell whether service work, parts areas, or equipment testing is what moved the bill that month, or is that side of things pretty much handled?`,
+      `I'm curious, how do y'all separate the service side, parts areas, and equipment testing on the bill, or is that pretty much on autopilot?`,
+      `I'm curious, how do y'all keep track of whether service timing or parts support is what created the heavier bill, or is that already handled?`,
+    ]
+    return buildTwoSentenceTalkTrack(
+      pickVariant(constructionProblems, variantSeed) || constructionProblems[0],
+      pickVariant(constructionQuestions, variantSeed) || constructionQuestions[0],
+    )
+  }
 
   if (hasMaterialHandlingEquipmentSignals(accountText)) {
     const materialHandlingProblems = [
@@ -6925,6 +6996,16 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     return shortenText(detail, 560)
   }
 
+  if (hasConstructionMachinerySupportSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and supports construction equipment through sales, parts, and service operations.`,
+      `The relevant operating pieces are concrete mixers, mortar pumps, access equipment, parts areas, service bays, and support-space HVAC, not a generic production plant.`,
+      `The electricity angle is checking whether service work, parts support, and support-space load are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   if (hasIndustrialSiteLogisticsSignals(detailText)) {
     const detail = [
       verifiedFact,
@@ -6967,6 +7048,16 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
       `${companyName}${location ? ` is based in ${location}` : ''} and operates as a restaurant group supporting ${locationText}.`,
       `The relevant operating pieces are kitchen timing, refrigeration, dining-room HVAC, and location-by-location bill review.`,
       `The electricity angle is checking which locations are creating the highest usage moments instead of treating the restaurant group like one blended bill.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
+  if (profile?.industryCluster === 'public_sector' || /\b(city of|county|municipal|public safety|utility infrastructure|public facilities)\b/i.test(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates as a municipal or public-sector facility portfolio.`,
+      `The relevant operating pieces are administrative offices, public safety, utility infrastructure, and HVAC, not a generic office building.`,
+      `The electricity angle is checking whether one hot-weather spike or a few busy buildings are setting the highest usage moments on the meter.`,
     ].filter(Boolean).join(' ')
     return shortenText(detail, 560)
   }
@@ -7074,6 +7165,7 @@ function normalizeFinalSignalHeadline(headline: string, account: AccountRow, can
   if (!cleaned) return buildCompanyContextHeadline(account, null)
   if ((candidate?.priority || 0) >= 8 && (!candidate || !isOfficialCompanyAnnouncement(account, candidate))) return buildCompanyContextHeadline(account, null)
   if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '')) return buildCompanyContextHeadline(account, null)
+  if (isPhoneLikeHeadline(cleaned)) return buildCompanyContextHeadline(account, null)
   if (navOnlyHeadline || looksLikeRawNavigationText(cleaned)) return buildCompanyContextHeadline(account, null)
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
     return buildCompanyContextHeadline(account, null)
@@ -7168,6 +7260,10 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   // e.g. 'Home', 'Homepage - Team Worldwide', 'Spicy Pickle profile', 'My Pharmacy USA - Find your Daily Medications Here'
   if (isBoilerplatePageTitle(headline, cleanText(account.name) || '')) {
     console.warn('[Intelligence Brief Validation] Boilerplate page title headline:', headline)
+    return null
+  }
+  if (isPhoneLikeHeadline(headline)) {
+    console.warn('[Intelligence Brief Validation] Phone-number headline:', headline)
     return null
   }
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(headline) && !hasStrongAutomotiveSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)}`))) {
