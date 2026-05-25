@@ -644,6 +644,10 @@ function hasGameRetailSignals(text: string) {
   return /(board games?|card games?|collectibles?|gaming accessories|game store|game retailer|hobby store|tabletop games?|trading cards?|tcg\b|miniatures?|pokemon|magic:?\s*the gathering|warhammer)/i.test(text)
 }
 
+function hasGolfClubSignals(text: string) {
+  return /(golf club|country club|private club|clubhouse|golf course|pro shop|tee time|greens? crew|fairways?|cart path|irrigation|club dining|club grill)/i.test(text)
+}
+
 function hasStrongManufacturersRepSignals(text: string) {
   return /(manufacturers?'?\s+rep(?:resentative)?|manufacturers?'?\s+representative agency|rep firm|lighting rep|electrical rep|sales rep agency|independent sales representative|represents? manufacturers?|working with distributors|electrical contractors|engineers|architects|lighting designers)/i.test(text)
 }
@@ -1942,6 +1946,10 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     ? 'Since the site is already live'
     : 'Since you have a new site coming online'
 
+  if (hasGolfClubSignals(accountText)) {
+    return `${prefix}, the main factor is usually how clubhouse HVAC, dining, cart charging, and course irrigation are showing up on the bill.`
+  }
+
   switch (industryCluster) {
     case 'hotel_owner':
       return `${prefix}, the main factor is usually guest-room load, laundry, kitchen service, and HVAC landing on that hotel meter.`
@@ -2025,6 +2033,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   // Infer industry cluster to prevent cross-industry regex false matches
   const cluster = inferIndustryCluster(account, candidate)
+
+  if (hasGolfClubSignals(text)) {
+    return 'Often times for a golf club, clubhouse HVAC, dining, cart charging, and course irrigation can all hit the meter in different ways because the clubhouse and course run on different schedules.'
+  }
 
   if (cluster === 'residential_care' && /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential[- ]care|shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing)/.test(text)) {
     return 'Often times for a residential care nonprofit, it\'s hard to separate what the homes, counseling spaces, and support services are each adding to the bill because of how multiple meters roll up.'
@@ -2162,6 +2174,9 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
     if (context.industryCluster === 'restaurant') {
       return `Often times for a multi-location restaurant group, it's hard to prevent kitchen equipment, HVAC, and refrigeration from driving up the peak charge on separate store meters.`
     }
+    if (hasGolfClubSignals(accountText)) {
+      return `Often times for a golf club, clubhouse HVAC, dining, cart charging, and course irrigation can all push the meter in different ways because the clubhouse and course run on different schedules.`
+    }
     if (context.industryCluster === 'retail') {
       if (hasStrongAutomotiveSignals(accountText)) {
         return `Often times for a multi-location dealership group, it's difficult to prevent service bays, parts departments, and showroom AC from running wide open at the same time.`
@@ -2171,17 +2186,50 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
   }
 
   if (context.industryOpeners && context.industryOpeners.length > 0) {
-    const opener = context.industryOpeners[0]
-    if (opener && !opener.toLowerCase().startsWith('often times')) {
-      return `Often times ${opener.charAt(0).toLowerCase()}${opener.slice(1)}`
+    const opener = context.industryOpeners.find((item) => {
+      const lower = cleanText(item).toLowerCase()
+      if (!lower) return false
+      return !TALK_TRACK_GENERIC_PATTERNS.some((pattern) => pattern.test(lower))
+    })
+    if (opener) {
+      if (!opener.toLowerCase().startsWith('often times')) {
+        return `Often times ${opener.charAt(0).toLowerCase()}${opener.slice(1)}`
+      }
+      return opener
     }
-    return opener
   }
 
-  return `Often times for a commercial facility, it's difficult to determine whether the utility meters are actually aligned with the real operational activity.`
+  switch (context.industryCluster) {
+    case 'hospitality_group':
+      return `Often times for a hospitality group, it's hard to keep each property's guest rooms, laundry, and HVAC from landing on the meter in the same busy window.`
+    case 'hotel_owner':
+      return `Often times for a hotel property, guest rooms, laundry, kitchen service, and HVAC can all stack up on the meter in the same busy window.`
+    case 'school_district':
+      return `Often times for a school district, campus HVAC, athletics, cafeteria load, and classroom technology can all push different meters in different ways.`
+    case 'higher_education':
+      return `Often times for a higher education campus, residence halls, classrooms, labs, and dining load can all stack up on the bill at different times.`
+    case 'public_sector':
+      return `Often times for a public sector operation, administrative offices, public safety sites, and utility buildings can all show up differently on the bill.`
+    case 'healthcare':
+      return `Often times for a healthcare facility, clinical equipment, HVAC, and daily timing can all create very different usage patterns.`
+    case 'logistics':
+      return `Often times for a distribution operation, dock activity, storage climate control, and office HVAC can all drive different bill patterns.`
+    case 'manufacturing':
+      return `Often times for a manufacturing operation, equipment timing, compressed air, and process loads can all hit the meter at different times.`
+    case 'retail':
+      return `Often times for a retail operation, store traffic, lighting, and HVAC can all push the bill in different directions.`
+    case 'restaurant':
+      return `Often times for a restaurant operation, kitchen timing, refrigeration, and AC can all drive different bill patterns.`
+    default:
+      return `Often times for ${cleanText(account.name) || 'the company'}, it's difficult to tell whether the utility meters are actually aligned with the real operational activity.`
+  }
 }
 
 function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  if (hasGolfClubSignals(accountText)) {
+    return `I'm curious, how do y'all tell whether clubhouse HVAC, dining, or course support is what moved the bill that month, or is that side of things pretty much on autopilot?`
+  }
   const multiLocation = hasMultiLocationEvidence(account, candidate)
   if (multiLocation) {
     if (context.industryCluster === 'restaurant' || context.industryCluster === 'retail') {
@@ -2191,13 +2239,33 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
 
   if (context.question) {
     const question = context.question.replace(/\?+$/, '')
-    if (question && !question.toLowerCase().startsWith("i'm curious")) {
+    const genericQuestion = TALK_TRACK_GENERIC_PATTERNS.some((pattern) => pattern.test(question.toLowerCase()))
+    if (question && !genericQuestion && !question.toLowerCase().startsWith("i'm curious")) {
       return `I'm curious, ${question.charAt(0).toLowerCase()}${question.slice(1)}, or is that side of things pretty much on autopilot?`
     }
-    return context.question
+    if (question && !genericQuestion) return context.question
   }
 
-  return `I'm curious, have you looked at whether the bill setup still matches how y'all use power, or is that side of things pretty much on autopilot?`
+  switch (context.industryCluster) {
+    case 'hospitality_group':
+      return `I'm curious, how do y'all check each hotel on its own meter to spot which property is pushing the bill, or is that side of things pretty much on autopilot?`
+    case 'hotel_owner':
+      return `I'm curious, how do y'all tell whether guest rooms, laundry, kitchen service, or HVAC is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'school_district':
+      return `I'm curious, how do y'all tell whether campus HVAC, athletics, or classroom technology is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'healthcare':
+      return `I'm curious, how do y'all tell whether clinical equipment, HVAC, or daily timing is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'logistics':
+      return `I'm curious, how do y'all tell whether dock activity, storage, or HVAC is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'manufacturing':
+      return `I'm curious, how do y'all tell whether equipment timing, compressed air, or process loads is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'retail':
+      return `I'm curious, how do y'all tell whether traffic, lighting, or HVAC is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    case 'restaurant':
+      return `I'm curious, how do y'all tell whether kitchen timing, refrigeration, or AC is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    default:
+      return `I'm curious, have you looked at whether the bill setup still matches how y'all use power, or is that side of things pretty much on autopilot?`
+  }
 }
 
 function isLikelyBadSourceUrl(value: string) {
@@ -2452,6 +2520,7 @@ function buildStructuredIdentityProfile(
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
   const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
+  const isGolfClub = hasGolfClubSignals(text)
   let companyType = cleanText(account.industry) || 'commercial account'
   let operatingModel = multiSiteInfo.isMultiSite ? 'multi-site portfolio' : 'single-site operator'
   let facilityType = 'commercial facility'
@@ -3002,7 +3071,7 @@ function buildStructuredIdentityProfile(
       talkTrackGuardrails = ['Keep liabilities meter-specific']
       break
 
-    default:
+  default:
       companyType = cleanText(account.industry) || 'commercial account'
       operatingModel = multiSiteInfo.isMultiSite ? 'multi-site portfolio' : 'commercial facility'
       facilityType = multiSiteInfo.isMultiSite ? 'portfolio of sites' : 'commercial facility'
@@ -3010,6 +3079,23 @@ function buildStructuredIdentityProfile(
       powerKeywords = selectIdentityKeywords(text, ['hvac', 'lighting', 'operations'], ['HVAC', 'operations'], 4)
       talkTrackGuardrails = ['Use plain language', 'Avoid unrelated industry labels']
       break
+  }
+
+  if (isGolfClub) {
+    companyType = multiSiteInfo.isMultiSite ? 'golf club network' : 'private golf club'
+    operatingModel = multiSiteInfo.isMultiSite ? 'multi-site golf club portfolio' : 'clubhouse and course operation'
+    facilityType = 'golf club / clubhouse'
+    identityKeywords = selectIdentityKeywords(
+      text,
+      ['golf club', 'country club', 'private club', 'clubhouse', 'golf course', 'pro shop', 'tee times', 'members', 'greens crew'],
+      ['golf club', 'clubhouse', 'golf course'],
+    )
+    powerKeywords = selectIdentityKeywords(
+      text,
+      ['clubhouse hvac', 'dining', 'cart charging', 'course irrigation', 'pro shop lighting', 'club kitchen'],
+      ['clubhouse HVAC', 'cart charging', 'course irrigation'],
+    )
+    talkTrackGuardrails = ['No retail language', 'No hotel language', 'No restaurant language unless the source explicitly confirms dining', 'No church/sanctuary language']
   }
 
   const confidenceSignals = identityKeywords.filter((keyword) => text.includes(keyword.toLowerCase())).length +
@@ -3106,6 +3192,10 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /what most operators need to know is/i,
   /what most operators want to know is/i,
   /the useful thing to understand about/i,
+  /commercial facilities?/i,
+  /commercial operation(?:s)?/i,
+  /commercial account/i,
+  /real operational activity/i,
   /there(?:'|')s a useful update about/i,
   /the update about .* is the part that matters here/i,
   // Additional banned patterns found in audit
@@ -3276,6 +3366,7 @@ function toSecondPersonOperationDescriptor(value: string) {
   const text = cleanText(value)
     .replace(/^(?:an?|the)\s+/i, '')
     .replace(/\bthe company'?s\b/i, 'your')
+    .replace(/\bhotel owner\b/i, 'hotel property')
   if (!text) return 'your operation'
   if (/^(your|y'all'?s|yours)\b/i.test(text)) return text
   return `your ${text}`
@@ -3323,6 +3414,16 @@ function extractStructuredBriefFacts(
   ;(profile?.powerKeywords || []).forEach((term) => energyDrivers.add(term))
   ;(industryGuidance.focus || []).forEach((term) => energyDrivers.add(term))
   ;(signalGuidance.focus || []).forEach((term) => energyDrivers.add(term))
+
+  if (hasGolfClubSignals(text)) {
+    ;['golf club operations', 'clubhouse operations', 'course maintenance', 'member services'].forEach((term) => activities.add(term))
+    ;['clubhouse HVAC', 'cart charging', 'irrigation pumps', 'pro shop lighting', 'club kitchen equipment'].forEach((term) => equipment.add(term))
+    ;['clubhouse HVAC', 'cart charging', 'course irrigation', 'pro shop lighting'].forEach((term) => energyDrivers.add(term))
+    ;['members', 'tee times', 'club dining', 'course schedules'].forEach((term) => customerContext.add(term))
+    avoidAngles.add('retail')
+    avoidAngles.add('hotel')
+    avoidAngles.add('restaurant')
+  }
 
   addIf(/materials?\s+handling|forklifts?|komatsu|pallet (?:storage )?rack|interlake[-\s]?mecalux|aerial lifts?|jlg\b|warehouse equipment/i, activities, ['materials handling equipment supply', 'equipment service', 'parts support'])
   addIf(/materials?\s+handling|forklifts?|komatsu|pallet (?:storage )?rack|interlake[-\s]?mecalux|aerial lifts?|jlg\b|warehouse equipment/i, equipment, ['forklifts', 'pallet rack systems', 'aerial lift equipment'])
@@ -3490,6 +3591,9 @@ function buildFactDrivenQuestionFrame(facts: StructuredBriefFacts) {
 function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: string, drivers: string[]) {
   const driverText = humanizeDriverList(drivers)
   const identity = cleanText(companyIdentity).toLowerCase()
+  if (/golf club|country club|private club|clubhouse/.test(identity) || /clubhouse|golf course|pro shop|tee time|greens? crew|fairways?|cart path|irrigation|club dining|club grill/i.test(driverText)) {
+    return `Often times for a golf club, clubhouse HVAC, dining, cart charging, and course irrigation can all push the meter in different ways because the clubhouse and course run on different schedules.`
+  }
   if (/auto dealership|dealership/.test(identity) || /lot lighting|service bays?|vehicle inventory|showroom HVAC/i.test(driverText)) {
     return `Often times for a dealership, service bays, showroom AC, parts counters, and lot lighting can all push the meter during the same busy window.`
   }
@@ -3604,6 +3708,9 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     return `I'm curious, ${lowercaseFirst(personaQuestion)}, or is that side of things pretty much on autopilot?`
   }
 
+  if (/golf club|country club|private club|clubhouse/.test(driverText)) {
+    return `I'm curious, how do y'all tell whether clubhouse HVAC, dining, or course support is what moved the bill that month, or is that side of things pretty much on autopilot?`
+  }
   if (/service bays?|vehicle inventory|lot lighting/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether the service bays, showroom AC, parts area, or lot lighting is what pushed the bill, or is that side of things pretty much handled?`
   }
@@ -3906,6 +4013,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) return 'residential_care'
   if (hasStrongBehavioralHealthSignals(text)) return 'healthcare'
   if (hasStrongBakeryCafeSignals(text)) return 'restaurant'
+  if (hasGolfClubSignals(text)) return 'hospitality_group'
   // Automotive dealer — must come before brewery to prevent dealership groups owning craft breweries from landing as food storage
   if (hasStrongAutomotiveDealerSignals(text)) return 'retail'
   // Brewery / taproom — must come before retail store to prevent craft breweries landing as 'shop and showroom'
@@ -3968,6 +4076,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
   if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/i.test(coreText)) return 'public_sector'
+  if (hasGolfClubSignals(coreText)) return 'hospitality_group'
   if (hasTruckLeasingSignals(coreText)) return 'logistics'
   if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
   if (hasPlasticsDistributionSignals(coreText)) return 'logistics'
@@ -4235,6 +4344,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
   const industryLabel = cleanText(account.industry) || companyName
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${buildIdentityProfileText(account, candidate)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
+
+  if (hasGolfClubSignals(text)) {
+    if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 3) {
+      const locationDesc = multiSiteInfo.locationCount >= 10
+        ? `${multiSiteInfo.locationCount}+ clubs`
+        : `${multiSiteInfo.locationCount} clubs`
+      const regionDesc = multiSiteInfo.regions.length > 1
+        ? ` across ${multiSiteInfo.regions.length} states`
+        : ''
+
+      return {
+        label: 'Golf club network',
+        angle: `Clubhouse-by-clubhouse comparison of clubhouse HVAC, dining, cart charging, and course irrigation across ${locationDesc}${regionDesc}.`,
+        question: `I'm curious, how do y'all check which clubhouses are carrying the biggest peaks, or is that side of things pretty much on autopilot?`,
+        openers: [
+          `Often times for a golf club network, clubhouse HVAC, dining, cart charging, and course irrigation can all hit the meter in different ways because the clubhouse and course run on different schedules.`,
+          `Often times for multi-site private clubs, it's hard to compare clubhouse load from one property to the next because each course runs on its own schedule.`,
+          `Often times for a golf portfolio, it's difficult to tell which clubhouse or course support building is carrying the highest peak because the bills get blended together at the corporate level.`,
+        ],
+        focus: ['clubhouse HVAC', 'cart charging', 'course irrigation', 'pro shop lighting', 'club dining', 'member services'],
+      }
+    }
+
+    return {
+      label: 'Golf club',
+      angle: 'Clubhouse HVAC, dining, cart charging, and course irrigation driving the load on the same meter.',
+      question: `I'm curious, how do y'all tell whether clubhouse HVAC, dining, or course support is what moved the bill that month, or is that side of things pretty much on autopilot?`,
+      openers: [
+        `Often times for a golf club, it's hard to keep clubhouse HVAC, dining, cart charging, and course irrigation from hitting the meter in different ways because the clubhouse and course run on different schedules.`,
+        `Often times at a private club, it's difficult to separate clubhouse load from course irrigation and cart charging because they do not run on the same schedule.`,
+        `Often times for a golf club, the bill moves more from clubhouse operations and course support than from a normal office-style load.`,
+      ],
+      focus: ['clubhouse HVAC', 'cart charging', 'course irrigation', 'pro shop lighting', 'club dining', 'member services'],
+    }
+  }
 
   switch (industryCluster) {
     case 'multi_site':
@@ -4897,7 +5041,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `Often times for a hotel portfolio, it's hard to check each property's meter history separately because corporate reports average all the utility bills together.`,
             `Often times for multiple hospitality sites, it's difficult to prevent guest rooms, laundry, and kitchen operations from peaking together at a single property and setting a high local billing floor.`,
-            `Often times for a hotel owner, it's hard to spot which location is carrying a summer peak charge on its meter because of blended property budgets.`,
+            `Often times for a hotel property, it's hard to spot which location is carrying a summer peak charge on its meter because of blended property budgets.`,
           ],
           focus: ['property comparison', 'guest rooms', 'laundry', 'HVAC', 'portfolio view', 'locked-in peak charges'],
         }
@@ -6291,6 +6435,9 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const companyType = cleanText(profile?.companyType || '')
   const facilityType = cleanText(profile?.facilityType || '')
   const cluster = context.industryCluster
+  const isHospitalityGroupCompany = /\bhospitality group\b/i.test(companyType)
+  const isHotelOwnerCompany = /\bhotel owner\b/i.test(companyType)
+  const isGolfClubCompany = /\bgolf club\b|\bcountry club\b|\bprivate club\b/i.test(companyType) || hasGolfClubSignals(accountText)
   const specificAccountLane = companyType && !/^(commercial account|retail business)$/i.test(companyType)
     ? companyType.toLowerCase()
       .replace(/\s+(network|provider|supplier|operator|company|business)$/i, '')
@@ -6319,6 +6466,15 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   }
   if (hasConstructionMachinerySupportSignals(cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${buildIdentityProfileText(account, null)}`))) {
     return `${multiSiteInfo.isMultiSite ? 'a construction equipment sales and service network' : 'a construction equipment sales and service operation'}${locationClause ? ` ${locationClause}` : ''}`
+  }
+  if (isHospitalityGroupCompany) {
+    return `a hospitality group${locationClause ? ` ${locationClause}` : ''}`
+  }
+  if (isHotelOwnerCompany) {
+    return `a hotel property${locationClause ? ` ${locationClause}` : ''}`
+  }
+  if (isGolfClubCompany) {
+    return `a private golf club${locationClause ? ` ${locationClause}` : ''}`
   }
   if (companyType && !/^(commercial account|retail business)$/i.test(companyType)) {
     const typeStr = companyType.toLowerCase()
@@ -6473,6 +6629,10 @@ function enforceIndustryTalkTrackGuardrails(talkTrack: string, account: AccountR
   const text = cleanText(talkTrack)
   const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   const cluster = inferIndustryCluster(account, candidate)
+
+  if (hasGolfClubSignals(accountText) && /\b(retail|hotel|guest rooms?|sanctuary|worship|church|restaurant|showroom)\b/i.test(text)) {
+    return simplifyTalkTrackLanguage(`Often times for a golf club, clubhouse HVAC, dining, cart charging, and course irrigation can all hit the meter in different ways because the clubhouse and course run on different schedules. I'm curious, how do y'all tell whether clubhouse HVAC, dining, or course support is what moved the bill that month, or is that side of things pretty much handled?`)
+  }
 
   if (cluster === 'hotel_owner' || cluster === 'hospitality_group') {
     if (/\b(emergency care|inpatient|imaging|lab work|hospital|clinic)\b/i.test(text)) {
@@ -7548,6 +7708,12 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
 
   if (/\b(grain-based|frozen bakery|flour mill|biscuits?|muffins?|bakery manufacturing|bakery products)\b/i.test(text)) {
     return `${companyName} Grain-Based and Frozen Bakery Production Context`
+  }
+
+  if (hasGolfClubSignals(text)) {
+    return /\b(golf club|country club|private club)\b/i.test(companyName)
+      ? `${companyName} Operating Context`
+      : `${companyName} Golf Club Operating Context`
   }
 
   if (profile?.industryCluster === 'restaurant') {
