@@ -617,7 +617,7 @@ function isSameAsAccountDescription(value: string, account: AccountRow) {
 }
 
 function hasStrongHealthcareSignals(text: string) {
-  return /(healthcare|hospital|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|specialist|wellness|doctor)/i.test(text)
+  return /(healthcare|\bhospital\b|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|specialist|wellness|doctor)/i.test(text)
 }
 
 function hasStrongBehavioralHealthSignals(text: string) {
@@ -716,6 +716,10 @@ function hasStrongDmeSignals(text: string) {
   return /(durable medical equipment|\bdme\b|home medical equipment|medical equipment|medical supplies?|equipment logistics|equipment delivery|equipment maintenance|direct-service locations?|direct service locations?|hospice dme|hospice equipment|inventory management|medical supply(?:ies)?)/i.test(text)
 }
 
+function hasHomeHealthHospiceSignals(text: string) {
+  return /(home health|hospice|end of life care|hospice care|home care|patient care coordination|care coordination|skilled home health|visiting nurse|nursing visits|palliative care)/i.test(text)
+}
+
 function hasStrongRestaurantSignals(text: string) {
   if (hasFrozenBakeryProductionSignals(text) && !/(restaurant|dining|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging|drive-thru coffee)/i.test(text)) {
     return false
@@ -768,8 +772,16 @@ function hasStrongTruckDealerSignals(text: string) {
   return /(heavy[-\s]?duty commercial truck|commercial truck dealership|truck dealership|truck center|truck sales|truck service|truck parts|diesel technician training|diesel technician|freightliner|western star|mitsubishi fuso|mercedes-benz trucks|peterbilt|kenworth|mack trucks|volvo trucks|diesel bays?|body shop|technical institute)/i.test(text)
 }
 
+function hasTruckLeasingSignals(text: string) {
+  return /(truck leasing|truck rental|leasing and rental|fleet leasing|full-service leasing|used truck program|used truck programs|commercial lease fleet|lease fleet|truck lease|rental fleet|fleet maintenance plans?|maintenance lease)/i.test(text)
+}
+
 function hasStrongRVDealerSignals(text: string) {
   return /(rv dealership|rv dealer|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicle(?:s)?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts|motorhome sales|motorhome service)/i.test(text)
+}
+
+function hasRvSupportSignals(text: string) {
+  return /(rv support|rv setup|rv assembly|rv staging|rv warehousing|warehousing and setup|recreational vehicle industry|motorhome prep|dealer prep|rv warehouse|rv industry support|recreational vehicle(?:s)?(?:[\s\S]{0,50}(?:warehouse|warehous|assembly|support|setup|staging))|(?:warehouse|warehousing|assembly|support|setup|staging)[\s\S]{0,50}recreational vehicle(?:s)?)/i.test(text) || /\b(rv industry|recreational vehicle industry)\b/i.test(text)
 }
 
 function getIndefiniteArticle(word: string): string {
@@ -979,6 +991,52 @@ function getAccountIdentityProfile(account: AccountRow, candidate: ResearchHit |
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
   const accountText = getIdentityProfileSeedText(account)
+  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/i.test(accountText)) {
+    const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
+    const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
+      ? confidence
+      : 'low'
+
+    return {
+      version: IDENTITY_PROFILE_VERSION,
+      industryCluster: 'public_sector',
+      companyType: /county/i.test(accountText) ? 'county government' : 'public-sector organization',
+      operatingModel: /county/i.test(accountText) ? 'county-wide public services network' : 'municipal facility portfolio',
+      facilityType: 'municipal / administrative facility',
+      identityKeywords: ['county', 'municipal', 'public safety', 'utility infrastructure', 'administrative offices'],
+      powerKeywords: ['administrative offices', 'public safety', 'utility infrastructure', 'HVAC'],
+      talkTrackGuardrails: ['No residential-care language', 'No shelter language', 'No hotel language', 'No clinic language'],
+      evidence: uniqueStrings(Array.isArray(record.evidence) ? record.evidence : [], 4),
+      confidence: safeConfidence,
+      generatedAt: cleanText(record.generatedAt),
+      sourceKinds: uniqueStrings(Array.isArray(record.sourceKinds) ? record.sourceKinds : [], 4)
+      .filter((value): value is ResearchSourceKind => ['news', 'web', 'sec', 'linkedin'].includes(value))
+      .slice(0, 4),
+    }
+  }
+  if (hasTruckLeasingSignals(accountText)) {
+    const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
+    const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
+      ? confidence
+      : 'low'
+
+    return {
+      version: IDENTITY_PROFILE_VERSION,
+      industryCluster: 'logistics',
+      companyType: 'truck leasing and rental network',
+      operatingModel: 'multi-site truck leasing, rental, and maintenance footprint',
+      facilityType: 'truck leasing / service location',
+      identityKeywords: ['truck leasing', 'truck rental', 'fleet leasing', 'maintenance shops', 'used truck programs'],
+      powerKeywords: ['maintenance shops', 'fleet staging', 'yard lighting', 'office load'],
+      talkTrackGuardrails: ['No dealership language', 'No showroom language', 'No retail language', 'No manufacturing plant language'],
+      evidence: uniqueStrings(Array.isArray(record.evidence) ? record.evidence : [], 4),
+      confidence: safeConfidence,
+      generatedAt: cleanText(record.generatedAt),
+      sourceKinds: uniqueStrings(Array.isArray(record.sourceKinds) ? record.sourceKinds : [], 4)
+        .filter((value): value is ResearchSourceKind => ['news', 'web', 'sec', 'linkedin'].includes(value))
+        .slice(0, 4),
+    }
+  }
   const stableCluster = inferIndustryClusterFromSignals(account, null)
   const savedProfile = {
     version: IDENTITY_PROFILE_VERSION,
@@ -1900,6 +1958,9 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'education_nonprofit':
       return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
+      if (hasHomeHealthHospiceSignals(accountText)) {
+        return `${prefix}, the main factor is usually how care coordination, office HVAC, and phone systems are showing up on the bill.`
+      }
       if (hasStrongDmeSignals(accountText)) {
         return `${prefix}, the main factor is usually how equipment deliveries, inventory, service turnaround, and storage are landing on that location.`
       }
@@ -1916,7 +1977,7 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
       if (hasStrongTruckDealerSignals(accountText)) {
         return `${prefix}, the main factor is usually how service bays, body shop work, parts support, and training spaces are landing on that truck dealership meter.`
       }
-      if (hasStrongRVDealerSignals(accountText)) {
+      if (hasStrongRVDealerSignals(accountText) && !hasRvSupportSignals(accountText)) {
         return `${prefix}, the main factor is usually how service bays, parts support, and showroom HVAC are landing on that RV dealer meter.`
       }
       if (hasStrongAutomotiveSignals(accountText)) {
@@ -1924,6 +1985,12 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
       }
       return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'logistics':
+      if (hasTruckLeasingSignals(accountText)) {
+        return `${prefix}, the main factor is usually how maintenance shops, fleet staging, yard lighting, and office load are landing on the truck leasing site.`
+      }
+      if (hasRvSupportSignals(accountText)) {
+        return `${prefix}, the main factor is usually how setup bays, staging, inventory handling, and warehouse HVAC are landing on that RV support site.`
+      }
       if (hasConstructionMachinerySupportSignals(accountText)) {
         return `${prefix}, the main factor is usually how service bays, parts areas, and equipment testing are showing up on the bill.`
       }
@@ -1970,6 +2037,15 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   }
 
   // Logistics check - use word boundaries and restrict to logistics cluster
+  if (cluster === 'logistics' && hasTruckLeasingSignals(text)) {
+    return 'Often times for a truck leasing and rental operation, maintenance shops, fleet staging, yard lighting, and office load can all hit the meter in the same busy window.'
+  }
+  if (cluster === 'logistics' && /(rv support|rv setup|rv assembly|staging|warehouse support|recreational vehicle industry)/.test(text)) {
+    return 'Often times for an RV support warehouse, setup bays, staging, inventory handling, and warehouse HVAC can all hit the meter in the same busy window.'
+  }
+  if (cluster === 'logistics' && hasTruckLeasingSignals(text)) {
+    return 'Often times for a truck leasing and rental operation, maintenance shops, fleet staging, yard lighting, and office load can all hit the meter in the same busy window.'
+  }
   if (cluster === 'logistics' && /(freight forwarder|nvocc|\bcargo\b|\bshipping\b|\btrucking\b|\btransport\b|\btransportation\b|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|auto logistics)/.test(text)) {
     return 'Often times in a logistics operation, it\'s hard to tell whether dock activity, office load, or warehouse support is what\'s actually setting that monthly peak because the busy parts of the day overlap.'
   }
@@ -2006,7 +2082,7 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return `Often times for a heavy-duty truck dealership, it's hard to keep service bays, body shop work, and parts support from running at the same time because those repair windows overlap.`
   }
 
-  if (cluster === 'retail' && hasStrongRVDealerSignals(text)) {
+  if (cluster === 'retail' && hasStrongRVDealerSignals(text) && !hasRvSupportSignals(text)) {
     return `Often times for an RV dealership, it's hard to keep service bays, parts support, and customer waiting areas from driving the bill at the same time because of constant service traffic.`
   }
 
@@ -2028,6 +2104,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (cluster === 'healthcare' && /(dental|dentist|dentistry|orthodont|orthodontic|oral surgery|oral health|periodont|endodont|prosthodont|hygienist|hygiene|dso\b|dpo\b|practice acquisition|practice management|operatories?|patient chairs?|chairside|implant|restorative dentistry|multi-site dental|dental partnership organization)/.test(text)) {
     return 'Often times in a dental clinic, it\'s difficult to manage patient-chair usage, imaging, and sterilization cycles without driving up the peak demand charge because of continuous patient scheduling.'
+  }
+
+  if (cluster === 'healthcare' && hasHomeHealthHospiceSignals(text)) {
+    return 'Often times for a home health and hospice provider, office HVAC, care coordination, and phone systems can all move the bill in different ways depending on the schedule.'
   }
 
   if (cluster === 'healthcare' && /\b(pharmacy|pharmacies|compounding|apothecary|chemist)\b/i.test(text)) {
@@ -2328,11 +2408,15 @@ function buildStructuredIdentityProfile(
     description: cleanText(`${getPublicAccountDescription(account)} ${researchText} ${hierarchyText}`),
   }
   const primaryCandidate = companySpecificCandidates[0] || null
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText}`).toLowerCase()
+  const isPublicSector = /\b(city of|county|municipal|public facilities|utility infrastructure|public safety|public works)\b/i.test(text)
   const baseCluster = inferIndustryClusterFromSignals(account, null)
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
-  const cluster = resolvePreferredIndustryCluster(baseCluster, derivedCluster)
+  let cluster = isPublicSector ? 'public_sector' : resolvePreferredIndustryCluster(baseCluster, derivedCluster)
+  if (hasTruckLeasingSignals(text) || hasStrongDmeSignals(text) || hasRvSupportSignals(text)) {
+    cluster = 'logistics'
+  }
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText}`).toLowerCase()
 
   if (!text && !savedProfile) return null
   if (!text && savedProfile) return savedProfile
@@ -2351,7 +2435,7 @@ function buildStructuredIdentityProfile(
   const isPetrochemicalProducer = hasStrongPetrochemicalSignals(text)
   const isFurnitureManufacturer = hasFurnitureManufacturingSignals(text)
   const isTruckDealer = hasStrongTruckDealerSignals(text)
-  const isRVDealer = hasStrongRVDealerSignals(text)
+  const isRVDealer = hasStrongRVDealerSignals(text) && !hasRvSupportSignals(text)
   const isAutoGroup = hasStrongAutomotiveSignals(text) && !isTruckDealer && !isRVDealer
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isMaterialHandlingEquipment = hasMaterialHandlingEquipmentSignals(text)
@@ -2364,8 +2448,6 @@ function buildStructuredIdentityProfile(
   const isFreightForwarder = /\b(freight forwarder|nvo?cc|auto logistics|shipping|cargo|international transport|oversized cargo|roro|flat rack)\b/i.test(text)
   const isHotelGroup = /\b(hospitality group|hotel management|portfolio of hotels|hotel portfolio|hotel owner|resort portfolio|branded hotel owner)\b/i.test(text)
   const isHotelProperty = /\b(hotel|resort|motel|inn|guest rooms?|lodging)\b/i.test(text)
-  const isPublicSector = /\b(city of|county|municipal|public facilities|utility infrastructure|public safety|government entity)\b/i.test(text)
-
   let companyType = cleanText(account.industry) || 'commercial account'
   let operatingModel = multiSiteInfo.isMultiSite ? 'multi-site portfolio' : 'single-site operator'
   let facilityType = 'commercial facility'
@@ -2382,6 +2464,16 @@ function buildStructuredIdentityProfile(
         identityKeywords = selectIdentityKeywords(text, ['durable medical equipment', 'medical supplies', 'hospice DME', 'equipment logistics', 'direct-service locations', 'inventory management'], ['durable medical equipment', 'medical supplies', 'equipment logistics'])
         powerKeywords = selectIdentityKeywords(text, ['warehouse climate control', 'inventory storage', 'equipment maintenance', '24/7 distribution', 'delivery turnaround', 'vehicle/route load'], ['warehouse climate control', 'inventory storage', 'equipment maintenance'])
         talkTrackGuardrails = ['No hospital language', 'No clinic language', 'No emergency department language', 'No inpatient language', 'No patient-room language']
+        break
+      }
+
+      if (hasHomeHealthHospiceSignals(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'home health and hospice network' : 'home health and hospice provider'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site care coordination network' : 'home-care and hospice coordination office'
+        facilityType = 'home health / hospice office'
+        identityKeywords = selectIdentityKeywords(text, ['home health', 'hospice', 'end of life care', 'care coordination', 'patient support', 'visiting nurses', 'palliative care'], ['home health', 'hospice', 'care coordination'])
+        powerKeywords = selectIdentityKeywords(text, ['office HVAC', 'care coordination', 'phone systems', 'staff support', 'records and scheduling'], ['office HVAC', 'care coordination', 'phone systems'])
+        talkTrackGuardrails = ['No hospital language', 'No clinic language', 'No emergency department language', 'No inpatient language', 'No patient-room language', 'No manufacturing language']
         break
       }
 
@@ -2524,6 +2616,16 @@ function buildStructuredIdentityProfile(
       break
 
     case 'logistics':
+      if (hasRvSupportSignals(text)) {
+        companyType = multiSiteInfo.isMultiSite ? 'RV support and assembly network' : 'RV support and assembly operation'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-site RV setup, staging, and support footprint' : 'RV setup, staging, and support operation'
+        facilityType = 'RV support warehouse / setup facility'
+        identityKeywords = selectIdentityKeywords(text, ['RV industry', 'RV support', 'RV setup', 'warehousing and setup', 'assembly', 'staging', 'motorhome prep'], ['RV support', 'RV setup', 'warehouse support'])
+        powerKeywords = selectIdentityKeywords(text, ['warehouse support', 'assembly bays', 'staging area', 'loading dock', 'shop HVAC', 'lighting'], ['warehouse support', 'assembly bays', 'staging area'])
+        talkTrackGuardrails = ['No dealership language', 'No hotel language', 'No hospitality language', 'No manufacturing plant language', 'No logistics hauling language']
+        break
+      }
+
       if (hasPalletManagementSignals(text)) {
         companyType = multiSiteInfo.isMultiSite ? 'pallet management and reverse logistics network' : 'pallet management and reverse logistics operation'
         operatingModel = multiSiteInfo.isMultiSite ? 'multi-site pallet retrieval, repair, and sortation network' : 'pallet retrieval, repair, and sortation operation'
@@ -2746,7 +2848,7 @@ function buildStructuredIdentityProfile(
       facilityType = 'hotel'
       identityKeywords = selectIdentityKeywords(text, ['hotel', 'guest rooms', 'lodging', 'brand flag', 'laundry'], ['hotel', 'guest rooms', 'lodging'])
       powerKeywords = selectIdentityKeywords(text, ['guest rooms', 'laundry', 'kitchen', 'hvac'], ['guest rooms', 'laundry', 'HVAC'])
-      talkTrackGuardrails = ['No event-venue language unless the source explicitly says banquet or convention space']
+      talkTrackGuardrails = ['No hospital language', 'No clinic language', 'No emergency care language', 'No inpatient language', 'No emergency department language', 'No event-venue language unless the source explicitly says banquet or convention space']
       break
 
     case 'hospitality_group':
@@ -2755,7 +2857,7 @@ function buildStructuredIdentityProfile(
       facilityType = 'hotels / resorts'
       identityKeywords = selectIdentityKeywords(text, ['hospitality group', 'hotel portfolio', 'multiple properties', 'resorts', 'hotels'], ['hospitality group', 'hotel portfolio', 'multiple properties'])
       powerKeywords = selectIdentityKeywords(text, ['guest rooms', 'laundry', 'kitchen', 'hvac'], ['guest rooms', 'laundry', 'HVAC'])
-      talkTrackGuardrails = ['No event-venue language unless source confirms it']
+      talkTrackGuardrails = ['No hospital language', 'No clinic language', 'No emergency care language', 'No inpatient language unless source confirms it', 'No restaurant language', 'No manufacturing language']
       break
 
     case 'school_district':
@@ -3309,7 +3411,7 @@ function extractStructuredBriefFacts(
     avoidAngles.add('logistics hauling')
   }
 
-  if (hasStrongRVDealerSignals(text)) {
+  if (hasStrongRVDealerSignals(text) && !hasRvSupportSignals(text)) {
     addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, activities, ['RV sales', 'RV service', 'parts support'])
     addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, equipment, ['service bays', 'parts center', 'customer waiting area'])
     addIf(/rv dealership|motorhome dealership|motorhomes?|motor coach|motorcoach|recreational vehicles?|camper(?:s)?|travel trailer(?:s)?|toy hauler(?:s)?|rv service|rv parts/i, energyDrivers, ['service bays', 'parts center', 'shop HVAC', 'lot lighting'])
@@ -3393,6 +3495,18 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   if (/commercial real estate|real estate|property management|brokerage/.test(identity)) {
     return `Often times for a commercial real estate firm, the hard part is separating office usage from the larger buildings or tenant spaces being managed.`
   }
+  if (/hotel property|hotel operating context|hospitality group|hotel owner/.test(identity) || /hotel|resort|guest rooms?|laundry|hospitality property/i.test(driverText)) {
+    return `Often times for a hotel property, guest rooms, laundry, kitchen service, and HVAC can all stack up on the meter in the same busy window.`
+  }
+  if (/county government|municipal facility portfolio|public-sector organization|public sector operation/.test(identity)) {
+    return `Often times for a county government, it's hard to keep administrative offices, public safety sites, parks buildings, and utility infrastructure from stacking up on the same bill.`
+  }
+  if (/truck leasing|truck rental|fleet leasing|leasing and rental/.test(identity) || /truck leasing|truck rental|fleet leasing|leasing and rental|maintenance shops?|fleet staging|yard lighting/i.test(driverText)) {
+    return `Often times for a truck leasing and rental operation, maintenance shops, fleet staging, yard lighting, and office load can all hit the meter in the same busy window.`
+  }
+  if (/rv support and assembly|rv support warehouse|rv setup and support|rv support operation/.test(identity) || /rv support|rv setup|rv assembly|staging|warehouse support/i.test(driverText)) {
+    return `Often times for an RV support warehouse, assembly bays, staging, inventory handling, and warehouse HVAC can all hit the meter in the same busy window.`
+  }
   if (/medical equipment|medical supply|durable medical equipment|\bdme\b/.test(identity) || /medical supplies|equipment maintenance|inventory storage/i.test(driverText)) {
     return `Often times for a medical supply operation, warehouse cooling, equipment service, inventory storage, and delivery timing can all push the bill in different ways.`
   }
@@ -3424,7 +3538,7 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
     return `Often times for a specialty retailer, it's hard to separate retail floor cooling and lighting from back-room fulfillment and online order support.`
   }
   const isGenericHospitalIndustry = /hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/i.test(identity)
-  if (/hospital/.test(identity) && !isGenericHospitalIndustry) {
+  if (/\bhospital\b/.test(identity) && !isGenericHospitalIndustry) {
     return `Often times for a hospital facility, it's difficult to separate emergency care and imaging cycles from normal 24/7 HVAC loads.`
   }
   if (/behavioral health|community care|substance use|recovery|residential treatment/.test(identity) || /counseling|therapy|crisis spaces?|resident|residential/i.test(driverText)) {
@@ -3432,6 +3546,9 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   }
   if (/medical practice|clinic|clinical care/.test(identity) || /imaging|lab|laboratory|patient hours|treatment rooms/i.test(driverText)) {
     return `Often times in a clinic setting, imaging, lab work, treatment rooms, and patient-hour HVAC can hit the meter in different ways throughout the day.`
+  }
+  if (/home health|hospice|end of life care|care coordination/i.test(identity) || /care coordination|phone systems|staff support|records and scheduling/i.test(driverText)) {
+    return `Often times for a home health and hospice provider, care coordination, office HVAC, and phone systems can all move the bill in different ways depending on the schedule.`
   }
   if (/site-store|site store|petrochemical site|industrial plant support/.test(identity) || /inventory handling|delivery tracking|petrochemical plant support|receiving/i.test(driverText)) {
     return `Often times in site-store logistics, inventory handling, receiving, warehouse support, and delivery tracking can stack up during the same busy window.`
@@ -3458,6 +3575,8 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
       return `Often times for a restaurant operation, it's difficult to prevent kitchen equipment, refrigeration, and cooling from peaking during the exact same busy hours.`
     case 'healthcare':
       return `Often times for a healthcare facility, it's hard to balance 24/7 patient comfort with clinical equipment load without creating unexpected demand spikes.`
+    case 'public_sector':
+      return `Often times for a county government, it's hard to keep administrative offices, public safety sites, parks buildings, and utility infrastructure from driving the biggest bill days.`
     case 'residential_care':
       return `Often times for a residential-care operation, it's difficult to tell how resident spaces, counseling areas, and support HVAC roll up across the meters.`
     case 'logistics':
@@ -3484,6 +3603,9 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
   if (/medical supplies|equipment maintenance|inventory storage|delivery turnaround|warehouse climate/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether storage cooling, equipment service, or delivery activity is what moved the bill that month, or is that side of things pretty much handled?`
   }
+  if (/home health|hospice|end of life care|care coordination/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether care coordination, office HVAC, or phone systems are what moved the bill that month, or is that side of things pretty much handled?`
+  }
   if (/forklift|pallet rack|aerial lift|battery charging|equipment service|warehouse equipment|materials? handling/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether forklift charging, service work, parts areas, or shop cooling is what moved the bill that month, or is that side of things pretty much handled?`
   }
@@ -3492,6 +3614,12 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
   }
   if (/office occupancy|lease|tenant|conference|managed buildings|property/i.test(driverText)) {
     return `I'm curious, how do y'all separate normal office usage from the buildings or tenant spaces that are actually moving the bill, or is that side of things pretty much handled?`
+  }
+  if (/rv support|rv setup|rv assembly|staging|warehouse support/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether setup bays, staging, inventory handling, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
+  }
+  if (/hotel|resort|motel|inn|lodging|guest rooms?|laundry|hospitality property/i.test(driverText)) {
+    return `I'm curious, how do y'all tell whether guest rooms, laundry, kitchen service, or HVAC is what moved the bill that month, or is that side of things pretty much handled?`
   }
   if (/brewed teas|smoothies|tapioca|display cases|ice machines|drink equipment/i.test(driverText)) {
     return `I'm curious, how do y'all tell whether refrigeration, ice machines, drink equipment, or AC is what pushed the bill, or is that side of things pretty much handled?`
@@ -3516,9 +3644,17 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
         return `I'm curious, how do y'all tell whether imaging, lab areas, treatment rooms, or HVAC are what pushed the bill, or is that side of things pretty much handled?`
       }
       return `I'm curious, how do y'all tell which part of the facility is creating the bigger spikes without digging through the meter data, or is that pretty much handled?`
+    case 'public_sector':
+      return `I'm curious, how do y'all tell whether administrative offices, public safety sites, or utility buildings are what pushed the bill, or is that side of things pretty much handled?`
     case 'residential_care':
       return `I'm curious, how do y'all tell whether resident spaces, support areas, or HVAC are what moved the bill that month, or is that pretty much on autopilot?`
     case 'logistics':
+      if (/truck leasing|truck rental|fleet leasing|leasing and rental/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether maintenance shops, fleet staging, or yard lighting is what pushed the bill, or is that side of things pretty much handled?`
+      }
+      if (/rv support|rv setup|rv assembly|staging|warehouse support/i.test(driverText)) {
+        return `I'm curious, how do y'all tell whether setup bays, staging, inventory handling, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
+      }
       if (/site-store|site store|inventory handling|delivery tracking|petrochemical plant support|receiving/i.test(driverText)) {
         return `I'm curious, how do y'all tell whether site stores, inventory handling, delivery tracking, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
       }
@@ -3736,6 +3872,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasCraneSalesSupportSignals(text)) return 'logistics'
   if (hasIndustrialSiteLogisticsSignals(text)) return 'logistics'
   if (hasPalletManagementSignals(text)) return 'logistics'
+  if (hasTruckLeasingSignals(text)) return 'logistics'
   if (hasMaritimePilotSignals(text)) return 'public_transit'
   if (hasReadyMixConcreteSignals(text)) return 'manufacturing'
   if (hasFiberglassConduitSignals(text)) return 'manufacturing'
@@ -3767,7 +3904,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasStrongManufacturersRepSignals(text)) return 'office_services'
   // Food production — require primary food/beverage production signals, NOT just 'food service' (e.g. a manufacturer making food service equipment is not a food producer)
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b)/.test(text) &&
-      !/(manufactur|fabricat|weld|metal|steel|machine|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
+      !/(manufactur|fabricat|weld|metal|steel|machine|industrial gas|compressed air|compressor|hotel|hospitality|resort|lodging|motel|inn)/.test(text)) return 'manufacturing'
   if (hasStrongPetrochemicalSignals(text)) return 'manufacturing'
   // Core manufacturing signals were moved to higher priority position above healthcare
   if (hasStrongAutoPartsDistributionSignals(text)) return 'logistics'
@@ -3779,22 +3916,23 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   // Logistics check — exclude accounts that are primarily manufacturers (have fabrication/welding/industrial signals)
   if (/(building materials|lumber|wholesale distribution|specialty building materials|\bdistributor\b|distribution center|distribution centers|distribution network|\blogistics\b|\bwarehouse\b|\bdistribution\b|\bfulfillment\b|\bfreight\b|nvo?cc|\btrucking\b|supply chain|\btransport\b|\bshipping\b|\bcargo\b|auto logistics|freight forwarder)/.test(text) &&
       !/(manufactur|fabricat|weld|foundry|machine shop|precision metal|metal fabricat|industrial compressor|compressed air)/.test(text)) return 'logistics'
+  if (hasTruckLeasingSignals(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) &&
-      (!/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text) ||
+      (!/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics|hotel|hospitality|resort|lodging|motel|inn)/.test(text) ||
        /(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text))) return 'manufacturing'
+  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/.test(text)) return 'public_sector'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
   if (hotelProperty && (verifiedLocationCount === null || verifiedLocationCount <= 1)) return 'hotel_owner'
-  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy|psychiatric|partial hospitalization|intensive outpatient|substance use|chemical dependency)/.test(text)) return 'healthcare'
+  if (/(healthcare|\bhospital\b|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy|psychiatric|partial hospitalization|intensive outpatient|substance use|chemical dependency)/.test(text)) return 'healthcare'
   if (/(restaurant|dining|cafe|café|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
-  if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
+  if (/(retail|store|shopping|franchise|dealer|showroom|convenience|\brecreation\b|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
   if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
   if (hasReligiousOrganizationSignals(text)) return 'religious'
-  if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
   if (/(school|education|university|college|nonprofit|foundation|charity|academy|daycare|preschool|childcare|tutoring|learning center)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
@@ -3814,11 +3952,13 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasReadyMixConcreteSignals(coreText)) return 'manufacturing'
   if (hasFiberglassConduitSignals(coreText)) return 'manufacturing'
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/i.test(coreText) &&
-      !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/i.test(coreText)) return 'manufacturing'
+      !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor|hotel|hospitality|resort|lodging|motel|inn)/i.test(coreText)) return 'manufacturing'
   if (hasPublicTransitSignals(coreText)) return 'public_transit'
   if (hasMaritimePilotSignals(coreText)) return 'public_transit'
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
+  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/i.test(coreText)) return 'public_sector'
+  if (hasTruckLeasingSignals(coreText)) return 'logistics'
   if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
   if (hasPlasticsDistributionSignals(coreText)) return 'logistics'
   if (hasCraneSalesSupportSignals(coreText)) return 'logistics'
@@ -5057,7 +5197,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
-      if (hasStrongRVDealerSignals(text)) {
+      if (hasStrongRVDealerSignals(text) && !hasRvSupportSignals(text)) {
         const locationDesc = retailMultiSite.locationCount
           ? retailMultiSite.locationCount >= 10
             ? `${retailMultiSite.locationCount}+ RV locations`
@@ -5887,7 +6027,7 @@ Return JSON only with this shape:
     }
 
     const opener = cleanText(parsed.opener)
-    const talkTrack = simplifyTalkTrackLanguage(cleanText(parsed.talk_track))
+    const talkTrack = enforceIndustryTalkTrackGuardrails(simplifyTalkTrackLanguage(cleanText(parsed.talk_track)), account, candidate)
 
     // Validate the AI-generated talk track
     const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
@@ -6319,6 +6459,38 @@ function buildTwoSentenceTalkTrack(problemSentence: string, questionSentence: st
   )
 }
 
+function enforceIndustryTalkTrackGuardrails(talkTrack: string, account: AccountRow, candidate: ResearchHit | null) {
+  const text = cleanText(talkTrack)
+  const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const cluster = inferIndustryCluster(account, candidate)
+
+  if (cluster === 'hotel_owner' || cluster === 'hospitality_group') {
+    if (/\b(emergency care|inpatient|imaging|lab work|hospital|clinic)\b/i.test(text)) {
+      return simplifyTalkTrackLanguage(`Often times for a hotel owner, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`)
+    }
+  }
+
+  if (cluster === 'logistics' && hasRvSupportSignals(accountText)) {
+    if (/\b(automotive dealership|service bays?|showroom|compressor|production equipment|process equipment)\b/i.test(text)) {
+      return simplifyTalkTrackLanguage(`Often times for an RV support warehouse, setup bays, staging, inventory handling, and warehouse HVAC can all hit the meter in the same busy window. I'm curious, how do y'all tell whether setup bays, staging, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`)
+    }
+  }
+
+  if (cluster === 'logistics' && hasTruckLeasingSignals(accountText)) {
+    if (/\b(dealership|showroom|customer lounge|parts counter)\b/i.test(text)) {
+      return simplifyTalkTrackLanguage(`Often times for a truck leasing and rental operation, maintenance shops, fleet staging, yard lighting, and office load can all hit the meter in the same busy window. I'm curious, how do y'all tell whether maintenance shops, fleet staging, or yard lighting is what pushed the bill, or is that side of things pretty much handled?`)
+    }
+  }
+
+  if (cluster === 'manufacturing' && hasRvSupportSignals(accountText)) {
+    if (/\b(automotive dealership|service bays?|showroom|compressor|production equipment|process equipment)\b/i.test(text)) {
+      return simplifyTalkTrackLanguage(`Often times for an RV support warehouse, setup bays, staging, inventory handling, and warehouse HVAC can all hit the meter in the same busy window. I'm curious, how do y'all tell whether setup bays, staging, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`)
+    }
+  }
+
+  return text
+}
+
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
@@ -6410,7 +6582,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     )
   }
 
-  if (hasStrongRVDealerSignals(accountText)) {
+  if (hasStrongRVDealerSignals(accountText) && !hasRvSupportSignals(accountText)) {
     const rvProblems = [
       `Often times for an RV dealership, service bays, parts support, and customer waiting areas can all hit the meter in the same busy window.`,
       `Often times for a motorhome dealer, service work and showroom comfort cooling can move the bill more than a normal retail setup because the repair windows overlap.`,
@@ -7281,6 +7453,26 @@ function buildFallbackSignalDetail(account: AccountRow, candidate: ResearchHit |
     return shortenText(detail, 560)
   }
 
+  if (profile?.industryCluster === 'logistics' && hasRvSupportSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates as an RV support warehouse and assembly operation.`,
+      `The relevant operating pieces are setup bays, staging, inventory handling, assembly support, and warehouse HVAC, not a dealership floor or a generic plant.`,
+      `The electricity angle is checking whether those support and staging windows are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
+  if (profile?.industryCluster === 'logistics' && hasTruckLeasingSignals(detailText)) {
+    const detail = [
+      verifiedFact,
+      `${companyName}${location ? ` is based in ${location}` : ''} and operates as a truck leasing and rental network with maintenance shops and fleet support.`,
+      `The relevant operating pieces are maintenance bays, fleet staging, yard lighting, office load, and vehicle turnover, not a truck dealership floor.`,
+      `The electricity angle is checking whether maintenance and staging windows are creating the highest usage moments on the meter.`,
+    ].filter(Boolean).join(' ')
+    return shortenText(detail, 560)
+  }
+
   const operatingFact = `${companyName}${location ? ` is based in ${location}` : ''} and operates as ${getIndefiniteArticle(companyType)} ${companyType.toLowerCase() === 'commercial account' ? 'commercial facility' : companyType.toLowerCase()}.`
   
   const operationDetail = identityKeywords.length
@@ -7363,6 +7555,58 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
     return `${companyName} Manages Retail Store and Customer-Facing Facility Load`
   }
 
+  if (profile?.industryCluster === 'healthcare') {
+    if (hasHomeHealthHospiceSignals(text)) {
+      return `${companyName} Home Health and Hospice Operating Context`
+    }
+    if (/(durable medical equipment|\bdme\b|home medical equipment|hospice equipment|medical supplies?)/i.test(text)) {
+      return `${companyName} Durable Medical Equipment Operating Context`
+    }
+    if (hasStrongDentalSignals(text)) {
+      return `${companyName} Dental Practice Operating Context`
+    }
+    if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|blood collection|blood processing|specialized laboratory testing)/i.test(text)) {
+      return `${companyName} Blood Center Operating Context`
+    }
+    if (hasStrongBehavioralHealthSignals(text)) {
+      return `${companyName} Behavioral Health Operating Context`
+    }
+    return `${companyName} Healthcare Operating Context`
+  }
+
+  if (profile?.industryCluster === 'hotel_owner') {
+    if (/\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|hospitality property)\b/i.test(text)) {
+      return `${companyName} Hotel Property Operating Context`
+    }
+    return `${companyName} Hotel Operating Context`
+  }
+
+  if (profile?.industryCluster === 'hospitality_group') {
+    return `${companyName} Hospitality Group Operating Context`
+  }
+
+  if (profile?.industryCluster === 'public_sector') {
+    if (/\bcounty\b/i.test(text)) {
+      return `${companyName} County Government and Public Services Operating Context`
+    }
+    if (/\b(city|municipal)\b/i.test(text)) {
+      return `${companyName} Municipal Services Operating Context`
+    }
+    return `${companyName} Public Sector Operating Context`
+  }
+
+  if (profile?.industryCluster === 'logistics' && hasRvSupportSignals(text)) {
+    return `${companyName} RV Support Warehouse and Assembly Operating Context`
+  }
+
+  if (profile?.industryCluster === 'logistics' && hasTruckLeasingSignals(text)) {
+    return `${companyName} Truck Leasing and Rental Operating Context`
+  }
+
+  if (hasRvSupportSignals(text)) {
+    return `${companyName} RV Support Warehouse and Assembly Operating Context`
+  }
+
   if (profile?.industryCluster === 'school_district') {
     if (/\b(private k-?12 school|private school|college-preparatory|day school)\b/i.test(text)) {
       return `${companyName} Private K-12 Campus Operating Context`
@@ -7371,6 +7615,9 @@ function buildCompanyContextHeadline(account: AccountRow, candidate: ResearchHit
   }
 
   if (profile?.companyType) {
+    if (hasHomeHealthHospiceSignals(text)) {
+      return `${companyName} Home Health and Hospice Operating Context`
+    }
     return cleanText(`${companyName} ${toTitleCase(profile.companyType)} Facility and Billing Intel`)
   }
 
@@ -7396,6 +7643,9 @@ function normalizeFinalSignalHeadline(headline: string, account: AccountRow, can
   }
   if (/\bwebsite facility and billing intel\b/i.test(cleaned)) {
     return buildCompanyContextHeadline(account, null)
+  }
+  if (hasRvSupportSignals(accountText)) {
+    return buildCompanyContextHeadline(account, candidate)
   }
   return cleaned
 }
@@ -8760,11 +9010,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const finalHeadline = normalizeFinalSignalHeadline(validated.signal_headline || '', briefingAccount, talkTrackCandidate)
+      const rawFinalTalkTrack = simplifyTalkTrackLanguage(validated.talk_track || '')
+      const accountText = cleanText(`${briefingAccount.name || ''} ${briefingAccount.industry || ''} ${getPublicAccountDescription(briefingAccount)} ${getAccountNotes(briefingAccount)} ${talkTrackCandidate?.title || ''} ${talkTrackCandidate?.snippet || ''}`).toLowerCase()
+      let finalTalkTrack = rawFinalTalkTrack
+
+      if ((identityProfile?.industryCluster === 'hotel_owner' || identityProfile?.industryCluster === 'hospitality_group') &&
+        /\b(emergency care|inpatient|imaging|lab work|hospital|clinic)\b/i.test(rawFinalTalkTrack)) {
+        finalTalkTrack = `Often times for a hotel owner, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`
+      }
+
+      if ((identityProfile?.industryCluster === 'logistics' || identityProfile?.industryCluster === 'manufacturing') &&
+        hasRvSupportSignals(accountText) &&
+        /\b(automotive dealership|service bays?|showroom|compressor|production equipment|process equipment)\b/i.test(rawFinalTalkTrack)) {
+        finalTalkTrack = `Often times for an RV support warehouse, setup bays, staging, inventory handling, and warehouse HVAC can all hit the meter in the same busy window. I'm curious, how do y'all tell whether setup bays, staging, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
+      }
       validated = {
         ...validated,
         signal_headline: finalHeadline,
         signal_detail: normalizeSignalDetail(validated.signal_detail || '', finalHeadline, briefingAccount, talkTrackCandidate),
-        talk_track: simplifyTalkTrackLanguage(validated.talk_track || ''),
+        talk_track: finalTalkTrack,
       }
 
       const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate)
