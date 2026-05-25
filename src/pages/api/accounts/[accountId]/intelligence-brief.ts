@@ -1984,6 +1984,10 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
         return `${prefix}, the main factor is usually how showroom traffic, service bays, parts, and lot lighting are landing on that dealership meter.`
       }
       return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
+    case 'hospitality_group':
+      return `I'm curious, how do y'all check each hotel on its own meter to spot which property is pushing the bill, or is that pretty much on autopilot?`
+    case 'hotel_owner':
+      return `I'm curious, how do y'all tell whether guest rooms, laundry, kitchen service, or HVAC is creating the bigger spike, or is that pretty much on autopilot?`
     case 'logistics':
       if (hasTruckLeasingSignals(accountText)) {
         return `${prefix}, the main factor is usually how maintenance shops, fleet staging, yard lighting, and office load are landing on the truck leasing site.`
@@ -3495,7 +3499,10 @@ function buildPlainProblemFrame(cluster: IndustryCluster, companyIdentity: strin
   if (/commercial real estate|real estate|property management|brokerage/.test(identity)) {
     return `Often times for a commercial real estate firm, the hard part is separating office usage from the larger buildings or tenant spaces being managed.`
   }
-  if (/hotel property|hotel operating context|hospitality group|hotel owner/.test(identity) || /hotel|resort|guest rooms?|laundry|hospitality property/i.test(driverText)) {
+  if (cluster === 'hospitality_group' || /hospitality group|hotel management|portfolio of hotels|hotel portfolio|resort portfolio|full-service hospitality|branded hotel owner|hotel ownership group|hotel operator|hotel development and management|resort management company/.test(identity)) {
+    return `Often times for a hospitality group, it's hard to keep each property's guest rooms, laundry, kitchen service, and HVAC from landing on the meter in the same busy window.`
+  }
+  if (/hotel property|hotel operating context|hotel owner/.test(identity) || /hotel|resort|guest rooms?|laundry|hospitality property/i.test(driverText)) {
     return `Often times for a hotel property, guest rooms, laundry, kitchen service, and HVAC can all stack up on the meter in the same busy window.`
   }
   if (/county government|municipal facility portfolio|public-sector organization|public sector operation/.test(identity)) {
@@ -3619,6 +3626,9 @@ function buildPlainQuestionFrame(cluster: IndustryCluster, drivers: string[], au
     return `I'm curious, how do y'all tell whether setup bays, staging, inventory handling, or warehouse support is what pushed the bill, or is that side of things pretty much handled?`
   }
   if (/hotel|resort|motel|inn|lodging|guest rooms?|laundry|hospitality property/i.test(driverText)) {
+    if (cluster === 'hospitality_group') {
+      return `I'm curious, how do y'all check each hotel on its own meter to spot which property is pushing the bill, or is that side of things pretty much handled?`
+    }
     return `I'm curious, how do y'all tell whether guest rooms, laundry, kitchen service, or HVAC is what moved the bill that month, or is that side of things pretty much handled?`
   }
   if (/brewed teas|smoothies|tapioca|display cases|ice machines|drink equipment/i.test(driverText)) {
@@ -6466,7 +6476,11 @@ function enforceIndustryTalkTrackGuardrails(talkTrack: string, account: AccountR
 
   if (cluster === 'hotel_owner' || cluster === 'hospitality_group') {
     if (/\b(emergency care|inpatient|imaging|lab work|hospital|clinic)\b/i.test(text)) {
-      return simplifyTalkTrackLanguage(`Often times for a hotel owner, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`)
+      return simplifyTalkTrackLanguage(
+        cluster === 'hospitality_group'
+          ? `Often times for a hospitality group, it's hard to keep each property's guest rooms, laundry, and HVAC from landing on the meter in the same busy window. I'm curious, how do y'all check each hotel on its own meter to spot which property is pushing the bill, or is that side of things pretty much handled?`
+          : `Often times for a hotel property, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`
+      )
     }
   }
 
@@ -9016,7 +9030,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if ((identityProfile?.industryCluster === 'hotel_owner' || identityProfile?.industryCluster === 'hospitality_group') &&
         /\b(emergency care|inpatient|imaging|lab work|hospital|clinic)\b/i.test(rawFinalTalkTrack)) {
-        finalTalkTrack = `Often times for a hotel owner, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`
+        finalTalkTrack = identityProfile?.industryCluster === 'hospitality_group'
+          ? `Often times for a hospitality group, it's hard to keep each property's guest rooms, laundry, and HVAC from landing on the meter in the same busy window. I'm curious, how do y'all check each hotel on its own meter to spot which property is pushing the bill, or is that side of things pretty much handled?`
+          : `Often times for a hotel property, guest rooms, laundry, and HVAC can all hit the meter during the same busy window. I'm curious, how do y'all tell whether guest rooms, laundry, and HVAC are what moved the bill that month, or is that side of things pretty much handled?`
       }
 
       if ((identityProfile?.industryCluster === 'logistics' || identityProfile?.industryCluster === 'manufacturing') &&
