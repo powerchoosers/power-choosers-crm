@@ -9,7 +9,7 @@ import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
-import { isActiveLoadAccount, isCustomerStatus } from '@/lib/status-filters';
+import { buildAccountStatusClauses, isActiveLoadAccount, isCustomerStatus } from '@/lib/status-filters';
 
 const HOVER_DELAY_MS = 1000;
 /** Time to keep card open after leaving marker so user can move to card and click Open dossier */
@@ -54,14 +54,14 @@ export default function InfrastructureMap() {
   }), [marketPulse]);
 
   // Fetch contacts org-wide, then apply "customer + true active load" filtering client-side.
-  const { data: contactsData, isLoading: contactsLoading } = useInfiniteQuery({
+  const { data: contactsData, isLoading: contactsLoading, error: contactsError } = useInfiniteQuery({
     queryKey: ['contacts-infrastructure', user?.email],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (!user) return { contacts: [], nextCursor: null };
       const q = supabase
         .from('contacts')
-        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, contract_end_date, status, latitude, longitude, logo_url, domain)', { count: 'exact' });
+        .select('*, accounts!contacts_accountId_fkey!inner(id, name, city, state, industry, annual_usage, contract_end_date, status, latitude, longitude, logo_url, domain)', { count: 'exact' });
       const PAGE_SIZE = 1000;
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -74,13 +74,15 @@ export default function InfrastructureMap() {
   });
 
   // Fetch accounts that may have no contacts, then apply the same eligibility rule.
-  const { data: accountsData } = useQuery({
+  const { data: accountsData, isLoading: accountsLoading, error: accountsError } = useQuery({
     queryKey: ['accounts-infrastructure-map'],
     queryFn: async () => {
+      const today = new Date().toISOString().slice(0, 10);
       const { data, error } = await supabase
         .from('accounts')
         .select('id, name, city, state, industry, annual_usage, contract_end_date, status, latitude, longitude, logo_url, domain')
-        .limit(2000);
+        .or(buildAccountStatusClauses(['CUSTOMER', 'ACTIVE_LOAD'], today).join(','))
+        .limit(500);
       if (error) throw error;
       return data || [];
     },
@@ -89,8 +91,8 @@ export default function InfrastructureMap() {
 
   // Flatten contacts and map to nodes; then add account-only nodes for accounts not already represented
   const nodes = useMemo(() => {
-    if (!contactsData) return [];
-    const eligibleContacts = contactsData.pages
+    const contactPages = contactsData?.pages ?? [];
+    const eligibleContacts = contactPages
       .flatMap(page => page.contacts)
       .filter(contact => {
         const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts;
@@ -232,6 +234,8 @@ export default function InfrastructureMap() {
     return [...contactNodes, ...accountNodes];
   }, [contactsData, accountsData, prices]);
 
+  const hasDataError = Boolean(contactsError || accountsError);
+
   const handleMarkerMouseOver = useCallback((node: MapNode) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
     hoverTimerRef.current = setTimeout(() => setHoveredNode(node), HOVER_DELAY_MS);
@@ -313,6 +317,28 @@ export default function InfrastructureMap() {
           </Marker>
         ))}
       </Map>
+
+      {hasDataError && nodes.length === 0 && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="nodal-glass rounded-2xl border border-red-500/20 bg-black/70 px-5 py-4 text-center">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-red-300">Grid asset query failed</p>
+            <p className="mt-2 max-w-sm text-xs text-zinc-500">
+              The map loaded, but account markers could not be retrieved.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!hasDataError && !contactsLoading && !accountsLoading && nodes.length === 0 && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+          <div className="nodal-glass rounded-2xl border border-white/10 bg-black/70 px-5 py-4 text-center">
+            <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-300">No active load nodes</p>
+            <p className="mt-2 max-w-sm text-xs text-zinc-500">
+              No customer or active-load accounts are available for this view.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* THE HUD OVERLAY */}
       <div className="absolute top-6 left-6 pointer-events-none">
