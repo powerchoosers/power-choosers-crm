@@ -93,37 +93,67 @@ function subjectMatchesTheme(subject, theme) {
   }
 }
 
-function inferThemeFromBriefText(contextText = '', replyStage = 'general') {
+function inferThemeFromBriefText(contextText = '', replyStage = 'general', account = null) {
   const combined = cleanText(contextText).toLowerCase();
-  if (/(pallet management|reverse logistics|pallet repair|sortation|pallet retrieval)/.test(combined)) return 'Pallet network';
-  if (/(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|dealer network|parts ordering|customer assistance|equipment support|service bays|parts areas)/.test(combined)) return 'Parts and service';
-  if (/(blood center|blood bank|donor|blood products?|blood components?|blood storage|biotherap|blood collection|blood processing)/.test(combined)) return 'Blood storage';
-  if (/(school|campus|classroom|athletics|cafeteria|student|k-12|academy|education|school district)/.test(combined)) return 'Campus peaks';
-  if (/(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|auto|automotive)/.test(combined)) return 'Service bays';
-  if (/(dessert|food production|baking|bakery|refrigerat|packaging|cheesecake|pies?)/.test(combined)) return 'Production load';
-  if (/(restaurant|seafood|kitchen|food service|dining|menu)/.test(combined)) return 'Kitchen load';
-  if (/(hospital|clinic|medical|behavioral|substance use|healthcare|blood center|patient|lab)/.test(combined)) return 'Clinical uptime';
-  if (/(office solutions|managed it|print|information technology|office|showroom|controls displays|lighting reps?)/.test(combined)) return 'Office load';
-  if (/(government|municipal|city|county|public|nonprofit|church)/.test(combined)) return 'Facility overhead';
-  if (/(manufacturing|industrial|plant|production|machining|fabrication|equipment|machinery)/.test(combined)) return 'Production load';
-  if (/(hotel|hospitality|collection|inn|resort|guest)/.test(combined)) return 'Hotel load';
-  if (/(real estate|facilities|property|lease|building)/.test(combined)) return 'Site load';
+  
+  // Use account profile if available
+  const profile = account?.metadata?.intelligenceProfile;
+  const cluster = profile?.industryCluster;
+  
+  if (cluster === 'school_district') return 'Campus peaks';
+  if (cluster === 'logistics' && /pallet/i.test(combined)) return 'Pallet network';
+  if (cluster === 'logistics' && /dme|medical equipment|hospice/i.test(combined)) return 'Clinical uptime';
+  if (cluster === 'logistics') return 'Site load';
+  if (cluster === 'manufacturing') return 'Production load';
+  if (cluster === 'healthcare') return 'Clinical uptime';
+  if (cluster === 'restaurant') return 'Kitchen load';
+  if (cluster === 'hotel_owner' || cluster === 'hospitality_group') return 'Hotel load';
+  if (cluster === 'public_sector') return 'Facility overhead';
+
+  if (/\b(pallet management|reverse logistics|pallet repair|sortation|pallet retrieval)\b/i.test(combined)) return 'Pallet network';
+  if (/\b(construction machinery|construction equipment|concrete mixers?|mortar pumps?|access equipment|dealer network|parts ordering|customer assistance|equipment support|service bays|parts areas)\b/i.test(combined)) return 'Parts and service';
+  if (/\b(blood center|blood bank|donor|blood products?|blood components?|blood storage|biotherap|blood collection|blood processing)\b/i.test(combined)) return 'Blood storage';
+  if (/\b(school district|isd|public school|classroom|athletics|cafeteria|student|k-12)\b/i.test(combined)) return 'Campus peaks';
+  if (/\b(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|automotive)\b/i.test(combined) || /\bauto\b/i.test(combined)) return 'Service bays';
+  if (/\b(dessert|food production|baking|bakery|refrigerat|packaging|cheesecake|pies?)\b/i.test(combined)) return 'Production load';
+  if (/\b(restaurant|seafood|kitchen|food service|dining|menu)\b/i.test(combined)) return 'Kitchen load';
+  if (/\b(hospital|clinic|medical|behavioral|substance use|healthcare|blood center|patient|lab)\b/i.test(combined)) return 'Clinical uptime';
+  if (/\b(office solutions|managed it|print|information technology|office|showroom|controls displays|lighting rep(?:resentative)?s?)\b/i.test(combined)) return 'Office load';
+  if (/\b(government|municipal|city|county|public|nonprofit|church)\b/i.test(combined)) return 'Facility overhead';
+  if (/\b(manufacturing|industrial|plant|production|machining|fabrication|equipment|machinery)\b/i.test(combined)) return 'Production load';
+  if (/\b(hotel|hospitality|collection|inn|resort|guest)\b/i.test(combined)) return 'Hotel load';
+  if (/\b(real estate|facilities|property|lease|building)\b/i.test(combined)) return 'Site load';
   if (replyStage === 'no_reply') return 'Quick reply';
   if (replyStage === 'follow_up') return 'Quick check';
   return 'Renewal timing';
 }
 
-function resolveBriefThemeOverride(contextText = '') {
+function resolveBriefThemeOverride(contextText = '', account = null) {
   const combined = cleanText(contextText).toLowerCase();
+  
+  // Use account profile if available
+  const profile = account?.metadata?.intelligenceProfile;
+  const cluster = profile?.industryCluster;
+  
+  if (cluster === 'school_district') return 'Campus peaks';
+  if (cluster === 'logistics' && /pallet/i.test(combined)) return 'Pallet network';
+  if (cluster === 'logistics' && /dme|medical equipment|hospice/i.test(combined)) return 'Clinical uptime';
+  if (cluster === 'logistics') return 'Site load';
+  if (cluster === 'manufacturing') return 'Production load';
+  if (cluster === 'healthcare') return 'Clinical uptime';
+  if (cluster === 'restaurant') return 'Kitchen load';
+  if (cluster === 'hotel_owner' || cluster === 'hospitality_group') return 'Hotel load';
+  if (cluster === 'public_sector') return 'Facility overhead';
+
   if (combined.includes('pallet management') || combined.includes('reverse logistics') || combined.includes('pallet repair') || combined.includes('pallet retrieval') || combined.includes('sortation')) return 'Pallet network';
   if (combined.includes('construction machinery') || combined.includes('construction equipment') || combined.includes('concrete mixers') || combined.includes('mortar pumps') || combined.includes('access equipment') || combined.includes('dealer network') || combined.includes('parts ordering') || combined.includes('customer assistance') || combined.includes('equipment support') || combined.includes('service bays') || combined.includes('parts areas')) return 'Parts and service';
   if (combined.includes('blood center') || combined.includes('blood bank') || combined.includes('blood storage') || combined.includes('blood products') || combined.includes('blood components') || combined.includes('blood collection') || combined.includes('blood processing') || combined.includes('donor')) return 'Blood storage';
   if (combined.includes('dessert') || combined.includes('food production') || combined.includes('food manufacturing') || combined.includes('baking') || combined.includes('bakery') || combined.includes('cheesecake') || combined.includes('pies') || combined.includes('pie') || combined.includes('packaging')) return 'Production load';
-  if (combined.includes('school') || combined.includes('campus') || combined.includes('classroom') || combined.includes('athletics') || combined.includes('cafeteria') || combined.includes('student') || combined.includes('k-12') || combined.includes('academy') || combined.includes('education') || combined.includes('school district')) return 'Campus peaks';
-  if (combined.includes('truck') || combined.includes('dealership') || combined.includes('service bay') || combined.includes('service department') || combined.includes('body shop') || combined.includes('rv center') || combined.includes('lot lighting') || combined.includes('automotive') || combined.includes('auto')) return 'Service bays';
+  if (/\b(school district|isd|public school|classroom|athletics|cafeteria|student|k-12)\b/i.test(combined)) return 'Campus peaks';
+  if (/\b(truck|dealership|dealers?hip|service bay|service department|body shop|rv center|lot lighting|automotive)\b/i.test(combined) || /\bauto\b/i.test(combined)) return 'Service bays';
   if (combined.includes('restaurant') || combined.includes('seafood') || combined.includes('kitchen') || combined.includes('food service') || combined.includes('dining') || combined.includes('menu')) return 'Kitchen load';
-  if (combined.includes('hospital') || combined.includes('clinic') || combined.includes('medical') || combined.includes('behavioral') || combined.includes('substance use') || combined.includes('healthcare') || combined.includes('patient') || combined.includes('lab')) return 'Clinical uptime';
-  if (combined.includes('office solutions') || combined.includes('managed it') || combined.includes('print') || combined.includes('information technology') || combined.includes('office') || combined.includes('showroom') || combined.includes('controls displays') || combined.includes('lighting reps')) return 'Office load';
+  if (/\b(hospital|clinic|medical|behavioral|substance use|healthcare|patient|lab)\b/i.test(combined)) return 'Clinical uptime';
+  if (combined.includes('office solutions') || combined.includes('managed it') || combined.includes('print') || combined.includes('information technology') || combined.includes('office') || combined.includes('showroom') || combined.includes('controls displays') || /\blighting rep(?:resentative)?s?\b/i.test(combined)) return 'Office load';
   if (combined.includes('government') || combined.includes('municipal') || combined.includes('city') || combined.includes('county') || combined.includes('public') || combined.includes('nonprofit') || combined.includes('church')) return 'Facility overhead';
   if (combined.includes('manufacturing') || combined.includes('industrial') || combined.includes('plant') || combined.includes('production') || combined.includes('machining') || combined.includes('fabrication') || combined.includes('equipment') || combined.includes('machinery')) return 'Production load';
   if (combined.includes('hotel') || combined.includes('hospitality') || combined.includes('collection') || combined.includes('inn') || combined.includes('resort') || combined.includes('guest')) return 'Hotel load';
@@ -131,13 +161,13 @@ function resolveBriefThemeOverride(contextText = '') {
   return null;
 }
 
-function refineSequenceSubjectLine(rawSubject, contextText = '', replyStage = 'general') {
+function refineSequenceSubjectLine(rawSubject, contextText = '', replyStage = 'general', account = null) {
   const normalized = normalizeSubject(rawSubject);
-  const explicitTheme = resolveBriefThemeOverride(contextText);
+  const explicitTheme = resolveBriefThemeOverride(contextText, account);
   if (explicitTheme) {
     return normalizeSubject(explicitTheme);
   }
-  const inferredTheme = inferThemeFromBriefText(contextText, replyStage) || inferSubjectThemeFromContext(contextText, replyStage);
+  const inferredTheme = inferThemeFromBriefText(contextText, replyStage, account) || inferSubjectThemeFromContext(contextText, replyStage);
   if (!subjectLooksGeneric(normalized) && subjectMatchesTheme(normalized, inferredTheme)) {
     return normalized;
   }
@@ -1121,7 +1151,7 @@ export default async function handler(req, res) {
     ]
       .filter(Boolean)
       .join(' ');
-    const finalSubject = refineSequenceSubjectLine(renderedSubject, subjectContextText, replyStage);
+    const finalSubject = refineSequenceSubjectLine(renderedSubject, subjectContextText, replyStage, account);
 
     if (/\{\{\s*[^}]+\s*\}\}/.test(renderedBody) || /\{\{\s*[^}]+\s*\}\}/.test(renderedSubject)) {
       throw new Error('Sequence template still contains unresolved variables after rendering');

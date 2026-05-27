@@ -131,6 +131,35 @@ type AccountRow = {
   intelligence_brief_status: BriefStatus | string | null
 }
 
+type MeterRow = {
+  id: string
+  esid: string | null
+  service_address: string | null
+  status: string | null
+  rate: string | null
+  end_date: string | null
+}
+
+/**
+ * Merged site intelligence: confirmed meter addresses, ESI IDs, and research-inferred
+ * locations when meter data is sparse. Used to ground the AI opener and talk track
+ * with real service addresses instead of the account-level city field.
+ */
+type SiteContext = {
+  /** Confirmed service addresses from meters table (most trusted) */
+  confirmedAddresses: string[]
+  /** ESI IDs from meters table */
+  esids: string[]
+  /** Total confirmed meter count (meters table + service_addresses field, deduplicated) */
+  confirmedMeterCount: number
+  /** Locations inferred from research candidates when meter count is low */
+  researchInferredLocations: string[]
+  /** Whether research clearly mentions more locations than we have in meters */
+  researchSuggestsMoreSites: boolean
+  /** Combined summary string for prompt injection */
+  promptBlock: string
+}
+
 type ResearchHit = {
   priority: number
   label: string
@@ -328,6 +357,142 @@ type StructuredBriefFacts = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
+
+/** Fetch all meters for an account from the meters table */
+async function fetchAccountMeters(accountId: string): Promise<MeterRow[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('meters')
+      .select('id, esid, service_address, status, rate, end_date')
+      .eq('account_id', accountId)
+      .order('created_at', { ascending: true })
+    if (error) {
+      console.warn('[SiteContext] meters fetch failed:', error.message)
+      return []
+    }
+    return (data || []) as MeterRow[]
+  } catch (e) {
+    console.warn('[SiteContext] meters fetch exception:', e)
+    return []
+  }
+}
+
+/**
+ * Extract city/location mentions from research snippets.
+ * Used when meter data is sparse to supplement with research-confirmed sites.
+ */
+function extractResearchLocations(candidates: ResearchHit[], accountCity: string | null): string[] {
+  const TX_CITY = /\b([A-Z][a-z]+(?: [A-Z][a-z]+)*)(?:,\s*(?:TX|Texas))?\b/g
+  const seen = new Set<string>()
+  const accountCityNorm = (accountCity || '').toLowerCase().trim()
+  const locs: string[] = []
+  for (const c of candidates.slice(0, 10)) {
+    const text = `${c.title} ${c.snippet}`
+    let m: RegExpExecArray | null
+    TX_CITY.lastIndex = 0
+    while ((m = TX_CITY.exec(text)) !== null) {
+      const loc = m[1].trim()
+      const norm = loc.toLowerCase()
+      // Skip generic words, the account's own city, and short noise
+      if (norm.length < 4 || norm === accountCityNorm) continue
+      if (/^(the|and|for|with|from|that|this|they|their|have|been|were|will|also|more|some|each|into|over|after|before|during|these|those|which|about|other|while|there|where|every|under|since|when|then|than|both|only|just|such|even|well|most|much|many|very|here|like|upon|next|able|full)$/i.test(norm)) continue
+      if (!seen.has(norm)) {
+        seen.add(norm)
+        locs.push(loc)
+      }
+    }
+  }
+  return locs.slice(0, 8)
+}
+
+/**
+ * Build a SiteContext from meters table rows, accounts.service_addresses,
+ * and research candidates. Research locations fill the gap when meter data is thin.
+ */
+function buildSiteContext(
+  meters: MeterRow[],
+  serviceAddresses: unknown,
+  candidates: ResearchHit[],
+  account: AccountRow,
+): SiteContext {
+  // 1. Confirmed addresses from meters table
+  const meterAddresses = meters
+    .map((m) => cleanText(m.service_address || ''))
+    .filter(Boolean)
+
+  const meterEsids = meters
+    .map((m) => cleanText(m.esid || ''))
+    .filter(Boolean)
+
+  // 2. Addresses from accounts.service_addresses (secondary)
+  const saList = Array.isArray(serviceAddresses) ? serviceAddresses : []
+  const saAddresses = saList
+    .map((sa: unknown) => {
+      if (typeof sa === 'string') return cleanText(sa)
+      if (sa && typeof sa === 'object') {
+        const r = sa as Record<string, unknown>
+        return cleanText((r.address as string) || '')
+      }
+      return ''
+    })
+    .filter(Boolean)
+
+  // Merge without duplicating — meter table is truth, SA fills gaps
+  const meterAddrNorms = new Set(meterAddresses.map((a) => a.toLowerCase()))
+  const extraSa = saAddresses.filter((a) => !meterAddrNorms.has(a.toLowerCase()))
+  const allConfirmedAddresses = [...meterAddresses, ...extraSa]
+
+  const confirmedMeterCount = Math.max(meters.length, saList.length, allConfirmedAddresses.length)
+
+  // 3. Research-inferred locations (used when meter count is low ≤ 2)
+  const researchLocs = confirmedMeterCount <= 2
+    ? extractResearchLocations(candidates, account.city)
+    : []
+
+  // 4. Detect when research clearly mentions more sites than meters table shows
+  const multiSiteResearchSignals = candidates.slice(0, 8).filter((c) => {
+    const t = `${c.title} ${c.snippet}`.toLowerCase()
+    return /\b(multiple locations?|several locations?|\d+ locations?|\d+ sites?|locations across|branches?|statewide|region-?wide|network of|campus(?:es)?|portfolio of)\b/.test(t)
+  })
+  const researchSuggestsMoreSites = multiSiteResearchSignals.length > 0 && confirmedMeterCount <= 2
+
+  // 5. Build the prompt block
+  const parts: string[] = []
+  if (allConfirmedAddresses.length > 0) {
+    parts.push(`Confirmed service addresses (${allConfirmedAddresses.length}):${allConfirmedAddresses.map((a, i) => `\n  ${i + 1}. ${a}`).join('')}`)
+  }
+  if (meterEsids.length > 0) {
+    parts.push(`ESI IDs on file: ${meterEsids.join(', ')}`)
+  }
+  if (meters.length > 0 && meters.some((m) => m.rate)) {
+    const rates = [...new Set(meters.map((m) => cleanText(m.rate || '')).filter(Boolean))]
+    if (rates.length > 0) parts.push(`Rate plan(s): ${rates.join(', ')}`)
+  }
+  if (researchLocs.length > 0) {
+    parts.push(`Research-mentioned locations: ${researchLocs.join(', ')}`)
+  }
+  if (researchSuggestsMoreSites) {
+    const signals = multiSiteResearchSignals.map((c) => c.title).slice(0, 2).join('; ')
+    parts.push(`Note: research suggests more sites exist than meters on file — ${signals}`)
+  }
+  if (confirmedMeterCount === 0 && researchLocs.length === 0) {
+    parts.push('No confirmed service addresses or ESI IDs on file yet.')
+  }
+
+  const promptBlock = parts.length > 0
+    ? `SITE & METER CONTEXT:\n${parts.join('\n')}`
+    : ''
+
+  return {
+    confirmedAddresses: allConfirmedAddresses,
+    esids: meterEsids,
+    confirmedMeterCount,
+    researchInferredLocations: researchLocs,
+    researchSuggestsMoreSites,
+    promptBlock,
+  }
+}
+
 const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, "primaryContactId", city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_opener, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
@@ -617,7 +782,7 @@ function isSameAsAccountDescription(value: string, account: AccountRow) {
 }
 
 function hasStrongHealthcareSignals(text: string) {
-  return /(healthcare|\bhospital\b|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|specialist|wellness|doctor)/i.test(text)
+  return /(healthcare|\bhospital\b|clinic|medical|behavioral health|mental health|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|community mental health|crisis center|crisis services|early childhood intervention|surgical center|surgery center|ambulatory surgery center|patient care|\bspecialists?\b|wellness|\bdoctors?\b)/i.test(text)
 }
 
 function hasStrongBehavioralHealthSignals(text: string) {
@@ -633,7 +798,7 @@ function hasStrongAutomotiveSignals(text: string) {
 }
 
 function hasStrongRetailStoreSignals(text: string) {
-  return /(convenience stores?|c[-\s]?stores?|gas station|fuel stations?|travel centers?|board games?|card games?|collectibles?|gaming accessories|game store|game retailer|hobby store|tabletop games?|lifestyle (?:and )?design store|department store|luxury retail|retail store|showroom space|showrooms?|home goods|tabletop|bedding|bath|furniture|garden|fashion|apothecary|shopping|customer-facing retail)/i.test(text)
+  return /(convenience stores?|c[-\s]?stores?|gas station|fuel stations?|travel centers?|board games?|card games?|collectibles?|gaming accessories|game store|game retailer|hobby store|tabletop games?|lifestyle (?:and )?design store|department store|luxury retail|retail store|showroom space|showrooms?|home goods|tabletop|bedding|bath|furniture|garden|fashion|apothecary|shopping|customer-facing retail|\bretailers?\b|\bhome decor\b|\bart supplies\b|\bcraft materials\b)/i.test(text)
 }
 
 function hasConvenienceStoreSignals(text: string) {
@@ -649,7 +814,7 @@ function hasGolfClubSignals(text: string) {
 }
 
 function hasStrongManufacturersRepSignals(text: string) {
-  return /(manufacturers?'?\s+rep(?:resentative)?|manufacturers?'?\s+representative agency|rep firm|lighting rep|electrical rep|sales rep agency|independent sales representative|represents? manufacturers?|working with distributors|electrical contractors|engineers|architects|lighting designers)/i.test(text)
+  return /(manufacturers?('s?)?\s+rep(?:resentative)?|manufacturers?('s?)?\s+representative agency|rep firm|lighting rep|electrical rep|sales rep agency|independent sales representative|represents? manufacturers?|working with distributors|electrical contractors|engineers|architects|lighting designers)/i.test(text)
 }
 
 function hasStrongBakeryCafeSignals(text: string) {
@@ -661,7 +826,7 @@ function hasFrozenBakeryProductionSignals(text: string) {
 }
 
 function hasStrongAutoPartsDistributionSignals(text: string) {
-  return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket parts|aftermarket collision parts|parts house|parts stores?|parts supplier|parts distribution|distribution centers?|same[-\s]?day parts|automotive service centers|repair centers|fleet and municipal)/i.test(text)
+  return /(wholesale auto parts|automotive parts supplier|auto parts supplier|auto parts distributor|aftermarket collision parts|parts house|parts stores?|same[-\s]?day parts|automotive service center|auto parts distribution)/i.test(text)
 }
 
 function hasPrintFulfillmentSignals(text: string) {
@@ -725,16 +890,16 @@ function hasHomeHealthHospiceSignals(text: string) {
 }
 
 function hasStrongRestaurantSignals(text: string) {
-  if (hasFrozenBakeryProductionSignals(text) && !/(restaurant|dining|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging|drive-thru coffee)/i.test(text)) {
+  if (hasFrozenBakeryProductionSignals(text) && !/(restaurant|dining|food service|service rushes?|\bgrills?\b|\bfryers?\b|\bcafe\b|\bcafé\b|bakery caf[eé]|\bbar\b|eatery|banquet|event space|hospitality|\bhotel\b|\bresort\b|\blodging\b|drive-thru coffee)/i.test(text)) {
     return false
   }
-  return /(restaurant|dining|kitchen|food service|service rushes?|grills?|fryers?|cafe|café|bakery caf[eé]|bar|eatery|banquet|event space|hospitality|hotel|resort|lodging|\b(coffee|espresso|barista)\b|drive-thru coffee)/i.test(text)
+  return /(restaurant|dining|kitchen|food service|service rushes?|\bgrills?\b|\bfryers?\b|\bcafe\b|\bcafé\b|bakery caf[eé]|\bbar\b|eatery|banquet|event space|hospitality|\bhotel\b|\bresort\b|\blodging\b|\b(coffee|espresso|barista)\b|drive-thru coffee)/i.test(text)
 }
 
 function hasStrongManufacturingSignals(text: string) {
   if (hasStrongBehavioralHealthSignals(text)) return false
   if (hasPrintFulfillmentSignals(text) && !/(factory automation|aerospace tooling|machining|fabricat|weld|assembly plant|industrial production)/i.test(text)) return false
-  return /(manufacturing|industrial|plant|production|fabricat|machine|chemical|packag|assembly|process equipment)/i.test(text)
+  return /(manufacturing|industrial|\bplants?\b|production|\bfabricat|\bmachining\b|\bmachinery\b|\bmachine shop\b|\bmachine tools?\b|chemical|packaging|assembly|process equipment)/i.test(text)
 }
 
 function hasStrongPetrochemicalSignals(text: string) {
@@ -845,15 +1010,15 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     return true
   }
 
-  if (dmeSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)/i.test(profileText)) {
+  if (dmeSignals && /\b(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|clinic|medical practice|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|patient care)\b/i.test(profileText)) {
     return true
   }
 
-  if (dentalSignals && /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|guest rooms?|laundry)/i.test(profileText)) {
+  if (dentalSignals && /\b(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care|short-stay rooms?|guest rooms?|laundry)\b/i.test(profileText)) {
     return true
   }
 
-  if (healthcareSignals && /(restaurant|dining|kitchen|hotel|hospitality|plant|industrial|warehouse|logistics|distribution)/i.test(profileText)) {
+  if (healthcareSignals && !dmeSignals && /(restaurant|dining|kitchen|hotel|hospitality|plant|industrial|warehouse|logistics|distribution)/i.test(profileText)) {
     return true
   }
 
@@ -866,6 +1031,9 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
   }
 
   if (retailStoreSignals && /(school|school district|manufacturing|industrial|plant|production|warehouse|logistics|distribution|cold storage|clinic|hospital)/i.test(profileText)) {
+    if (profile.industryCluster === 'retail' && /(national retail and distribution network|centralized distribution)/i.test(profileText)) {
+      return false
+    }
     return true
   }
 
@@ -893,7 +1061,7 @@ function profileConflictsWithCoreSignals(profile: IntelligenceProfile, accountTe
     return true
   }
 
-  if (logisticsSignals && /(healthcare|hospital|clinic|medical|behavioral health|mental health|patient care|counseling|therapy|crisis spaces?)/i.test(profileText)) {
+  if (logisticsSignals && !dmeSignals && /(healthcare|hospital|clinic|medical|behavioral health|mental health|patient care|counseling|therapy|crisis spaces?)/i.test(profileText)) {
     return true
   }
 
@@ -995,7 +1163,7 @@ function getAccountIdentityProfile(account: AccountRow, candidate: ResearchHit |
   const cluster = cleanText(record.industryCluster).toLowerCase() as IndustryCluster
   if (!(INDUSTRY_CLUSTER_VALUES as string[]).includes(cluster)) return null
   const accountText = getIdentityProfileSeedText(account)
-  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/i.test(accountText)) {
+  if (/\b(municipal|city of|county government|county of|public sector|civic|public works|public safety|utility infrastructure|public facilities)\b/i.test(accountText)) {
     const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
     const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
       ? confidence
@@ -1060,7 +1228,11 @@ function getAccountIdentityProfile(account: AccountRow, candidate: ResearchHit |
   }
 
   if (profileConflictsWithCoreSignals(savedProfile, accountText)) return null
-  if (cluster !== stableCluster && !isBroadIdentityCluster(stableCluster)) return null
+  if (cluster !== stableCluster && !isBroadIdentityCluster(stableCluster)) {
+    const dmeSignals = hasStrongDmeSignals(accountText)
+    const isDmeExemption = dmeSignals && cluster === 'logistics' && stableCluster === 'healthcare'
+    if (!isDmeExemption) return null
+  }
 
   const confidence = cleanText(record.confidence).toLowerCase() as IdentityConfidence
   const safeConfidence: IdentityConfidence = confidence === 'high' || confidence === 'medium' || confidence === 'low'
@@ -1100,7 +1272,13 @@ function buildIdentityProfileText(account: AccountRow, candidate: ResearchHit | 
 
 function selectIdentityKeywords(text: string, preferred: string[], fallback: string[], limit = 6) {
   const lower = text.toLowerCase()
-  const matched = preferred.filter((keyword) => lower.includes(keyword.toLowerCase()))
+  const matched = preferred.filter((keyword) => {
+    const escaped = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+    const startBoundary = /^\w/.test(keyword) ? '\\b' : ''
+    const endBoundary = /\w$/.test(keyword) ? '\\b' : ''
+    const regex = new RegExp(`${startBoundary}${escaped}${endBoundary}`, 'i')
+    return regex.test(lower)
+  })
   return uniqueStrings([...matched, ...fallback], limit)
 }
 
@@ -2178,6 +2356,12 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
       return `Often times for a golf club, clubhouse HVAC, dining, cart charging, and course irrigation can all push the meter in different ways because the clubhouse and course run on different schedules.`
     }
     if (context.industryCluster === 'retail') {
+      const profile = getAccountIdentityProfile(account, candidate)
+      const isNationalRetailDistribution = profile?.companyType === 'national retail and distribution network' || 
+                                           (detectMultiSiteScale(account, candidate).isMultiSite && /(distribution|warehouse|manufacturing|headquarters|hq)/i.test(accountText))
+      if (isNationalRetailDistribution) {
+        return `Often times for a national retail and distribution network, distribution center cooling, store HVAC, and manufacturing process loads hit the meter during the same peak windows.`
+      }
       if (hasStrongAutomotiveSignals(accountText)) {
         return `Often times for a multi-location dealership group, it's difficult to prevent service bays, parts departments, and showroom AC from running wide open at the same time.`
       }
@@ -2259,8 +2443,15 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
       return `I'm curious, how do y'all tell whether dock activity, storage, or HVAC is what moved the bill that month, or is that side of things pretty much on autopilot?`
     case 'manufacturing':
       return `I'm curious, how do y'all tell whether equipment timing, compressed air, or process loads is what moved the bill that month, or is that side of things pretty much on autopilot?`
-    case 'retail':
+    case 'retail': {
+      const profile = getAccountIdentityProfile(account, candidate)
+      const isNationalRetailDistribution = profile?.companyType === 'national retail and distribution network' || 
+                                           (detectMultiSiteScale(account, candidate).isMultiSite && /(distribution|warehouse|manufacturing|headquarters|hq)/i.test(accountText))
+      if (isNationalRetailDistribution) {
+        return `I'm curious, how do y'all separate the electricity bills for the central manufacturing and distribution hub from the nationwide store network, or is that side of things pretty much on autopilot?`
+      }
       return `I'm curious, how do y'all tell whether traffic, lighting, or HVAC is what moved the bill that month, or is that side of things pretty much on autopilot?`
+    }
     case 'restaurant':
       return `I'm curious, how do y'all tell whether kitchen timing, refrigeration, or AC is what moved the bill that month, or is that side of things pretty much on autopilot?`
     default:
@@ -2438,9 +2629,9 @@ function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null
   const text = `${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`
   const lower = text.toLowerCase()
   
-  // Extract location count if mentioned
-  const locationMatch = /(\d+)\s*(?:schools?|locations?|sites?|campuses|stores?|branches?|dealerships?|facilities|restaurants?|units?|buildings?)/i.exec(text)
-  const locationCount = locationMatch ? parseInt(locationMatch[1], 10) : null
+  // Extract location count if mentioned (allowing commas, e.g. 1,000)
+  const locationMatch = /(\d{1,3}(?:,\d{3})+|\d+)\s*(?:schools?|locations?|sites?|campuses|stores?|branches?|dealerships?|facilities|restaurants?|units?|buildings?)/i.exec(text)
+  const locationCount = locationMatch ? parseInt(locationMatch[1].replace(/,/g, ''), 10) : null
   
   // Extract regions/states mentioned
   const statePattern = /(texas|california|florida|new york|ohio|louisiana|georgia|illinois|pennsylvania|north carolina|michigan|virginia|washington|arizona|massachusetts|tennessee|indiana|missouri|maryland|wisconsin|colorado|minnesota|south carolina|alabama|kentucky|oregon|oklahoma|connecticut|iowa|mississippi|arkansas|kansas|utah|nevada|new mexico|west virginia|nebraska|idaho|hawaii|maine|new hampshire|rhode island|montana|delaware|south dakota|north dakota|alaska|vermont|wyoming)/gi
@@ -2449,7 +2640,7 @@ function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null
   
   const isMultiSite = (locationCount !== null && locationCount >= 10) || 
                       uniqueStates.length >= 2 ||
-      /\b(multi[-\s]?site|portfolio|network|(?<!supply\s)chain|across \d+ (?:states?|regions?)|nationwide)\b/i.test(lower)
+      /\b(multi[-\s]?site|portfolio|network|(?<!supply\s)chain|across \d+ (?:u\.?s\.?\s+)?(?:states?|regions?)|nationwide)\b/i.test(lower)
   
   return {
     isMultiSite,
@@ -2481,7 +2672,7 @@ function buildStructuredIdentityProfile(
   }
   const primaryCandidate = companySpecificCandidates[0] || null
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)} ${researchText} ${hierarchyText}`).toLowerCase()
-  const isPublicSector = /\b(city of|county|municipal|public facilities|utility infrastructure|public safety|public works)\b/i.test(text)
+  const isPublicSector = /\b(city of|county government|county of|municipal|public facilities|utility infrastructure|public safety|public works)\b/i.test(text)
   const baseCluster = inferIndustryClusterFromSignals(account, null)
   const derivedCluster = inferIndustryClusterFromSignals(synthesizedAccount, primaryCandidate)
   let cluster = isPublicSector ? 'public_sector' : resolvePreferredIndustryCluster(baseCluster, derivedCluster)
@@ -2494,7 +2685,7 @@ function buildStructuredIdentityProfile(
   if (!text && savedProfile) return savedProfile
 
   const classificationText = text.replace(/hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/gi, 'healthcare')
-  const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(classificationText)
+  const hasHospitalSignals = /\b(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)\b/i.test(classificationText)
   const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
   const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
   const isDentalPractice = hasStrongDentalSignals(text)
@@ -2511,7 +2702,7 @@ function buildStructuredIdentityProfile(
   const isAutoGroup = hasStrongAutomotiveSignals(text) && !isTruckDealer && !isRVDealer
   const isAutoPartsDistributor = hasStrongAutoPartsDistributionSignals(text)
   const isMaterialHandlingEquipment = hasMaterialHandlingEquipmentSignals(text)
-  const isLifestyleRetailStore = hasStrongRetailStoreSignals(text)
+  const isLifestyleRetailStore = /(lifestyle (?:and )?design store|luxury retail|apothecary|lifestyle retail|design store)/i.test(text)
   const isConvenienceStore = hasConvenienceStoreSignals(text)
   const isGameRetailer = hasGameRetailSignals(text)
   const isManufacturersRepAgency = hasStrongManufacturersRepSignals(text)
@@ -2888,12 +3079,21 @@ function buildStructuredIdentityProfile(
         break
       }
 
-      companyType = multiSiteInfo.isMultiSite ? 'retail store network' : 'retail business'
-      operatingModel = multiSiteInfo.isMultiSite ? 'multi-store footprint' : 'customer-facing retail site'
-      facilityType = 'store / showroom'
-      identityKeywords = selectIdentityKeywords(text, ['retail', 'store', 'shopping', 'showroom', 'franchise'], ['retail', 'store', 'showroom'])
-      powerKeywords = selectIdentityKeywords(text, ['lighting', 'hvac', 'refrigeration', 'comfort'], ['lighting', 'HVAC', 'comfort'])
-      talkTrackGuardrails = ['No industrial language']
+      if (multiSiteInfo.isMultiSite && /(distribution|warehouse|manufacturing|headquarters|hq)/i.test(text)) {
+        companyType = 'national retail and distribution network'
+        operatingModel = 'multi-state store footprint with centralized distribution and manufacturing hub'
+        facilityType = 'retail stores / distribution centers / corporate campus'
+        identityKeywords = selectIdentityKeywords(text, ['retail network', 'distribution center', 'manufacturing hub', 'corporate headquarters', 'supply chain', 'warehouse operations'], ['retail network', 'distribution center', 'corporate campus'])
+        powerKeywords = selectIdentityKeywords(text, ['store HVAC', 'distribution center cooling', 'manufacturing process loads', 'facility lighting', 'peak demand alignment', 'portfolio peak scheduling'], ['distribution center cooling', 'store HVAC', 'facility lighting'])
+        talkTrackGuardrails = ['Mention distribution and corporate campus', 'No hospital language', 'No school language']
+      } else {
+        companyType = multiSiteInfo.isMultiSite ? 'retail store network' : 'retail business'
+        operatingModel = multiSiteInfo.isMultiSite ? 'multi-store footprint' : 'customer-facing retail site'
+        facilityType = 'store / showroom'
+        identityKeywords = selectIdentityKeywords(text, ['retail', 'store', 'shopping', 'showroom', 'franchise'], ['retail', 'store', 'showroom'])
+        powerKeywords = selectIdentityKeywords(text, ['lighting', 'hvac', 'refrigeration', 'comfort'], ['lighting', 'HVAC', 'comfort'])
+        talkTrackGuardrails = ['No industrial language']
+      }
       break
 
     case 'restaurant':
@@ -3530,13 +3730,13 @@ function extractStructuredBriefFacts(
     addIf(/service bays?|showroom ac|lot lighting|parts department/i, energyDrivers, ['service bays', 'showroom AC', 'parts area', 'lot lighting'])
   }
 
-  addIf(/clinic|medical practice|dental|operatories|imaging|lab|patient/i, activities, ['patient care', 'clinical operations'])
-  addIf(/operatories|imaging|lab|treatment rooms?|sterilization|patient rooms?/i, equipment, ['treatment rooms', 'clinical equipment', 'patient-hour HVAC'])
-  addIf(/operatories|imaging|lab|treatment rooms?|sterilization|patient-hour/i, energyDrivers, ['clinical equipment', 'patient-hour HVAC', 'treatment rooms'])
+  addIf(/\b(clinic|medical practice|dental|operatories|diagnostic imaging|medical imaging|patient|patients)\b|\blabs?\b|\blaborator(?:y|ies)\b/i, activities, ['patient care', 'clinical operations'])
+  addIf(/\b(operatories|diagnostic imaging|medical imaging|treatment rooms?|sterilization|patient rooms?)\b|\blabs?\b|\blaborator(?:y|ies)\b/i, equipment, ['treatment rooms', 'clinical equipment', 'patient-hour HVAC'])
+  addIf(/\b(operatories|diagnostic imaging|medical imaging|treatment rooms?|sterilization|patient-hour)\b|\blabs?\b|\blaborator(?:y|ies)\b/i, energyDrivers, ['clinical equipment', 'patient-hour HVAC', 'treatment rooms'])
 
-  addIf(/school district|students|classrooms|athletics|cafeteria|school campus|public school|charter school/i, activities, ['campus operations', 'student schedule'])
-  addIf(/classroom technology|athletics|cafeterias?|school campus|students|classrooms/i, equipment, ['campus HVAC', 'classroom technology', 'athletics lighting', 'cafeterias'])
-  addIf(/classroom technology|athletics|cafeterias?|school campus|students|classrooms/i, energyDrivers, ['campus HVAC', 'classroom technology', 'athletics lighting'])
+  addIf(/\b(school district|students|classrooms|athletics|cafeteria|school campus|public school|charter school)\b/i, activities, ['campus operations', 'student schedule'])
+  addIf(/\b(classroom technology|athletics|cafeterias?|school campus|students|classrooms)\b/i, equipment, ['campus HVAC', 'classroom technology', 'athletics lighting', 'cafeterias'])
+  addIf(/\b(classroom technology|athletics|cafeterias?|school campus|students|classrooms)\b/i, energyDrivers, ['campus HVAC', 'classroom technology', 'athletics lighting'])
 
   addIf(/manufactur|production|fabricat|assembly|plant/i, activities, ['production work'])
   addIf(/production lines?|process equipment|compressed air|motors?|packaging|assembly/i, equipment, ['production equipment', 'process equipment', 'plant HVAC'])
@@ -3977,10 +4177,12 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (!text) return 'unknown'
   // Energy brokers and consultants — do not classify as any operational cluster
   if (isCompetitorEnergyBroker(account)) return 'office_services'
-  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
+  // Religious must come before school_district — churches that mention elementary schools in their founding history
+  // (e.g. "held first service at Black Jack Elementary School") would otherwise be misclassified as school_district
+  if (hasReligiousOrganizationSignals(text)) return 'religious'
+  if (/(primary\/secondary education|school district|independent school district|\bisd\b|public school|charter school|k-12|school board|high school|middle school|elementary school|school campus|school system)/.test(text) && !hasReligiousOrganizationSignals(text)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/.test(text)) return 'education_nonprofit'
   if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
-  if (hasReligiousOrganizationSignals(text)) return 'religious'
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b|\bfrozen bakery\b|\bgrain-based\b|\bflour mill\b|\bsmall-batch\b.*\broast|\bcoffee roasting\b|\bcustom roasting\b|\broasting equipment\b)/.test(text) &&
       !/(fabricat|weld|metal|steel|machine shop|industrial gas|compressed air|compressor)/.test(text)) return 'manufacturing'
   if (hasStrongLogisticsSignals(text) && /(logistics|supply chain|site store management|inventory management|warehouse management|materials and delivery tracking|transportation management|third party integrator)/.test(text)) return 'logistics'
@@ -3997,13 +4199,18 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (hasFurnitureManufacturingSignals(text)) return 'manufacturing'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
-  if (/(oil and gas|oilfield|natural gas|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream|pipeline|petroleum)/.test(text)) {
+  if (/\b(oil and gas|oilfield|natural gas|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream|pipeline|petroleum)\b/i.test(text)) {
     if (!/(energy drink|high-energy|low-energy|clean energy distributor|renewable energy products|solar distributor)/i.test(text)) {
       return 'energy_intensive'
     }
   }
-  // Core manufacturing signals — must come before healthcare and other services to prevent manufacturers serving clinics/hospitals from drifting
-  if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) return 'manufacturing'
+  if (hasStrongManufacturersRepSignals(text)) return 'office_services'
+  if (/(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) {
+    if (hasStrongRetailStoreSignals(text) && !/(fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text)) {
+      return 'retail'
+    }
+    return 'manufacturing'
+  }
 
   if (/(blood center|bloodcare|blood bank|blood donation|blood products|blood components|transfusion|donor center|mobile blood drives?|blood collection|blood processing|specialized laboratory testing)/.test(text)) return 'healthcare'
   if (hasPublicTransitSignals(text)) return 'public_transit'
@@ -4019,7 +4226,6 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   // Brewery / taproom — must come before retail store to prevent craft breweries landing as 'shop and showroom'
   if (/(\bbrewery\b|\bbreweries\b|\bbrewing company\b|\bbrewing co\.?\b|\btaproom\b|\btap room\b|\bcraft beer\b|\bcraft brewery\b|\bmicrobrewery\b|\bnanobrewery\b|\bdistillery\b|\bdistilled spirits\b|\bwinery\b|\bwine maker\b|\bwinemaker\b|\bvineyard\b|\balemaker\b|\bale house\b)/.test(text)) return 'food_storage'
   if (hasStrongRetailStoreSignals(text)) return 'retail'
-  if (hasStrongManufacturersRepSignals(text)) return 'office_services'
   // Food production — require primary food/beverage production signals, NOT just 'food service' (e.g. a manufacturer making food service equipment is not a food producer)
   if (/(\bfood production\b|\bfood manufacturing\b|\bfood manufacturer\b|\bfood processing\b|food processing facilit|usda[-\s]?approved|\bcustom proteins?\b|\bkettle soups?\b|\bdry sausage\b|\bdehydrated beans\b|\bco[-\s]?manufacturing\b)/.test(text) &&
       !/(manufactur|fabricat|weld|metal|steel|machine|industrial gas|compressed air|compressor|hotel|hospitality|resort|lodging|motel|inn)/.test(text)) return 'manufacturing'
@@ -4038,7 +4244,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) &&
       (!/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics|hotel|hospitality|resort|lodging|motel|inn)/.test(text) ||
        /(manufactur|fabricat|weld|foundry|assembly (?:plant|line|facility))/i.test(text))) return 'manufacturing'
-  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/.test(text)) return 'public_sector'
+  if (/\b(municipal|city of|county government|county of|public sector|civic|public works|public safety|utility infrastructure|public facilities)\b/i.test(text)) return 'public_sector'
   const hotelProperty = looksLikeHotelProperty(text)
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
@@ -4048,7 +4254,7 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|\brecreation\b|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
-  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
+  if (/(primary\/secondary education|school district|independent school district|\bisd\b|public school|charter school|k-12|school board|high school|middle school|elementary school|school campus|school system)/.test(text)) return 'school_district'
   if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
   if (hasReligiousOrganizationSignals(text)) return 'religious'
   if (/(school|education|university|college|nonprofit|foundation|charity|academy|daycare|preschool|childcare|tutoring|learning center)/.test(text)) return 'education_nonprofit'
@@ -4059,12 +4265,19 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 }
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
+  const cleanCandidate = candidate?.label === 'Industry Trends' ? null : candidate
+  const savedProfile = getAccountIdentityProfile(account, cleanCandidate)
+  if (savedProfile?.industryCluster) {
+    return savedProfile.industryCluster
+  }
+
   const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
-  if (/(hospital|medical center|regional hospital|health system|emergency room|acute care)/i.test(coreText)) return 'healthcare'
-  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/i.test(coreText)) return 'school_district'
+  if (/\b(hospital|medical center|regional hospital|health system|emergency room|acute care)\b/i.test(coreText)) return 'healthcare'
+  // Religious must come before school_district — same priority issue as inferIndustryClusterFromSignals
+  if (hasReligiousOrganizationSignals(coreText)) return 'religious'
+  if (/(primary\/secondary education|school district|independent school district|\bisd\b|public school|charter school|k-12|school board|high school|middle school|elementary school|school campus|school system)/i.test(coreText) && !hasReligiousOrganizationSignals(coreText)) return 'school_district'
   if (/(summer camp|outdoor recreational summer camp|year-round preschool|preschool|childcare|daycare|learning center|academy)/i.test(coreText)) return 'education_nonprofit'
   if (/(college(?![-\s]?preparatory)|university(?!\s+(?:blvd|boulevard|ave|avenue|dr|drive|rd|road|st|street))|higher education|community college|student housing|dorm|residence hall|campus ministry)/i.test(coreText)) return 'higher_education'
-  if (hasReligiousOrganizationSignals(coreText)) return 'religious'
   if (hasStrongCommercialRealEstateSignals(coreText)) return 'office_services'
   if (hasFurnitureManufacturingSignals(coreText)) return 'manufacturing'
   if (hasReadyMixConcreteSignals(coreText)) return 'manufacturing'
@@ -4075,7 +4288,8 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasMaritimePilotSignals(coreText)) return 'public_transit'
   if (hasPrintFulfillmentSignals(coreText)) return 'print_fulfillment'
   if (hasMovingStorageSignals(coreText)) return 'moving_storage'
-  if (/(municipal|city|county|public sector|civic|public works|public safety|utility infrastructure|public facilities)/i.test(coreText)) return 'public_sector'
+  // Use county government|county of (not bare \bcounty\b) to avoid matching geographic names like "Harris County, Texas"
+  if (/\b(municipal|city of|county government|county of|public sector|civic|public works|public safety|utility infrastructure|public facilities)\b/i.test(coreText)) return 'public_sector'
   if (hasGolfClubSignals(coreText)) return 'hospitality_group'
   if (hasTruckLeasingSignals(coreText)) return 'logistics'
   if (hasMaterialHandlingEquipmentSignals(coreText)) return 'logistics'
@@ -4084,12 +4298,6 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (hasIndustrialSiteLogisticsSignals(coreText)) return 'logistics'
   if (/(shelter|women's shelter|emergency shelter|homeless shelter|transitional housing|supportive housing|children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/i.test(coreText)) return 'residential_care'
   if (hasConvenienceStoreSignals(coreText) || hasGameRetailSignals(coreText) || hasStrongAutomotiveDealerSignals(coreText)) return 'retail'
-
-  const cleanCandidate = candidate?.label === 'Industry Trends' ? null : candidate
-  const savedProfile = getAccountIdentityProfile(account, cleanCandidate)
-  if (savedProfile?.industryCluster) {
-    return savedProfile.industryCluster
-  }
 
   return inferIndustryClusterFromSignals(account, cleanCandidate)
 }
@@ -4117,7 +4325,7 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
   }
 
   if (priority === 4) {
-    if (/(heat pump|electrification|decarbonization|ev charging|charging station|data center|server|ai compute|bitcoin|mining|technical testing|lab|pilot plant|research|prototype|fabrication)/i.test(text)) {
+    if (/(heat pump|electrification|decarbonization|ev charging|charging station|data center|server|ai compute|bitcoin|mining|technical testing|\blabs?\b|\blaborator(?:y|ies)\b|pilot plant|research|prototype|fabrication)/i.test(text)) {
       return 'technical_load'
     }
     return 'growth'
@@ -4236,7 +4444,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         focus: ['fresh-eyes review', 'budget authority', 'facility ownership'],
       }
     case 'growth':
-      const isDentalGrowth = /(dental|dentist|dentistry|dso\b|dpo\b|practice acquisition|practice expansion|operatories?|imaging|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(text)
+      const isDentalGrowth = /(dental|dentist|dentistry|dso\b|dpo\b|practice acquisition|practice expansion|operatories?|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(text)
       if (isDentalGrowth) {
         return {
           label: 'Dental practice growth',
@@ -5061,7 +5269,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       const classificationText = text.replace(/hospital\s*(?:s)?\s*(?:&|and)\s*health\s*care/gi, 'healthcare')
-      const hasHospitalSignals = /(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)/i.test(classificationText)
+  const hasHospitalSignals = /\b(hospital|neighborhood hospital|micro[-\s]?hospital|community hospital|small-format hospital|licensed hospital|emergency room|emergency care|inpatient care|inpatient bed|acute care)\b/i.test(classificationText)
       const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic imaging|imaging center|ortho|orthopedic|pediatric|wellness|doctor)/i.test(text) && !hasHospitalSignals
       const isBehavioralHealth = hasStrongBehavioralHealthSignals(text)
       const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
@@ -5403,6 +5611,26 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `Often times for specialty retailers, it's hard to see whether the retail floor or back-of-house order work is creating the bigger usage spikes.`,
           ],
           focus: ['store lighting', 'customer comfort', 'online order packing', 'warehouse support', 'office load'],
+        }
+      }
+
+      const profile = getAccountIdentityProfile(account, candidate)
+      const isNationalRetailDistribution = profile?.companyType === 'national retail and distribution network' || 
+                                           (retailMultiSite.isMultiSite && /(distribution|warehouse|manufacturing|headquarters|hq)/i.test(text))
+
+      if (isNationalRetailDistribution) {
+        const storeCount = retailMultiSite.locationCount || 1000
+        const locationDesc = `${storeCount}+ retail stores, centralized logistics, and corporate manufacturing`
+        return {
+          label: 'National retail and distribution network',
+          angle: 'Centralized distribution center cooling, corporate campus HVAC, and manufacturing process loads peaking alongside a massive nationwide store footprint.',
+          question: `I'm curious, how do y'all separate the electricity bills for the central manufacturing and distribution hub from the nationwide store network, or is that side of things pretty much handled?`,
+          openers: [
+            `Often times for a national retail and distribution network, the main headache is that distribution center cooling, corporate campus HVAC, and manufacturing process loads all hit the meter during the same peak windows.`,
+            `Often times when running a centralized corporate and logistics hub alongside a nationwide store footprint, it's hard to tell whether the central manufacturing processes or the store HVAC is what's setting that peak charge.`,
+            `Often times for a retail network of this scale, it's difficult to keep high-capacity distribution center cooling and campus lighting from driving up the bill during hot summer afternoons.`,
+          ],
+          focus: ['distribution center cooling', 'store HVAC', 'manufacturing process loads', 'facility lighting', 'centralized logistics', 'portfolio peak demand'],
         }
       }
 
@@ -5958,7 +6186,7 @@ function buildTalkTrackContext(
   }
 }
 
-async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext): Promise<{ opener: string; talk_track: string } | null> {
+async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, siteContext: SiteContext | null = null): Promise<{ opener: string; talk_track: string } | null> {
   const companyName = cleanText(account.name) || 'the company'
   const industry = cleanText(account.industry) || 'general commerce'
   const city = cleanText(account.city)
@@ -5992,7 +6220,7 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     : ''
   const sequencePriorityRule = '- Do not blend multiple people into one talk track. Use only the selected audience profile.'
   const briefingContextBlock = JSON.stringify(context.briefingContext, null, 2)
-  const dentalContext = /(dental|dentist|dentistry|dental partnership organization|dso\b|dpo\b|operatories?|imaging|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${publicDescription} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+  const dentalContext = /(dental|dentist|dentistry|dental partnership organization|dso\b|dpo\b|operatories?|sterilization|hygienist|hygiene|orthodont|oral surgery)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${publicDescription} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
     ? '- For dental groups, use practice and office language: operatories, imaging, sterilization, hygiene cadence, patient flow, and front-desk timing. Do not use hospital, emergency department, inpatient, or short-stay-room language unless the source explicitly confirms a hospital or surgery-center setting.\n'
     : ''
   
@@ -6024,7 +6252,8 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in [their actual city]" or "I was looking at your compounding pharmacy footprint in [their actual city]" or "I was looking into your school district facilities in [their actual city]". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- CRITICAL: The city in the opener MUST come from the Location field in COMPANY CONTEXT above. Do NOT use Fort Worth, Houston, or any other city unless that is the actual city in the Location field.
 - If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
@@ -6052,6 +6281,8 @@ COMPANY CONTEXT:
 - Industry: ${industry}
 - Location: ${location}
 ${[employeesContext, revenueContext, descriptionContext, usageContext, multiSiteContext].filter(Boolean).join('\n')}
+
+${siteContext?.promptBlock ? siteContext.promptBlock : ''}
 
 SIGNAL CONTEXT:
 ${candidate ? `- Headline: ${candidate.title}\n- Snippet: ${candidate.snippet}\n- Source: ${candidate.source}` : 'No specific news signal found. Use general business context.'}
@@ -6241,7 +6472,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
   const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
   const sentenceCount = splitTalkTrackSentences(text).length
-  const mentionsSignal = TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
+  const mentionsSignal = context.signalFamily !== 'industry_context' &&
+    TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsIndustry = TALK_TRACK_INDUSTRY_KEYWORDS[context.industryCluster].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsMarket = context.marketFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
   const mentionsAtLeastOneFocus = context.ercotFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
@@ -6319,9 +6551,13 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
     /\b(distribution operation|logistics operation|warehouse group|freight|cargo|dock activity|dock doors?|storage climate control)\b/i.test(lower)
   const accountOfficeIndustrialJargon = accountIsOfficeServices &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
-  const accountRetailIndustrialJargon = accountIsRetail &&
+  const isNationalRetailDistribution = account
+    ? getAccountIdentityProfile(account, candidate)?.companyType === 'national retail and distribution network'
+    : false
+
+  const accountRetailIndustrialJargon = accountIsRetail && !isNationalRetailDistribution &&
     /\b(energy-intensive facility|process equipment|process startup|startup times|large motors|manufacturing|industrial|production lines?|machine startup|factory|plant)\b/i.test(lower)
-  const accountRetailLogisticsJargon = accountIsRetail &&
+  const accountRetailLogisticsJargon = accountIsRetail && !isNationalRetailDistribution &&
     /\b(logistics operation|logistics and distribution|dock activity|dock doors?|daily throughput|terminal|freight|cargo)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   // Catch jargon terms that regularly slip through and confuse prospects
@@ -6418,7 +6654,7 @@ function buildConciseOpenerHook(account: AccountRow, candidate: ResearchHit | nu
  * this uses what we know about their actual operation (industry cluster, company type, location, size)
  * to say something specific about WHAT they do or HOW they operate.
  */
-function buildIndustryContextOpeners(greeting: string, account: AccountRow, context: TalkTrackContext): string[] {
+function buildIndustryContextOpeners(greeting: string, account: AccountRow, context: TalkTrackContext, siteContext: SiteContext | null = null): string[] {
   const companyName = cleanText(account.name) || 'the company'
   const city = cleanText(account.city)
   const state = cleanText(account.state)
@@ -6426,9 +6662,19 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const accountText = cleanText(`${account.name || ''} ${account.industry || ''} ${descriptionText}`)
   const nonTexasDescriptor = !/\b(texas|tx|ercot|dfw|dallas|houston|austin|san antonio|fort worth|el paso|arlington|plano|irving|pasadena|spring|euless|weatherford|texarkana|colleyville)\b/i.test(descriptionText)
     && /\b(indiana|florida|california|new york|new jersey|ohio|illinois|alabama|georgia|tennessee|oklahoma|louisiana|arkansas|missouri|kansas|colorado|arizona|nevada)\b/i.test(descriptionText)
+  // If we have a confirmed service address, extract the city from the first one for the opener
+  const confirmedCity = siteContext?.confirmedAddresses[0]
+    ? (() => {
+        const addr = siteContext.confirmedAddresses[0]
+        // Try to extract city from "Street, City, ST ZIP" or "Street, City, Texas" patterns
+        const cityMatch = addr.match(/,\s*([^,]+),\s*(?:TX|Texas)/i)
+        return cityMatch ? cityMatch[1].trim() : null
+      })()
+    : null
+  const effectiveCity = confirmedCity || city
   const locationClause = nonTexasDescriptor
     ? ''
-    : city && state ? `in ${city}` : state ? `in ${state}` : 'in Texas'
+    : effectiveCity && state ? `in ${effectiveCity}` : state ? `in ${state}` : 'in Texas'
   const multiSiteInfo = detectMultiSiteScale(account, null)
   const palletManagementSignals = hasPalletManagementSignals(accountText)
   const profile = getAccountIdentityProfile(account)
@@ -6527,7 +6773,7 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   ]
 }
 
-function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string, candidate: ResearchHit | null = null) {
+function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, variantSeed: string, candidate: ResearchHit | null = null, siteContext: SiteContext | null = null) {
   const companyName = cleanText(account.name) || 'the company'
   const firstName = cleanText(context.audienceProfile?.contactFirstName || context.audienceProfile?.contactName || '')
   const greeting = firstName
@@ -6577,7 +6823,7 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
       `${greeting}. I'm calling you out the blue here, so I'll be brief. I saw y'all are running the infrastructure at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
       `${greeting}. I'm calling you out the blue here, so I'll be brief. I saw y'all operate the technical facilities at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
-    industry_context: buildIndustryContextOpeners(greeting, account, context),
+    industry_context: buildIndustryContextOpeners(greeting, account, context, siteContext),
   }
 
   return pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
@@ -6841,6 +7087,11 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   if (!t) return true
   const lower = t.toLowerCase()
   const companyLower = cleanCompanyNameForSearch(accountName).toLowerCase()
+
+  // Allow high-quality descriptive headlines containing specific operations terminology
+  if (/\b(distribution|logistics|manufacturing|operating context|billing context|facility|facilities|infrastructure|footprint|retailer|network)\b/i.test(lower)) {
+    return false
+  }
 
   // Skip navigation and accessibility boilerplate
   if (/^(skip to content|skip to main content|skip navigation|skip to main|skip content|skip main|menu|toggle navigation)$/i.test(t.trim())) return true
@@ -8268,6 +8519,7 @@ async function runOpenRouterResearch(
   hierarchyContext: HierarchyResearchContext | null = null,
   hierarchyWebsiteHits: ResearchHit[] = [],
   audienceProfile: AudienceProfile | null = null,
+  siteContext: SiteContext | null = null,
 ) {
   const openRouterKey = process.env.OPEN_ROUTER_API_KEY
   const geminiKey = process.env.NEXT_PUBLIC_FREE_GEMINI_KEY || process.env.GEMINI_API_KEY
@@ -8377,13 +8629,22 @@ async function runOpenRouterResearch(
       snippet: item.snippet,
       source: item.source,
     })),
+    site_context: siteContext ? {
+      confirmed_addresses: siteContext.confirmedAddresses,
+      esids: siteContext.esids,
+      confirmed_meter_count: siteContext.confirmedMeterCount,
+      research_inferred_locations: siteContext.researchInferredLocations,
+      research_suggests_more_sites: siteContext.researchSuggestsMoreSites,
+    } : null,
   }
   const audienceProfileBlock = buildAudienceProfileBlock(audienceProfile)
+
+  const siteContextBlock = siteContext?.promptBlock ? `\n\n${siteContext.promptBlock}` : ''
 
   const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
 Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
-If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.
+If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.${siteContextBlock}
 
 VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
 - Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
@@ -8413,7 +8674,8 @@ OPENER RULES (Exactly two sentences):
 - Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
 - For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be brief. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
-- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in Fort Worth" or "I was looking at your compounding pharmacy footprint in Houston" or "I was looking into your school district facilities in Fort Worth". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in [their actual city]" or "I was looking at your compounding pharmacy footprint in [their actual city]" or "I was looking into your school district facilities in [their actual city]". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
+- CRITICAL: The city in the opener MUST come from the Location field in COMPANY CONTEXT above. Do NOT use Fort Worth, Houston, or any other city unless that is the actual city in the Location field.
 - If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
 - CRITICAL: Never use the phrase 'I saw y'all run [Company]' or 'I notice you run [Company]'.
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
@@ -8861,6 +9123,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const audienceProfile = await resolveAudienceProfileForBrief(account as AccountRow)
+    // Fetch meters in parallel with audience profile — non-blocking, fails gracefully
+    const accountMeters = await fetchAccountMeters(accountId)
 
     const privileged = auth.isAdmin || auth.role === 'dev'
     const ownerScopeValues = buildOwnerScopeValues(auth.user)
@@ -8977,6 +9241,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       : account as AccountRow
     const diagnostics = buildResearchDiagnostics(candidateResults)
+
+    // Build site context after candidates are collected so research-inferred locations are available
+    const siteContext = buildSiteContext(
+      accountMeters,
+      account.service_addresses,
+      candidateResults,
+      briefingAccount,
+    )
+    console.info('[Intelligence Brief] Site context built:', {
+      accountId,
+      confirmedAddresses: siteContext.confirmedAddresses.length,
+      meterCount: siteContext.confirmedMeterCount,
+      researchSuggestsMoreSites: siteContext.researchSuggestsMoreSites,
+    })
+
     console.info('[Intelligence Brief] Research candidates collected:', {
       accountId,
       accountName: briefingAccount.name,
@@ -8992,7 +9271,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (candidateResults.length > 0) {
       try {
-        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false, hierarchyContext, hierarchyWebsiteHits, audienceProfile)
+        generatedBrief = await runOpenRouterResearch(briefingAccount, candidateResults, false, hierarchyContext, hierarchyWebsiteHits, audienceProfile, siteContext)
         if (generatedBrief) {
           outcomeStatus = 'ready'
           validated = generatedBrief
@@ -9038,7 +9317,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           rescueCandidates = dedupeAndSort([...candidateResults, ...fallbackCandidates], account)
           
-          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true, hierarchyContext, hierarchyWebsiteHits, audienceProfile)
+          generatedBrief = await runOpenRouterResearch(briefingAccount, fallbackCandidates, true, hierarchyContext, hierarchyWebsiteHits, audienceProfile, siteContext)
           if (generatedBrief) {
             outcomeStatus = 'ready'
             validated = generatedBrief
@@ -9079,7 +9358,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       })
       
       const fallbackContext = buildTalkTrackContext(briefingAccount, null, true, audienceProfile)
-      const aiBriefParts = await generateAITalkTrack(briefingAccount, null, fallbackContext)
+      const aiBriefParts = await generateAITalkTrack(briefingAccount, null, fallbackContext, siteContext)
       
       if (aiBriefParts) {
         // Create a minimal brief with the AI opener and talk track
@@ -9149,7 +9428,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         let rewrittenParts: { opener: string; talk_track: string } | null = null
         
         // Always try AI generation first for rewrites
-        rewrittenParts = await generateAITalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext)
+        rewrittenParts = await generateAITalkTrack(briefingAccount, talkTrackCandidate, talkTrackRewriteContext, siteContext)
         
         // Validate AI-generated talk track
         if (rewrittenParts) {
@@ -9213,7 +9492,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         talk_track: finalTalkTrack,
       }
 
-      const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate)
+      const generatedOpener = buildPermissionOpener(briefingAccount, talkTrackRewriteContext, talkTrackRewriteContext.seed, talkTrackCandidate, siteContext)
       validated = {
         ...validated,
         opener: openerNeedsRewrite(validated.opener || '', briefingAccount) ? generatedOpener : cleanText(validated.opener),
