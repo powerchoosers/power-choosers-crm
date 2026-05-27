@@ -2,7 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('fs');
 
 async function test() {
-  const accountId = 'a0c44b32-4ac0-407e-80c2-c6b135d5641d'; // Shine Pediatrics
+  const accountId = '2e23e350-fa3a-4fd7-9874-d1a0f69949af'; // Hobby Lobby
   const url = `http://localhost:3000/api/accounts/${accountId}/intelligence-brief`;
   
   try {
