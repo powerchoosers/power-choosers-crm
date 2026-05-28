@@ -640,7 +640,7 @@ function buildReplyStageDirective(stage: string): string {
         general: [
             '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
             '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-            '- Use a plain subject line with 1-4 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage. Do not keep reusing the same cost-view phrasing.',
+            '- Use a plain subject line with 2-3 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage. Do not keep reusing the same cost-view phrasing.',
             '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
             '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
             '- Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
