@@ -9,6 +9,7 @@ import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { enrichApolloOrganizationByDomain, normalizeOrganizationName } from '@/lib/apollo-prospect';
 import { cors } from '../_cors.js';
 import { getApiKey, APOLLO_BASE_URL, fetchWithRetry } from '../apollo/_utils.js';
+import { getTexasEnergyContext } from '@/lib/texas-territory';
 
 function normalizeLocationKey(value) {
   return String(value || '')
@@ -195,13 +196,80 @@ const INDUSTRY_ROTATIONS = [
   ['automotive', 'auto parts'],
   ['construction', 'building materials'],
   ['chemicals', 'plastics'],
-  ['agriculture', 'farming'],
+  ['hospital and health care', 'medical practice', 'hospitals'],
+  ['hospitality', 'hotels and motels', 'resorts'],
+  ['restaurants', 'food service'],
+  ['education', 'primary/secondary education', 'schools'],
+  ['retail', 'supermarkets', 'department stores'],
 ];
 
 // Pick a deterministic rotation bucket based on current hour
 // (changes each run so manual refreshes give fresh results)
 function getRotationIndex() {
   return Math.floor(Date.now() / 3600000) % INDUSTRY_ROTATIONS.length;
+}
+
+// Lightweight webpage scraper fallback using Jina AI Reader to backfill descriptions and check site availability
+async function scrapeHomepageDetails(url) {
+  if (!url) return null;
+  const cleanUrl = url.replace(/^https?:\/\//i, '');
+  const jinaUrl = `https://r.jina.ai/${cleanUrl}`;
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(jinaUrl, {
+      headers: {
+        'Accept': 'text/plain',
+        'User-Agent': 'Mozilla/5.0 (compatible; NodalPointBot/1.0)',
+        'X-Return-Format': 'text',
+      },
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId));
+    
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.length > 50) {
+        // Try to parse description from markdown/YAML frontmatter if Jina included it
+        const descMatch = text.match(/description:\s*(.*)/i) || text.match(/Description:\s*(.*)/i);
+        if (descMatch && descMatch[1].trim()) {
+          return { description: descMatch[1].trim() };
+        }
+        
+        // Otherwise, grab the first few lines of markdown body
+        const lines = text.split('\n')
+          .map(l => l.trim())
+          .filter(l => l && !l.startsWith('#') && !l.startsWith('!') && !l.startsWith('[') && !l.includes('jina.ai'));
+        
+        if (lines.length > 0) {
+          const bodyText = lines.slice(0, 3).join(' ');
+          if (bodyText.length > 20) {
+            return { description: bodyText.slice(0, 300) };
+          }
+        }
+      }
+    }
+  } catch (_) {
+    // Ignore Jina failures and fall back to raw HTML scrape
+  }
+
+  // Fallback: raw HTML fetch
+  try {
+    const headers = { 'User-Agent': 'Mozilla/5.0 (compatible; NodalPointBot/1.0)' };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(url, { headers, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+    if (!res.ok) return null;
+    const html = await res.text();
+    
+    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
+                        html.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i) ||
+                        html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
+    const description = metaDescMatch ? metaDescMatch[1].trim() : null;
+    return { description };
+  } catch {
+    return null;
+  }
 }
 
 function pickLocations(count = 5) {
@@ -303,13 +371,18 @@ export default async function handler(req, res) {
       const resolvedIndustry = resolveIndustry(org);
       if (isExcludedIndustry(resolvedIndustry)) continue;
 
-      if (apolloId) seenIds.add(apolloId);
-
-      // Determine TDSP zone from city match
+      // Determine TDSP zone & targetability using texas-territory helper
       const orgCity = org.organization_city || org.city || '';
-      const matchedLocation = DEREGULATED_LOCATIONS.find(
-        (l) => matchesLocationKey(orgCity, l.city)
-      );
+      const orgState = org.organization_state || org.state || 'TX';
+      const orgAddress = org.organization_raw_address || org.raw_address || org.street_address || org.organization_street_address || '';
+      const energyContext = getTexasEnergyContext(orgCity, orgState, orgAddress);
+
+      // Skip out-of-market (not in Texas) or regulated municipal utility zones (e.g. Austin, San Antonio)
+      if (!energyContext.isTexas || energyContext.isRegulated) {
+        continue;
+      }
+
+      if (apolloId) seenIds.add(apolloId);
 
       toInsert.push({
         apollo_org_id: apolloId || null,
@@ -324,11 +397,11 @@ export default async function handler(req, res) {
         annual_revenue_printed: org.organization_revenue_printed || org.annual_revenue_printed || null,
         city: org.organization_city || org.city || null,
         state: org.organization_state || org.state || null,
-        tdsp_zone: matchedLocation?.tdsp || 'Unknown',
+        tdsp_zone: energyContext.utilityTerritory || 'Unknown',
         phone: org.phone || org.primary_phone?.number || null,
         linkedin_url: org.linkedin_url || null,
         description: org.short_description || org.seo_description || null,
-        address: org.organization_raw_address || org.raw_address || org.street_address || org.organization_street_address || null,
+        address: orgAddress || null,
         zip: org.organization_postal_code || org.postal_code || null,
         discovered_at: new Date().toISOString(),
       });
@@ -344,17 +417,30 @@ export default async function handler(req, res) {
     const APOLLO_API_KEY_FOR_ENRICH = getApiKey();
     await enrichProspectProfiles(toInsert, APOLLO_API_KEY_FOR_ENRICH);
 
-    // Recompute territory after enrichment. This keeps out-of-market records
-    // from being mislabelled as ERCOT when Apollo gives us a better location.
+    // Scrape homepage for description backfill if Apollo did not supply one
+    await Promise.all(
+      toInsert.map(async (p) => {
+        if (!p.description && p.website) {
+          const scraped = await scrapeHomepageDetails(p.website);
+          if (scraped?.description) {
+            p.description = scraped.description;
+          }
+        }
+      })
+    );
+
+    // Recompute territory after enrichment to keep out-of-market records out of the radar
+    const enrichedAndFiltered = [];
     for (const prospect of toInsert) {
-      const city = prospect.city || '';
-      const matchedLocation = city
-        ? DEREGULATED_LOCATIONS.find((l) => matchesLocationKey(city, l.city))
-        : null;
-      prospect.tdsp_zone = matchedLocation?.tdsp || 'Unknown';
+      const energyContext = getTexasEnergyContext(prospect.city, prospect.state || 'TX', prospect.address);
+      if (!energyContext.isTexas || energyContext.isRegulated) {
+        continue;
+      }
+      prospect.tdsp_zone = energyContext.utilityTerritory || 'Unknown';
+      enrichedAndFiltered.push(prospect);
     }
 
-    const normalizedInsert = toInsert.filter((prospect) => !isExcludedIndustry(prospect.industry));
+    const normalizedInsert = enrichedAndFiltered.filter((prospect) => !isExcludedIndustry(prospect.industry));
 
     // ── 5. Upsert — ON CONFLICT update so existing null rows get backfilled ──
     const { error: insertError } = await supabaseAdmin
