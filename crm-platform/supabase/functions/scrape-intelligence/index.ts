@@ -9,6 +9,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import * as crypto from 'node:crypto'
+import { getTexasEnergyContext } from '../lib/texas-territory.ts'
 
 const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY')
 const APOLLO_API_KEY = Deno.env.get('APOLLO_API_KEY')
@@ -80,23 +81,21 @@ function safeHostname(value: unknown): string | null {
 }
 
 function isRegulatedTerritory(signal: any): boolean {
-  const city = cleanText(signal.city || signal.metadata?.city).toLowerCase()
-  if (!city) return false
-  return REGULATED_CITIES.some((term) => city.includes(term))
+  const city = cleanText(signal.city || signal.metadata?.city)
+  const state = cleanText(signal.state || signal.metadata?.state || 'TX')
+  const energyContext = getTexasEnergyContext(city, state)
+  return energyContext.isRegulated
 }
 
-function determineTdspZone(city: string, foundTdsp?: string): string {
+function determineTdspZone(city: string, state: string, foundTdsp?: string): string {
   if (foundTdsp && ['oncor', 'centerpoint', 'aep', 'tnmp'].some(x => foundTdsp.toLowerCase().includes(x))) {
     if (foundTdsp.toLowerCase().includes('oncor')) return 'Oncor'
     if (foundTdsp.toLowerCase().includes('centerpoint')) return 'CenterPoint'
     if (foundTdsp.toLowerCase().includes('aep')) return 'AEP Texas'
     if (foundTdsp.toLowerCase().includes('tnmp')) return 'TNMP'
   }
-  if (['houston', 'beaumont', 'port arthur', 'baytown', 'pasadena', 'pearland', 'sugar land', 'the woodlands', 'conroe', 'galveston', 'lufkin', 'nacogdoches', 'aldine', 'bammel', 'bunker hill village', 'hedwig village', 'hilshire village', 'huffman', 'humble', 'hunters creek village', 'jersey village', 'kingwood', 'oak ridge north', 'piney point village', 'satsuma', 'spring', 'spring branch', 'spring valley', 'spring valley village', 'westfield'].some((x) => matchesCityTerm(city, x))) return 'CenterPoint'
-  if (['dallas', 'fort worth', 'arlington', 'plano', 'irving', 'garland', 'mesquite', 'mckinney', 'frisco', 'grand prairie', 'waco', 'lubbock', 'tyler', 'longview', 'wichita falls', 'abilene', 'midland', 'odessa'].some((x) => matchesCityTerm(city, x))) return 'Oncor'
-  if (['corpus christi', 'victoria', 'mcallen', 'laredo', 'harlingen', 'brownsville'].some((x) => matchesCityTerm(city, x))) return 'AEP Texas'
-  if (['pecos', 'fort stockton', 'alpine', 'marfa', 'presidio', 'big spring', 'sweetwater', 'clute', 'lake jackson', 'angleton', 'alvin', 'freeport'].some((x) => matchesCityTerm(city, x))) return 'TNMP'
-  return 'ERCOT_Unknown'
+  const energyContext = getTexasEnergyContext(city, state)
+  return energyContext.utilityTerritory || 'ERCOT_Unknown'
 }
 
 async function verifyWithApollo(entityName: string): Promise<{ domain: string; logo_url: string; employee_count?: number } | null> {
@@ -329,18 +328,78 @@ function isInCitations(sourceUrl: string, citations: string[]): boolean {
  * 4s timeout — a real page on a live server responds quickly.
  * Accepts any non-4xx response (3xx redirects, 200 OK, even 5xx is ambiguous).
  */
-async function verifyUrl(url: string): Promise<boolean> {
+/**
+ * Last-resort check. Fetches the page content and verifies
+ * that the company name is actually mentioned on the page.
+ * Uses Jina AI Reader first, falling back to raw HTML extraction.
+ */
+async function verifyUrl(url: string, entityName: string): Promise<boolean> {
   if (!url) return false
+  const cleanUrl = url.replace(/^https?:\/\//i, '')
+  const jinaUrl = `https://r.jina.ai/${cleanUrl}`
+
+  // Try Jina Reader first (gives clean markdown, avoids bot protection blocks)
   try {
     const controller = new AbortController()
-    const tid = setTimeout(() => controller.abort(), 4000)
+    const tid = setTimeout(() => controller.abort(), 8000)
+    const res = await fetch(jinaUrl, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: {
+        'Accept': 'text/plain',
+        'User-Agent': 'Mozilla/5.0 (compatible; NodalPointBot/1.0)',
+        'X-Return-Format': 'text',
+      },
+    }).finally(() => clearTimeout(tid))
+    
+    if (res.ok) {
+      const text = await res.text()
+      const cleanName = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      const words = cleanName.split(' ').filter(w => w.length > 2)
+      if (words.length === 0) return true
+      
+      const markdownLower = text.toLowerCase()
+      if (words.length >= 2) {
+        const firstTwo = words.slice(0, 2).join(' ')
+        if (markdownLower.includes(firstTwo) || markdownLower.includes(cleanName)) return true
+        
+        const matchCount = words.filter(w => markdownLower.includes(w)).length
+        return (matchCount / words.length) >= 0.7
+      }
+      return markdownLower.includes(words[0])
+    }
+  } catch {
+    // Ignore and fall back to direct fetch
+  }
+
+  // Fallback: Direct fetch
+  try {
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 5000)
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NodalPointBot/1.0)' },
     }).finally(() => clearTimeout(tid))
-    // 404, 410, 403 on a URL that should be public = doesn't exist
-    return res.status !== 404 && res.status !== 410
+    
+    if (!res.ok) return false
+    const text = await res.text()
+    
+    // Verify that the entity name (or parts of it) is mentioned in the HTML body
+    const cleanName = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    const words = cleanName.split(' ').filter(w => w.length > 2)
+    if (words.length === 0) return true
+    
+    const htmlLower = text.toLowerCase()
+    if (words.length >= 2) {
+      const firstTwo = words.slice(0, 2).join(' ')
+      if (htmlLower.includes(firstTwo) || htmlLower.includes(cleanName)) return true
+      
+      const matchCount = words.filter(w => htmlLower.includes(w)).length
+      return (matchCount / words.length) >= 0.7
+    }
+    
+    return htmlLower.includes(words[0])
   } catch {
     return false
   }
@@ -479,7 +538,7 @@ Deno.serve(async (req: Request) => {
       if (sourceUrl) {
         const inCitations = isInCitations(sourceUrl, citations)
         if (!inCitations) {
-          const urlLive = await verifyUrl(sourceUrl)
+          const urlLive = await verifyUrl(sourceUrl, entityName)
           if (!urlLive) {
             console.warn(`[hallucination] rejected: ${entityName} — ${sourceUrl}`)
             skippedHallucinated++
@@ -491,7 +550,7 @@ Deno.serve(async (req: Request) => {
 
       const city = truncate(signal.city || signal.metadata?.city, 80) || ''
       const state = truncate(signal.state || signal.metadata?.state || 'TX', 32) || 'TX'
-      const tdspZone = determineTdspZone(city, signal.tdsp)
+      const tdspZone = determineTdspZone(city, state, signal.tdsp)
       const apolloVerified = await verifyWithApollo(entityName)
 
       let crmMatchId = null
