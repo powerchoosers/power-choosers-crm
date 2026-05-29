@@ -12,9 +12,9 @@ import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variab
 import { compareTasksByDueDate, isPendingTask } from '@/lib/task-date'
 import { taskMatchesEntityScope } from '@/hooks/useEntityTasks'
 
-const EXIT_DELAY_MS = 180
-const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
-const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
+const EXIT_DELAY_MS = 350
+const exitTransition = { duration: 0.35, ease: [0.23, 1, 0.32, 1] as const }
+const layoutTransition = { duration: 0.35, ease: [0.23, 1, 0.32, 1] as const }
 
 interface ContextTasksWidgetProps {
   entityId: string
@@ -105,7 +105,7 @@ export default function ContextTasksWidget({
   }
 
   return (
-    <motion.div layout className="space-y-2 overflow-hidden">
+    <motion.div layout className="space-y-2 pb-1">
       <AnimatePresence initial={false} mode="popLayout">
         {listToRender.length > 0 ? (
           listToRender.map((task, i) => {

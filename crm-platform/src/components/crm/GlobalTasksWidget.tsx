@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils'
 import { compareTasksByDueDate, isPendingTask, isTodayOrOverdue } from '@/lib/task-date'
 
 const DISPLAY_LIMIT = 3
-const EXIT_DELAY_MS = 180
-const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
-const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
+const EXIT_DELAY_MS = 350
+const exitTransition = { duration: 0.35, ease: [0.23, 1, 0.32, 1] as const }
+const layoutTransition = { duration: 0.35, ease: [0.23, 1, 0.32, 1] as const }
 
 function TaskRow({
   task,
@@ -162,7 +162,7 @@ export default function GlobalTasksWidget() {
         </div>
       </div>
 
-      <div className="space-y-2 overflow-hidden">
+      <div className="space-y-2 pb-1">
         <AnimatePresence initial={false} mode="popLayout">
           {listToRender.length > 0 ? (
             listToRender.map((task, i) => {
