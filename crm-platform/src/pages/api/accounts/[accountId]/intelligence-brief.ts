@@ -6249,9 +6249,9 @@ VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influen
 - Sound like a forensic analyst who has noticed a specific operational fact or news event about the company and wants to check how it affects their utility billing.
 
 OPENER RULES (Exactly two sentences):
-- Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be quick. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
+- Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, real quick. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available (first name: ${firstName || 'none'}), e.g., 'Hey ${firstName}' or 'Hey there' if no name is available.
-- For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be quick. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
+- For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, real quick. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
 - If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in [their actual city]" or "I was looking at your compounding pharmacy footprint in [their actual city]" or "I was looking into your school district facilities in [their actual city]". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: The city in the opener MUST come from the Location field in COMPANY CONTEXT above. Do NOT use Fort Worth, Houston, or any other city unless that is the actual city in the Location field.
 - If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
@@ -6767,9 +6767,9 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const yourOperationDescriptor = toSecondPersonOperationDescriptor(operationDescriptor)
 
   return [
-    `${greeting}. I'm calling you out the blue here, so I'll be quick. I was looking into ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
-    `${greeting}. I'm calling you out the blue here, so I'll be quick. I was looking at ${companyName} and ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
-    `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw enough about ${yourOperationDescriptor} to have one quick question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, real quick. I was looking into ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, real quick. I was looking at ${companyName} and ${yourOperationDescriptor}, and had a curious question about y'alls electricity agreements and contracts.`,
+    `${greeting}. I'm calling you out the blue here, real quick. I saw enough about ${yourOperationDescriptor} to have one quick question about y'alls electricity agreements and contracts.`,
   ]
 }
 
@@ -6784,44 +6784,44 @@ function buildPermissionOpener(account: AccountRow, context: TalkTrackContext, v
 
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the news about the acquisition of ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all took over the ${openerLead} locations, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw the news about the acquisition of ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all took over the ${openerLead} locations, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     new_location: [
       // Use openerLead only when it is a clean location name (≤6 words), not an article title
       ...(openerLead !== companyName && openerLead.split(/\s+/).length <= 6
         ? [
-            `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are opening a new location in ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-            `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all just added the new site in ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+            `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are opening a new location in ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+            `${greeting}. I'm calling you out the blue here, real quick. I saw y'all just added the new site in ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
           ]
         : [
-            `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are adding a new location, and had a curious question about y'alls electricity agreements and contracts.`,
-            `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the announcement about the new site, and had a curious question about y'alls electricity agreements and contracts.`,
+            `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are adding a new location, and had a curious question about y'alls electricity agreements and contracts.`,
+            `${greeting}. I'm calling you out the blue here, real quick. I saw the announcement about the new site, and had a curious question about y'alls electricity agreements and contracts.`,
           ]),
     ],
     leadership_change: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all recently brought on a new team member to help manage ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the leadership transition at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all recently brought on a new team member to help manage ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw the leadership transition at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     growth: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are expanding the footprint for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are ramping up operations at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are expanding the footprint for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are ramping up operations at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     restructuring: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are consolidating some operations at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the recent operational shifts at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are consolidating some operations at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw the recent operational shifts at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     contract_win: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all landed the new contract for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all won the recent project for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all landed the new contract for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all won the recent project for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     funding: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the recent capital raise for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw the funding round for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw the recent capital raise for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw the funding round for ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     technical_load: [
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all are running the infrastructure at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
-      `${greeting}. I'm calling you out the blue here, so I'll be quick. I saw y'all operate the technical facilities at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all are running the infrastructure at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
+      `${greeting}. I'm calling you out the blue here, real quick. I saw y'all operate the technical facilities at ${openerLead}, and had a curious question about y'alls electricity agreements and contracts.`,
     ],
     industry_context: buildIndustryContextOpeners(greeting, account, context, siteContext),
   }
@@ -8671,9 +8671,9 @@ CONFIDENCE LEVEL RULES:
   * "Low": Unverified sources, generic web directories, third-party catalogs, or fallback briefs with no company-specific updates.
 
 OPENER RULES (Exactly two sentences):
-- Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, so I'll be quick. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
+- Must be structured EXACTLY like: "[Greeting], it's Lewis with Nodal Point, calling you out the blue here, real quick. [Signal/Research Hook], and had a curious question about y'alls electricity agreements and contracts."
 - Greeting (for the first sentence) must use the contact's first name if available, e.g., 'Hey [First Name]' or 'Hey there' if no name is available.
-- For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, so I'll be quick. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
+- For example, if name is John and signal is a new location in Shenandoah, the two sentences must be: "Hey John, it's Lewis with Nodal Point, calling you out the blue here, real quick. I saw y'all are opening a new location in Shenandoah, and had a curious question about y'alls electricity agreements and contracts."
 - If the brief is based on general company context or a homepage/domain (no specific news signal), frame the research hook as something Lewis noticed about THEIR business, not a generic category he researched. Use second-person language like "I was looking into your tire recycling operation in [their actual city]" or "I was looking at your compounding pharmacy footprint in [their actual city]" or "I was looking into your school district facilities in [their actual city]". Never say "I've been researching a..." and never use vague category phrases like "a manufacturing operation", "a retail account", "a logistics network", or "an office-style footprint".
 - CRITICAL: The city in the opener MUST come from the Location field in COMPANY CONTEXT above. Do NOT use Fort Worth, Houston, or any other city unless that is the actual city in the Location field.
 - If the account is a pallet management or reverse-logistics business, call it exactly that. Do not collapse it into a generic logistics or distribution operation.
