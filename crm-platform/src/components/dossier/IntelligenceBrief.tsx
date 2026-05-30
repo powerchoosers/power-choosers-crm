@@ -653,8 +653,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                               : 'border-white/5 bg-zinc-950/90 hover:border-white/10 hover:bg-zinc-900/40'
                           )}
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-2 flex-1 min-w-0">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-4">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className={cn(
                                   'text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border',
@@ -667,39 +667,41 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                                   {angle.name} {angle.isPrimary ? '(PRIMARY)' : angle.isSecondary ? '(SECONDARY)' : ''}
                                 </span>
                               </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {!angle.isPrimary && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={updateAngleMutation.isPending}
+                                    onClick={() => updateAngleMutation.mutate(angle.key)}
+                                    className="h-8 text-[11px] font-mono text-zinc-400 hover:text-white border border-transparent hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5 cursor-pointer px-2"
+                                  >
+                                    {updateAngleMutation.isPending && updateAngleMutation.variables === angle.key ? (
+                                      <Loader2 className="h-3 w-3 animate-spin mr-1 text-white" />
+                                    ) : null}
+                                    Set as Active
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={handleCopyAngle}
+                                  className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
+                                  aria-label="Copy angle"
+                                >
+                                  {copiedAngleKey === angle.key ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
                               <h5 className="text-sm font-semibold text-white font-sans leading-snug">
                                 {angle.headline}
                               </h5>
                               <blockquote className="text-xs leading-relaxed text-zinc-300 italic border-l border-white/10 pl-3">
-                                \"{angle.talkTrack}\"
+                                "{angle.talkTrack}"
                               </blockquote>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              {!angle.isPrimary && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  disabled={updateAngleMutation.isPending}
-                                  onClick={() => updateAngleMutation.mutate(angle.key)}
-                                  className="h-8 text-[11px] font-mono text-zinc-400 hover:text-white border border-transparent hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5 cursor-pointer px-2"
-                                >
-                                  {updateAngleMutation.isPending && updateAngleMutation.variables === angle.key ? (
-                                    <Loader2 className="h-3 w-3 animate-spin mr-1 text-white" />
-                                  ) : null}
-                                  Set as Active
-                                </Button>
-                              )}
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={handleCopyAngle}
-                                className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
-                                aria-label="Copy angle"
-                              >
-                                {copiedAngleKey === angle.key ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
-                              </Button>
                             </div>
                           </div>
                         </div>
