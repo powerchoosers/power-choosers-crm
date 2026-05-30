@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, isValid } from 'date-fns'
-import { Copy, ExternalLink, Loader2, RefreshCcw, Search, Sparkles, TrendingUp, MessageSquare, Lightbulb, Code } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, RefreshCcw, Search, Sparkles, TrendingUp, MessageSquare, Lightbulb, Code, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -170,6 +170,9 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
   const [showDiscoveryFlow, setShowDiscoveryFlow] = useState(false)
   const [showAllAngles, setShowAllAngles] = useState(false)
   const [activePhase, setActivePhase] = useState(0)
+  const [mainCopied, setMainCopied] = useState(false)
+  const [copiedAngleKey, setCopiedAngleKey] = useState<string | null>(null)
+  const [copiedQuestionText, setCopiedQuestionText] = useState<string | null>(null)
   const isPrivilegedUser = isPrivilegedRole(role)
 
   const refreshMutation = useMutation<RefreshPayload>({
@@ -430,7 +433,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     if (!hasBrief || !displayAccount || isFallbackState) return
     try {
       await navigator.clipboard.writeText(buildClipboardText(displayAccount))
-      toast.success('Copied to clipboard.')
+      setMainCopied(true)
+      setTimeout(() => setMainCopied(false), 1500)
     } catch {
       toast.error('Copy failed.')
     }
@@ -480,10 +484,10 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
             variant="outline"
             disabled={!hasBrief || isFallbackState}
             onClick={handleCopy}
-            className="border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white"
+            className="border-white/10 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white min-w-[75px]"
           >
-            <Copy className="w-3.5 h-3.5" />
-            Copy
+            {mainCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+            {mainCopied ? 'Copied' : 'Copy'}
           </Button>
         </div>
       </div>
@@ -563,9 +567,9 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                 Talk Track
               </div>
             </div>
-            <div className="space-y-4">
+            <div className={cn("grid gap-4", brief.opener ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
               {brief.opener ? (
-                <div>
+                <div className="rounded-xl bg-zinc-950/40 p-4 border border-white/5">
                   <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                     Opener
                   </div>
@@ -574,7 +578,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                   </blockquote>
                 </div>
               ) : null}
-              <div>
+              <div className="rounded-xl bg-zinc-950/40 p-4 border border-white/5">
                 <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                   Talk Track
                 </div>
@@ -630,7 +634,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                         const copyText = "Angle: " + angle.name + "\nHeadline: " + angle.headline + "\nTalk Track: " + angle.talkTrack;
                         try {
                           await navigator.clipboard.writeText(copyText);
-                          toast.success(angle.name + " copied to clipboard.");
+                          setCopiedAngleKey(angle.key);
+                          setTimeout(() => setCopiedAngleKey(null), 1500);
                         } catch {
                           toast.error('Copy failed.');
                         }
@@ -644,7 +649,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                             angle.isPrimary 
                               ? 'border-[#002FA7]/40 bg-[#002FA7]/5 hover:border-[#002FA7]/60' 
                               : angle.isSecondary
-                              ? 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40'
+                              ? 'border-white/10 bg-zinc-950/70 hover:border-white/20'
                               : 'border-white/5 bg-zinc-950/90 hover:border-white/10 hover:bg-zinc-900/40'
                           )}
                         >
@@ -656,8 +661,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                                   angle.isPrimary
                                     ? 'border-[#002FA7]/40 bg-[#002FA7]/20 text-blue-300'
                                     : angle.isSecondary
-                                    ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-300'
-                                    : 'border-white/10 bg-white/5 text-zinc-400'
+                                    ? 'border-white/15 bg-white/5 text-zinc-300'
+                                    : 'border-white/10 bg-white/5 text-zinc-500'
                                 )}>
                                   {angle.name} {angle.isPrimary ? '(PRIMARY)' : angle.isSecondary ? '(SECONDARY)' : ''}
                                 </span>
@@ -693,7 +698,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                                 className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
                                 aria-label="Copy angle"
                               >
-                                <Copy className="h-3.5 w-3.5" />
+                                {copiedAngleKey === angle.key ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                               </Button>
                             </div>
                           </div>
@@ -759,7 +764,10 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                           : 'border-white/5 bg-zinc-950/40 text-zinc-500 hover:text-zinc-300 hover:border-white/10'
                       )}
                     >
-                      <span className="text-[9px] font-sans font-bold tracking-wider uppercase">{phase.label}</span>
+                      <span className="text-[9px] tracking-wider uppercase">
+                        <span className="font-mono">{phase.label.slice(0, 2)}</span>
+                        <span className="font-sans font-bold ml-1">{phase.label.slice(2)}</span>
+                      </span>
                       <span className="text-xs font-semibold mt-1 font-sans">{phase.title}</span>
                     </button>
                   ))}
@@ -778,7 +786,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                     const handleCopyQuestion = async () => {
                       try {
                         await navigator.clipboard.writeText(question)
-                        toast.success('Question copied to clipboard.')
+                        setCopiedQuestionText(question)
+                        setTimeout(() => setCopiedQuestionText(null), 1500)
                       } catch {
                         toast.error('Copy failed.')
                       }
@@ -806,7 +815,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                             className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
                             aria-label="Copy question"
                           >
-                            <Copy className="h-3.5 w-3.5" />
+                            {copiedQuestionText === question ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
                           </Button>
                         </div>
                       </div>
