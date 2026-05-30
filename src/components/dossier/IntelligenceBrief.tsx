@@ -860,34 +860,6 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
               )}
             </div>
           </div>
-
-          {/* Foundry Variables */}
-          <section className="rounded-2xl border border-white/5 bg-zinc-950/60 p-5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300">
-            <div className="flex items-center gap-2 mb-3">
-              <Code className="w-4 h-4 text-zinc-500" />
-              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500">
-                Foundry Prompt Variables
-              </div>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 text-xs font-mono text-zinc-400">
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
-                <span>{"{{account.name}}"}</span>
-                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{displayAccount?.name || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
-                <span>{"{{account.industry}}"}</span>
-                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{displayAccount?.industry || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
-                <span>{"{{account.contract_end_date}}"}</span>
-                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{(displayAccount?.contractEndDate || displayAccount?.contract_end_date) || 'N/A'}</span>
-              </div>
-              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
-                <span>{"{{intelligence.primary_angle}}"}</span>
-                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{briefAngles?.primary || 'N/A'}</span>
-              </div>
-            </div>
-          </section>
         </div>
       )}
     </div>
