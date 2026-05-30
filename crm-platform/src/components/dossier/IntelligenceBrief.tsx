@@ -154,11 +154,21 @@ function formatDetailText(text: string) {
   )
 }
 
+const ANGLE_DISPLAY_NAMES = {
+  budgetCertainty: 'Budget Certainty & Volatility',
+  renewalTiming: 'Contract Renewal Timing',
+  loadFactor: 'Load Factor & TOU Audit',
+  demandResponse: 'Demand Response & Curtailment',
+  billingOptimization: 'Billing Errors & Tax Audit',
+  esgRenewables: 'ESG & Renewable Strategy'
+}
+
 export function IntelligenceBrief({ account, className }: IntelligenceBriefProps) {
   const queryClient = useQueryClient()
   const { role } = useAuth()
   const [showContent, setShowContent] = useState(false)
   const [showDiscoveryFlow, setShowDiscoveryFlow] = useState(false)
+  const [showAllAngles, setShowAllAngles] = useState(false)
   const [activePhase, setActivePhase] = useState(0)
   const isPrivilegedUser = isPrivilegedRole(role)
 
@@ -287,6 +297,23 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       contractLabel,
     }
   }, [brief.detail, brief.headline, brief.talkTrack, displayAccount])
+
+  const briefAngles = displayAccount?.metadata?.intelligenceBriefAngles || null
+  const alternateAngles = useMemo(() => {
+    if (!briefAngles?.all) return []
+    return Object.entries(briefAngles.all).map(([key, val]: any) => {
+      const isPrimary = key === briefAngles.primary
+      const isSecondary = key === briefAngles.secondary
+      return {
+        key,
+        name: ANGLE_DISPLAY_NAMES[key as keyof typeof ANGLE_DISPLAY_NAMES] || key,
+        headline: val?.headline || '',
+        talkTrack: val?.talk_track || '',
+        isPrimary,
+        isSecondary
+      }
+    })
+  }, [briefAngles])
 
   const nepqPhases = useMemo(() => {
     const { company, locationName, facility, opModel, primaryDriver, secondaryDriver, contractLabel } = parsedBriefInfo
@@ -514,6 +541,110 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
               </div>
             </div>
           </section>
+
+          {/* Alternate Opportunity Angles Section */}
+          {alternateAngles.length > 0 && (
+            <section className={cn(
+              'rounded-2xl border border-white/5 bg-zinc-950/60 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] overflow-hidden',
+              showAllAngles ? 'shadow-[0_18px_45px_rgba(0,0,0,0.22)]' : 'shadow-none',
+              'animate-in fade-in slide-in-from-top-2 duration-500 delay-200'
+            )}>
+              <div className={cn(
+                'flex items-center justify-between p-5 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                showAllAngles ? 'border-b border-white/5 pb-4' : 'border-b border-transparent'
+              )}>
+                <div className="flex items-center gap-2">
+                  <Lightbulb className="w-4 h-4 text-white" />
+                  <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                    Alternate Cost & Risk Angles
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllAngles(!showAllAngles)}
+                  className={cn(
+                    'overflow-hidden text-xs text-zinc-400 hover:text-white cursor-pointer transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                    showAllAngles ? 'w-24 bg-white/[0.03]' : 'w-32'
+                  )}
+                >
+                  {showAllAngles ? 'Hide Angles' : 'Explore Angles'}
+                </Button>
+              </div>
+
+              <div className={cn(
+                'grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                showAllAngles ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+              )}>
+                <div className="min-h-0 overflow-hidden">
+                  <div className={cn(
+                    'p-5 space-y-4 transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]',
+                    showAllAngles ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+                  )}>
+                    {alternateAngles.map((angle: any) => {
+                      const handleCopyAngle = async () => {
+                        const copyText = "Angle: " + angle.name + "\nHeadline: " + angle.headline + "\nTalk Track: " + angle.talkTrack;
+                        try {
+                          await navigator.clipboard.writeText(copyText);
+                          toast.success(angle.name + " copied to clipboard.");
+                        } catch {
+                          toast.error('Copy failed.');
+                        }
+                      };
+
+                      return (
+                        <div
+                          key={angle.key}
+                          className={cn(
+                            'group relative rounded-xl border p-4 transition-all duration-300',
+                            angle.isPrimary 
+                              ? 'border-[#002FA7]/40 bg-[#002FA7]/5 hover:border-[#002FA7]/60' 
+                              : angle.isSecondary
+                              ? 'border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40'
+                              : 'border-white/5 bg-zinc-950/90 hover:border-white/10 hover:bg-zinc-900/40'
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-2 flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={cn(
+                                  'text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border',
+                                  angle.isPrimary
+                                    ? 'border-[#002FA7]/40 bg-[#002FA7]/20 text-blue-300'
+                                    : angle.isSecondary
+                                    ? 'border-emerald-500/30 bg-emerald-500/20 text-emerald-300'
+                                    : 'border-white/10 bg-white/5 text-zinc-400'
+                                )}>
+                                  {angle.name} {angle.isPrimary ? '(PRIMARY)' : angle.isSecondary ? '(SECONDARY)' : ''}
+                                </span>
+                              </div>
+                              <h5 className="text-sm font-semibold text-white font-sans leading-snug">
+                                {angle.headline}
+                              </h5>
+                              <blockquote className="text-xs leading-relaxed text-zinc-300 italic border-l border-white/10 pl-3">
+                                \"{angle.talkTrack}\"
+                              </blockquote>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={handleCopyAngle}
+                              className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
+                              aria-label="Copy angle"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* NEPQ Discovery Flow Section */}
           <section className={cn(
