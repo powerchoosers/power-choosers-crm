@@ -192,6 +192,14 @@ type BriefResult = {
   source_title?: string
   source_domain?: string
   reason?: string
+  angles?: {
+    budgetCertainty?: { headline: string; talk_track: string }
+    renewalTiming?: { headline: string; talk_track: string }
+    loadFactor?: { headline: string; talk_track: string }
+    demandResponse?: { headline: string; talk_track: string }
+    billingOptimization?: { headline: string; talk_track: string }
+    esgRenewables?: { headline: string; talk_track: string }
+  }
 }
 
 type StoredBriefResult = Partial<BriefResult> & {
@@ -6234,6 +6242,17 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
 
   const prompt = `You are a plainspoken energy analyst and strategist. You are writing BOTH a permission-based OPENER and a TALK TRACK that comes after the opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
+ADDITIONAL MULTI-ANGLE OUTPUT RULES:
+You must generate a customized "headline" and "talk_track" for each of the 6 angles inside the "angles" JSON field. Do not use generic placeholders; customize them based on the company's research payload, actual products/services, and city/locations:
+1. "budgetCertainty": Focus on risk management, price spikes, and budget certainty over 24-36 months.
+2. "renewalTiming": Focus on contract auto-renewals, estimated renewal window, or auditing renewal terms.
+3. "loadFactor": Focus on shifting usage, capacity factor, flat load vs spiky load, or peak pricing hours.
+4. "demandResponse": Focus on getting paid for flexibility during grid stress (ERCOT events).
+5. "billingOptimization": Focus on line-item auditing, pass-throughs, sales tax exemptions, or billing errors.
+6. "esgRenewables": Focus on hitting sustainability/renewable goals without green premiums.
+
+Each talk_track in the "angles" must be exactly 2 sentences and follow the TALK_TRACK_RULES (start with operational pacing, end with curiosity question + safety-valve).
+
 VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
 - Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
 - Cadence: Use contractions naturally (y'all, y'all's, it's, don't, can't, we're). Avoid polished, formal, or high-flown sales language. Sound undeniably like Lewis Patterson calling out of the blue.
@@ -7712,6 +7731,90 @@ async function collectResearchCandidates(account: AccountRow, hierarchyContext: 
   return dedupeAndSort([...newsHits, ...bingNewsHits, ...officialWebsiteHits, ...webHits, ...hierarchyWebsiteHits, ...linkedInHits, ...secSearchHits, ...secFilingHits], account)
 }
 
+type IntelligenceAngle = {
+  angleName: 'budgetCertainty' | 'renewalTiming' | 'loadFactor' | 'demandResponse' | 'billingOptimization' | 'esgRenewables'
+  displayName: string
+  score: number
+}
+
+function determinePrimaryAndSecondaryAngles(
+  account: AccountRow,
+  siteContext: SiteContext | null
+): { primary: string; secondary: string } {
+  const angles: IntelligenceAngle[] = [
+    { angleName: 'budgetCertainty', displayName: 'Budget Certainty', score: 0 },
+    { angleName: 'renewalTiming', displayName: 'Renewal Timing', score: 0 },
+    { angleName: 'loadFactor', displayName: 'Load Factor', score: 0 },
+    { angleName: 'demandResponse', displayName: 'Demand Response', score: 0 },
+    { angleName: 'billingOptimization', displayName: 'Billing Optimization', score: 0 },
+    { angleName: 'esgRenewables', displayName: 'ESG & Renewables', score: 0 },
+  ]
+
+  const contractDateStr = (account as any).contract_end_date || account.metadata?.contractEndDate
+  if (contractDateStr) {
+    const contractDate = new Date(contractDateStr)
+    const diffMs = contractDate.getTime() - Date.now()
+    const diffMonths = diffMs / (1000 * 60 * 60 * 24 * 30.4)
+    if (diffMonths > 0 && diffMonths <= 12) {
+      angles.find(a => a.angleName === 'renewalTiming')!.score += 15
+      angles.find(a => a.angleName === 'budgetCertainty')!.score += 5
+    } else if (diffMonths > 12 && diffMonths <= 24) {
+      angles.find(a => a.angleName === 'renewalTiming')!.score += 8
+    }
+  } else {
+    angles.find(a => a.angleName === 'renewalTiming')!.score += 5
+  }
+
+  const industry = (account.industry || '').toLowerCase()
+  const description = (getPublicAccountDescription(account) || '').toLowerCase()
+  const profile = account.metadata?.intelligenceProfile as any
+  const cluster = profile?.industryCluster || ''
+
+  const isHeavyUser = ['manufacturing', 'logistics', 'food_storage', 'cold_storage', 'industrial'].includes(cluster) || 
+                      /manufactur|industrial|steel|chemical|plastics|machinery|processing|cold storage|refrigerat|warehouse|distribution/i.test(industry + ' ' + description)
+  
+  if (isHeavyUser) {
+    angles.find(a => a.angleName === 'demandResponse')!.score += 10
+    angles.find(a => a.angleName === 'loadFactor')!.score += 8
+  }
+
+  const hasMultipleMeters = (siteContext && siteContext.confirmedMeterCount > 1) || 
+                            (account.service_addresses && Array.isArray(account.service_addresses) && account.service_addresses.length > 1)
+  if (hasMultipleMeters) {
+    angles.find(a => a.angleName === 'billingOptimization')!.score += 8
+    angles.find(a => a.angleName === 'loadFactor')!.score += 5
+  }
+
+  const isNonProfit = ['school_district', 'public_sector', 'church', 'nonprofit', 'government'].includes(cluster) ||
+                      /school|district|isd|academy|church|worship|ministry|charity|municipal|city of/i.test(industry + ' ' + description)
+  if (isNonProfit) {
+    angles.find(a => a.angleName === 'billingOptimization')!.score += 12
+    angles.find(a => a.angleName === 'budgetCertainty')!.score += 10
+  }
+
+  const isBrandOrRetail = ['retail', 'restaurant', 'hotel_owner', 'hospitality_group'].includes(cluster) ||
+                          /retail|restaurant|hotel|hospitality|brand|real estate|office|headquarters/i.test(industry + ' ' + description)
+  if (isBrandOrRetail) {
+    angles.find(a => a.angleName === 'esgRenewables')!.score += 8
+    angles.find(a => a.angleName === 'budgetCertainty')!.score += 6
+  }
+
+  const employees = Number(account.employees || account.metadata?.employees || 0)
+  if (employees > 0 && employees < 20) {
+    angles.find(a => a.angleName === 'billingOptimization')!.score += 10
+  } else if (employees >= 250) {
+    angles.find(a => a.angleName === 'esgRenewables')!.score += 6
+    angles.find(a => a.angleName === 'demandResponse')!.score += 8
+  }
+
+  angles.sort((a, b) => b.score - a.score)
+  
+  return {
+    primary: angles[0].angleName,
+    secondary: angles[1].angleName
+  }
+}
+
 function serializeAccount(account: AccountRow) {
   return {
     id: account.id,
@@ -7725,6 +7828,7 @@ function serializeAccount(account: AccountRow) {
     intelligenceBriefConfidenceLevel: account.intelligence_brief_confidence_level || null,
     intelligenceBriefLastRefreshedAt: account.intelligence_brief_last_refreshed_at || null,
     intelligenceBriefStatus: (account.intelligence_brief_status || 'idle') as BriefStatus,
+    metadata: account.metadata || null,
   }
 }
 
@@ -8249,6 +8353,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
     selected_priority: candidate?.priority ?? result?.selected_priority ?? 0,
     source_title: candidate?.title || result?.source_title || '',
     source_domain: candidate?.source || result?.source_domain || '',
+    angles: result?.angles,
   }
 }
 
@@ -8297,6 +8402,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
     selected_priority: candidate?.priority ?? 9,
     source_title: candidate?.title || '',
     source_domain: candidate?.source || '',
+    angles: undefined,
   }
 }
 
@@ -8646,6 +8752,17 @@ async function runOpenRouterResearch(
 Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
 If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.${siteContextBlock}
 
+ADDITIONAL MULTI-ANGLE OUTPUT RULES:
+You must generate a customized "headline" and "talk_track" for each of the 6 angles inside the "angles" JSON field. Do not use generic placeholders; customize them based on the company's research payload, actual products/services, and city/locations:
+1. "budgetCertainty": Focus on risk management, price spikes, and budget certainty over 24-36 months.
+2. "renewalTiming": Focus on contract auto-renewals, estimated renewal window, or auditing renewal terms.
+3. "loadFactor": Focus on shifting usage, capacity factor, flat load vs spiky load, or peak pricing hours.
+4. "demandResponse": Focus on getting paid for flexibility during grid stress (ERCOT events).
+5. "billingOptimization": Focus on line-item auditing, pass-throughs, sales tax exemptions, or billing errors.
+6. "esgRenewables": Focus on hitting sustainability/renewable goals without green premiums.
+
+Each talk_track in the "angles" must be exactly 2 sentences and follow the TALK_TRACK_RULES (start with operational pacing, end with curiosity question + safety-valve).
+
 VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
 - Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
 - Cadence: Use contractions naturally (y'all, y'all's, it's, don't, can't, we're). Avoid polished, formal, or high-flown sales language. Sound undeniably like Lewis Patterson calling out of the blue.
@@ -8941,7 +9058,15 @@ Return JSON only with this shape:
   "confidence_level": "High|Medium|Low",
   "selected_priority": 1,
   "source_title": "",
-  "source_domain": ""
+  "source_domain": "",
+  "angles": {
+    "budgetCertainty": { "headline": "Short customized headline (not generic, e.g., 'Budget Stability and Price-Spike Protection for [Company]')", "talk_track": "2-sentence customized talk track pacing their operations and ending with a safety-valve question" },
+    "renewalTiming": { "headline": "Short customized headline", "talk_track": "2-sentence customized talk track" },
+    "loadFactor": { "headline": "Short customized headline", "talk_track": "2-sentence customized talk track" },
+    "demandResponse": { "headline": "Short customized headline", "talk_track": "2-sentence customized talk track" },
+    "billingOptimization": { "headline": "Short customized headline", "talk_track": "2-sentence customized talk track" },
+    "esgRenewables": { "headline": "Short customized headline", "talk_track": "2-sentence customized talk track" }
+  }
 }
 
 TALK_TRACK_CONTEXT:
@@ -9507,6 +9632,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    const angleSelection = determinePrimaryAndSecondaryAngles(briefingAccount, siteContext);
+
+    if (validated && validated.angles) {
+      const primary = (validated.angles as any)[angleSelection.primary];
+      if (primary && primary.talk_track) {
+        validated.talk_track = primary.talk_track;
+        if (primary.headline) {
+          validated.signal_headline = primary.headline;
+        }
+      }
+    }
+
     const updatePayload: Record<string, unknown> = {
       intelligence_brief_status: outcomeStatus,
       intelligence_brief_last_refreshed_at: new Date().toISOString(),
@@ -9531,6 +9668,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       roleFamily: audienceProfile.roleFamily,
       roleSummary: audienceProfile.roleSummary,
     } : null
+
+    // Save selected primary and secondary angles, along with all generated alternatives
+    nextMetadata.intelligenceBriefAngles = {
+      primary: angleSelection.primary,
+      secondary: angleSelection.secondary,
+      all: validated?.angles || null
+    }
+
     updatePayload.metadata = nextMetadata
 
     if (validated) {
