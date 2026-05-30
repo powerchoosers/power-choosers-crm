@@ -222,6 +222,49 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     },
   })
 
+  const updateAngleMutation = useMutation<any, Error, string>({
+    mutationFn: async (angleKey: string) => {
+      if (!account?.id) throw new Error('Missing account ID')
+
+      const headers = await getAuthHeaders()
+      const response = await fetch(`/api/accounts/${encodeURIComponent(account.id)}/intelligence-brief`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: JSON.stringify({
+          action: 'select_angle',
+          angleKey
+        })
+      })
+
+      const payload = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Failed to update angle.')
+      }
+
+      if (payload?.account) {
+        queryClient.setQueriesData({ queryKey: ['account', account.id] }, (cached: any) => (
+          cached?.id === account.id ? { ...cached, ...payload.account } : cached
+        ))
+      }
+
+      return payload
+    },
+    onSuccess: (payload) => {
+      if (!account?.id) return
+      void queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey.some((part) => part === account.id),
+      })
+      toast.success(payload?.message || 'Primary angle updated.')
+    },
+    onError: (error) => {
+      toast.error(error.message)
+    }
+  })
+
   const displayAccount = useMemo(() => (
     refreshMutation.data?.account ? { ...account, ...refreshMutation.data.account } : account
   ), [account, refreshMutation.data?.account])
@@ -626,16 +669,33 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                                 \"{angle.talkTrack}\"
                               </blockquote>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={handleCopyAngle}
-                              className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
-                              aria-label="Copy angle"
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </Button>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {!angle.isPrimary && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={updateAngleMutation.isPending}
+                                  onClick={() => updateAngleMutation.mutate(angle.key)}
+                                  className="h-8 text-[11px] font-mono text-zinc-400 hover:text-white border border-transparent hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5 cursor-pointer px-2"
+                                >
+                                  {updateAngleMutation.isPending && updateAngleMutation.variables === angle.key ? (
+                                    <Loader2 className="h-3 w-3 animate-spin mr-1 text-white" />
+                                  ) : null}
+                                  Set as Active
+                                </Button>
+                              )}
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={handleCopyAngle}
+                                className="h-8 w-8 text-zinc-500 hover:text-white shrink-0 border border-transparent hover:border-white/5 cursor-pointer"
+                                aria-label="Copy angle"
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
