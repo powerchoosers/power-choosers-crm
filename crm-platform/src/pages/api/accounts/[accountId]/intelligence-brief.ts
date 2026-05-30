@@ -6244,14 +6244,27 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
 
 ADDITIONAL MULTI-ANGLE OUTPUT RULES:
 You must generate a customized "headline" and "talk_track" for each of the 6 angles inside the "angles" JSON field. Do not use generic placeholders; customize them based on the company's research payload, actual products/services, and city/locations:
-1. "budgetCertainty": Focus on risk management, price spikes, and budget certainty over 24-36 months.
-2. "renewalTiming": Focus on contract auto-renewals, estimated renewal window, or auditing renewal terms.
-3. "loadFactor": Focus on shifting usage, capacity factor, flat load vs spiky load, or peak pricing hours.
-4. "demandResponse": Focus on getting paid for flexibility during grid stress (ERCOT events).
-5. "billingOptimization": Focus on line-item auditing, pass-throughs, sales tax exemptions, or billing errors.
-6. "esgRenewables": Focus on hitting sustainability/renewable goals without green premiums.
+1. "budgetCertainty": Focus on risk management and price-spike protection for their specific operations. If 'rate' or 'energy_supplier' is known, weave it in (e.g. "with y'all's TXU agreement..." or "securing a fixed rate below 8.7 cents..."). If not, focus on their specific machinery/HVAC seasonal budget volatility. NEVER start with generic phrases like "Often times, the biggest swings..." or "unexpected spikes from equipment usage...".
+2. "renewalTiming": Focus on their specific renewal timing. If the 'contract_end_date' is known, you MUST weave it in (e.g. "With y'all's current agreement coming up in October..." or "heading into your October renewal..."). If it is not known, frame it around auditing the renewal terms of their specific clinical/manufacturing equipment load (e.g. "With the clinic's clinical equipment and HVAC running daily, auditing the terms before the next renewal window..."). NEVER use generic starter phrases like "Many businesses just let their electricity contracts auto-renew...".
+3. "loadFactor": Focus on their specific operational load profile. If 'meter_count' or 'annual_usage' is known, weave it in (e.g. "managing three utility meters..." or "drawing over a million kilowatt-hours..."). Hook them on their specific machinery (e.g. imaging systems, batching plants, refrigeration compressors) and peak pricing hours.
+4. "demandResponse": Focus on earning revenue from their specific flexibility. Reference their specific flexible loads (e.g. non-critical HVAC, secondary compressors, vehicle charging) and getting paid by ERCOT during grid stress.
+5. "billingOptimization": Focus on auditing and tax exemptions for their specific entity type. If they are a religious/nonprofit/educational entity, highlight the "utility sales tax exemption" or "tax exemptions" immediately. If they are a clinic/office/manufacturing firm, focus on auditing line-item pass-through charges.
+6. "esgRenewables": Focus on hitting sustainability goals for their specific company/brand without paying green premiums.
 
 Each talk_track in the "angles" must be exactly 2 sentences and follow the TALK_TRACK_RULES (start with operational pacing, end with curiosity question + safety-valve).
+
+ENERGY DATA INTEGRATION RULES:
+If any of these known energy metrics are present in the account payload, you MUST incorporate them directly into the pacing/opener and the specific angle where it is highly relevant:
+- contract_end_date: e.g. if '2026-10-31', weave this date into the "renewalTiming" talk track or opener (e.g. "with your agreement ending this October..." or "heading into your October renewal...").
+- energy_supplier: e.g. if 'TXU Energy', weave it in (e.g. "since y'all are currently set up with TXU...").
+- rate: e.g. if '8.5 cents/kWh' or '0.085', reference it (e.g. "having a rate of 8.5 cents on that meter...").
+- meter_count: e.g. if '3', reference it (e.g. "managing three separate utility meters across Laredo...").
+- annual_usage: e.g. if '1,200,000 kWh', reference it (e.g. "drawing over a million kilowatt-hours a year...").
+
+TO PASS THE "CFO TEST" WITH A GRADE OF A/A+:
+- NEVER use generic opening statements in the talk tracks like "Many businesses just let their electricity contracts auto-renew..." or "Often times, the biggest swings on a clinic's electricity bill...". These sound like sales scripts.
+- Instead, dive directly into a highly specific operational action/equipment/space fact about the company (e.g., "Having those surgery tables and clinical imaging systems preheating every morning...", "With the athletics lighting and campus cooling systems running during the summer calendar...", "Running multiple shift patterns and conveyor systems across your Laredo warehouse...").
+- Hook them instantly on a practical operational reality first, then causal-link it to the bill.
 
 VOICE, TONE & PERSUASION PSYCHOLOGY (Lewis Patterson's Calling Cadence & Influence):
 - Tone: High-integrity, expert, disarming, low-pressure, direct. Talk peer-to-peer as if calling a friend who runs a business.
@@ -8653,6 +8666,10 @@ async function runOpenRouterResearch(
       annual_usage: account.annual_usage || '',
       is_in_deregulated_market: isInDeregulatedMarket(account),
       is_competitor_energy_broker: isCompetitorEnergyBroker(account),
+      contract_end_date: (account as any).contract_end_date || account.metadata?.contractEndDate || null,
+      energy_supplier: (account as any).energy_supplier || account.metadata?.energy_supplier || null,
+      rate: (account as any).rate || account.metadata?.rate || null,
+      meter_count: siteContext?.confirmedMeterCount || (account.metadata?.meters && Array.isArray(account.metadata.meters) ? account.metadata.meters.length : null) || null,
     },
     audience_profile: audienceProfile ? {
       source: audienceProfile.source,
