@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, isValid } from 'date-fns'
-import { Copy, ExternalLink, Loader2, RefreshCcw, Search, Sparkles, TrendingUp, MessageSquare, Lightbulb } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, RefreshCcw, Search, Sparkles, TrendingUp, MessageSquare, Lightbulb, Code } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
@@ -444,12 +444,12 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-2">
+          <h3 className="text-[10px] font-sans font-bold text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-2">
             <Sparkles className="w-3.5 h-3.5 text-white" />
             Intelligence Brief
           </h3>
-          <p className="mt-1 text-[11px] font-mono text-zinc-600">
-            {brief.lastRefreshedAt ? `Last updated ${getClockLabel(brief.lastRefreshedAt)}` : 'Last updated not yet refreshed'}
+          <p className="mt-1 text-[11px] font-sans text-zinc-600">
+            Last updated {brief.lastRefreshedAt ? <span className="font-mono">{getClockLabel(brief.lastRefreshedAt)}</span> : <span className="font-mono">not yet refreshed</span>}
           </p>
         </div>
 
@@ -527,7 +527,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
           )}>
             <div className="flex items-center gap-2 mb-3">
               <TrendingUp className="w-4 h-4 text-white" />
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500">
                 Signal Headline
               </div>
             </div>
@@ -543,7 +543,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
           )}>
             <div className="flex items-center gap-2 mb-3">
               <Lightbulb className="w-4 h-4 text-white" />
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500">
                 Signal Detail
               </div>
             </div>
@@ -559,14 +559,14 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
           )}>
             <div className="flex items-center gap-2 mb-3">
               <MessageSquare className="w-4 h-4 text-white" />
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-white">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-white">
                 Talk Track
               </div>
             </div>
             <div className="space-y-4">
               {brief.opener ? (
                 <div>
-                  <div className="mb-2 text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                  <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                     Opener
                   </div>
                   <blockquote className="text-sm leading-7 text-white italic border-l-2 border-white/20 pl-4">
@@ -575,7 +575,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                 </div>
               ) : null}
               <div>
-                <div className="mb-2 text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                   Talk Track
                 </div>
                 <blockquote className="text-sm leading-7 text-white italic border-l-2 border-[#002FA7]/40 pl-4">
@@ -598,7 +598,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
               )}>
                 <div className="flex items-center gap-2">
                   <Lightbulb className="w-4 h-4 text-white" />
-                  <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                  <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                     Alternate Cost & Risk Angles
                   </div>
                 </div>
@@ -718,7 +718,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
             )}>
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-white" />
-                <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-400">
+                <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                   NEPQ Discovery Flow
                 </div>
               </div>
@@ -759,7 +759,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                           : 'border-white/5 bg-zinc-950/40 text-zinc-500 hover:text-zinc-300 hover:border-white/10'
                       )}
                     >
-                      <span className="text-[9px] font-mono tracking-wider uppercase">{phase.label}</span>
+                      <span className="text-[9px] font-sans font-bold tracking-wider uppercase">{phase.label}</span>
                       <span className="text-xs font-semibold mt-1 font-sans">{phase.title}</span>
                     </button>
                   ))}
@@ -824,25 +824,25 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
             'animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300'
           )}>
             <div className="rounded-2xl border border-white/5 bg-zinc-950/90 p-4">
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500 mb-2">
                 Signal Date
               </div>
-              <p className="text-sm font-medium text-zinc-100">
+              <p className="text-sm font-mono text-zinc-100">
                 {getHumanDate(brief.signalDate) || 'Not set'}
               </p>
             </div>
 
             <div className={cn('rounded-2xl border p-4', confidenceTone(brief.confidenceLevel))}>
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] mb-2">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] mb-2">
                 Confidence
               </div>
-              <p className="text-sm font-medium">
+              <p className="text-sm font-mono font-bold">
                 {brief.confidenceLevel ? brief.confidenceLevel.charAt(0).toUpperCase() + brief.confidenceLevel.slice(1).toLowerCase() : 'Not set'}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/5 bg-zinc-950/90 p-4">
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500 mb-2">
                 Source
               </div>
               {brief.sourceUrl ? (
@@ -850,16 +850,44 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                   href={brief.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="group inline-flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-white break-all transition-colors"
+                  className="group inline-flex items-center gap-1 text-sm font-mono text-zinc-500 hover:text-white break-all transition-colors"
                 >
                   View source
                   <ExternalLink className="w-3.5 h-3.5 shrink-0 text-current transition-colors group-hover:text-white" />
                 </a>
               ) : (
-                <p className="text-sm text-zinc-500">Not set</p>
+                <p className="text-sm font-mono text-zinc-500">Not set</p>
               )}
             </div>
           </div>
+
+          {/* Foundry Variables */}
+          <section className="rounded-2xl border border-white/5 bg-zinc-950/60 p-5 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300">
+            <div className="flex items-center gap-2 mb-3">
+              <Code className="w-4 h-4 text-zinc-500" />
+              <div className="text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-500">
+                Foundry Prompt Variables
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 text-xs font-mono text-zinc-400">
+              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
+                <span>{"{{account.name}}"}</span>
+                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{displayAccount?.name || 'N/A'}</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
+                <span>{"{{account.industry}}"}</span>
+                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{displayAccount?.industry || 'N/A'}</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
+                <span>{"{{account.contract_end_date}}"}</span>
+                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{(displayAccount?.contractEndDate || displayAccount?.contract_end_date) || 'N/A'}</span>
+              </div>
+              <div className="flex items-center justify-between p-2 rounded bg-zinc-950 border border-white/5 hover:border-white/10 group/var">
+                <span>{"{{intelligence.primary_angle}}"}</span>
+                <span className="text-zinc-500 truncate max-w-[150px] group-hover/var:text-white transition-colors">{briefAngles?.primary || 'N/A'}</span>
+              </div>
+            </div>
+          </section>
         </div>
       )}
     </div>
