@@ -6291,7 +6291,7 @@ OPENER RULES (Exactly two sentences):
 - Must end the second sentence exactly with ", and had a curious question about y'alls electricity agreements and contracts."
 
 TALK_TRACK_RULES (Exactly two sentences):
-- Sentence 1: A specific, plain-English problem or situational struggle tied to the company's real operations. You MUST customize it to weave in specific, concrete details of this company's actual business (e.g., naming their specific products, services, operations, or equipment found in the description/research, like "tutoring rooms", "trolleys", "bakery ovens", "salsa packaging lines", "shelter facilities") to show you know their specific business. Do NOT just use generic industry templates or placeholders. It can start with "Often times..." only if that sounds natural; do not force the same sentence pattern every time.
+- Sentence 1: MUST start directly with a concrete operational pacing statement about the company's day-to-day facilities/equipment (e.g., "Having those clinical treatment rooms and imaging setups running...", "With y'all operating the loading docks and charging forklifts across the Laredo facility...", "Running the campus HVAC and athletic lighting during student hours..."). Do NOT start with market details, ERCOT grid alerts, or generic industry descriptions (e.g. do NOT say "During ERCOT grid stress events..." or "Electricity bills for complex campus operations..."). Connect this paced reality to the billing issue in the second half of the sentence using causal links.
 - Sentence 2: One short curiosity question that invites them to explain how they handle it. It MUST start with "I'm curious..." or "How do y'all..." and end exactly with one of these safety-valve phrases: ", or is that pretty much on autopilot?" or ", or is that side of things pretty much on autopilot?" or ", or is that pretty much handled?" or ", or is that side of things pretty much handled?".
 - Use the STRUCTURED BRIEFING CONTEXT as the source of truth. The signal is the reason for the call; the company identity and operational drivers decide the talk track.
 - If the signal and company identity conflict, company identity wins.
@@ -9275,6 +9275,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!allowed) {
       return res.status(403).json({ ok: false, message: 'You do not have access to refresh this account' })
+    }
+
+    const { action, angleKey } = req.body || {}
+    if (action === 'select_angle') {
+      if (!angleKey) {
+        return res.status(400).json({ ok: false, message: 'Missing angleKey' })
+      }
+
+      const meta = getAccountMetadata(account as AccountRow)
+      const briefAngles = meta.intelligenceBriefAngles as Record<string, any> | null
+      const allAngles = briefAngles?.all as Record<string, any> | null
+      const selectedAngle = allAngles?.[angleKey]
+
+      if (!selectedAngle || !selectedAngle.talk_track) {
+        return res.status(400).json({ ok: false, message: `Angle ${angleKey} data not found on this account` })
+      }
+
+      const nextMetadata = {
+        ...meta,
+        intelligenceBriefAngles: {
+          ...briefAngles,
+          primary: angleKey,
+        }
+      }
+
+      const updatePayload: Record<string, any> = {
+        intelligence_brief_headline: selectedAngle.headline || account.intelligence_brief_headline,
+        intelligence_brief_talk_track: simplifyTalkTrackLanguage(selectedAngle.talk_track),
+        metadata: nextMetadata,
+        intelligence_brief_last_refreshed_at: new Date().toISOString()
+      }
+
+      const { data: updatedAccount, error: updateError } = await supabaseAdmin
+        .from('accounts')
+        .update(updatePayload)
+        .eq('id', accountId)
+        .select(ACCOUNT_SELECT)
+        .single()
+
+      if (updateError) {
+        console.error('[Intelligence Brief] Angle update failed:', updateError)
+        return res.status(500).json({ ok: false, message: 'Failed to update selected angle', detail: updateError.message })
+      }
+
+      return res.status(200).json({
+        ok: true,
+        message: `Primary angle updated to ${angleKey}.`,
+        account: serializeAccount(updatedAccount as AccountRow)
+      })
     }
 
     const lastRefreshAt = account.intelligence_brief_last_refreshed_at
