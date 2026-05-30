@@ -567,9 +567,9 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                 Talk Track
               </div>
             </div>
-            <div className={cn("grid gap-4", brief.opener ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1")}>
+            <div className="space-y-4">
               {brief.opener ? (
-                <div className="rounded-xl bg-zinc-950/40 p-4 border border-white/5">
+                <div>
                   <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                     Opener
                   </div>
@@ -578,7 +578,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                   </blockquote>
                 </div>
               ) : null}
-              <div className="rounded-xl bg-zinc-950/40 p-4 border border-white/5">
+              <div>
                 <div className="mb-2 text-[10px] font-sans font-bold uppercase tracking-[0.22em] text-zinc-400">
                   Talk Track
                 </div>
