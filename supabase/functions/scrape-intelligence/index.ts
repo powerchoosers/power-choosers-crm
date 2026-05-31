@@ -80,21 +80,21 @@ function safeHostname(value: unknown): string | null {
   }
 }
 
-function isRegulatedTerritory(signal: any): boolean {
+function getSignalEnergyContext(signal: any): ReturnType<typeof getTexasEnergyContext> {
   const city = cleanText(signal.city || signal.metadata?.city)
   const state = cleanText(signal.state || signal.metadata?.state || 'TX')
-  const energyContext = getTexasEnergyContext(city, state)
-  return energyContext.isRegulated
+  const rawLocation = cleanText(`${signal.headline || ''} ${signal.summary || ''} ${signal.tdsp || ''}`)
+  return getTexasEnergyContext(city, state, rawLocation)
 }
 
-function determineTdspZone(city: string, state: string, foundTdsp?: string): string {
+function determineTdspZone(city: string, state: string, foundTdsp?: string, rawLocation?: string): string {
   if (foundTdsp && ['oncor', 'centerpoint', 'aep', 'tnmp'].some(x => foundTdsp.toLowerCase().includes(x))) {
     if (foundTdsp.toLowerCase().includes('oncor')) return 'Oncor'
     if (foundTdsp.toLowerCase().includes('centerpoint')) return 'CenterPoint'
     if (foundTdsp.toLowerCase().includes('aep')) return 'AEP Texas'
     if (foundTdsp.toLowerCase().includes('tnmp')) return 'TNMP'
   }
-  const energyContext = getTexasEnergyContext(city, state)
+  const energyContext = getTexasEnergyContext(city, state, rawLocation)
   return energyContext.utilityTerritory || 'ERCOT_Unknown'
 }
 
@@ -277,6 +277,7 @@ async function callPerplexity(prompt: string): Promise<{ signals: any[]; citatio
           { role: 'user', content: prompt },
         ],
         temperature: 0.3,
+        search_recency_filter: 'month',
       }),
     })
   } catch (fetchErr) {
@@ -438,7 +439,7 @@ Deno.serve(async (req: Request) => {
           model: 'sonar-pro',
           messages: [{ role: 'user', content: 'Say the word PONG and nothing else.' }],
           temperature: 0,
-          max_tokens: 10,
+          max_tokens: 20,
         }),
       })
       const body = await res.text()
@@ -519,7 +520,12 @@ Deno.serve(async (req: Request) => {
         continue
       }
 
-      if (signal.signal_type !== 'energy_rfp' && isRegulatedTerritory(signal)) {
+      const energyContext = getSignalEnergyContext(signal)
+      if (!energyContext.isTexas) {
+        skippedRegulated++
+        continue
+      }
+      if (signal.signal_type !== 'energy_rfp' && energyContext.isRegulated) {
         skippedRegulated++
         continue
       }
@@ -557,7 +563,7 @@ Deno.serve(async (req: Request) => {
 
       const city = truncate(signal.city || signal.metadata?.city, 80) || ''
       const state = truncate(signal.state || signal.metadata?.state || 'TX', 32) || 'TX'
-      const tdspZone = determineTdspZone(city, state, signal.tdsp)
+      const tdspZone = determineTdspZone(city, state, signal.tdsp, `${headline} ${signal.summary || ''}`)
       const apolloVerified = await verifyWithApollo(entityName)
 
       let crmMatchId = null
