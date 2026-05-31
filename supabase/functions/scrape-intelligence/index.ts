@@ -315,13 +315,14 @@ async function callPerplexity(prompt: string): Promise<{ signals: any[]; citatio
  * Domain-level match is intentional — exact URL paths often differ slightly
  * between what Perplexity cites and what it puts in the JSON.
  */
-function isInCitations(sourceUrl: string, citations: string[]): boolean {
+function isExactUrlInCitations(sourceUrl: string, citations: string[]): boolean {
   if (!sourceUrl || citations.length === 0) return false
   try {
-    const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, '')
+    const sourceClean = sourceUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase()
     return citations.some((c) => {
       try {
-        return new URL(c).hostname.replace(/^www\./, '') === sourceHost
+        const cClean = c.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').toLowerCase()
+        return cClean === sourceClean
       } catch {
         return false
       }
@@ -336,15 +337,47 @@ function isInCitations(sourceUrl: string, citations: string[]): boolean {
  * 4s timeout — a real page on a live server responds quickly.
  * Accepts any non-4xx response (3xx redirects, 200 OK, even 5xx is ambiguous).
  */
+function getTopicKeywords(headline: string, entityName: string): string[] {
+  const STOPWORDS = new Set([
+    'the', 'and', 'for', 'with', 'from', 'that', 'this', 'will', 'would', 
+    'about', 'their', 'them', 'then', 'there', 'these', 'they', 'here', 
+    'have', 'been', 'announced', 'announces', 'plans', 'facility', 'plant', 
+    'expansion', 'new', 'operations', 'components', 'production', 'support', 
+    'investment', 'capital', 'capacity', 'project', 'texas', 'growth',
+    'company', 'corporation', 'incorporated', 'limited', 'inc', 'llc', 'ltd', 'co',
+    'announce', 'investing', 'invests', 'expanded', 'expands', 'expansion',
+    'facilities', 'manufacturing', 'industry', 'business', 'report', 'update',
+    'site', 'construction', 'breaking', 'ground', 'building', 'buildings',
+    'commercial', 'industrial', 'enterprise', 'energy', 'electricity',
+    'supplier', 'suppliers', 'consulting', 'advisory', 'services', 'management'
+  ])
+
+  const cleanEntity = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+  const entityWords = new Set(cleanEntity.split(' ').filter(w => w.length > 2))
+
+  const words = headline.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/\s+/)
+  return words.filter(w => w.length > 3 && !STOPWORDS.has(w) && !entityWords.has(w))
+}
+
 /**
  * Last-resort check. Fetches the page content and verifies
- * that the company name is actually mentioned on the page.
+ * that the company name is actually mentioned on the page,
+ * and if it's not a generic homepage, verifies that at least one
+ * topic-specific keyword from the headline is also present.
  * Uses Jina AI Reader first, falling back to raw HTML extraction.
  */
-async function verifyUrl(url: string, entityName: string): Promise<boolean> {
+async function verifyUrl(url: string, entityName: string, headline: string): Promise<boolean> {
   if (!url) return false
   const cleanUrl = url.replace(/^https?:\/\//i, '')
   const jinaUrl = `https://r.jina.ai/${cleanUrl}`
+
+  let isHomepage = false
+  try {
+    const parsed = new URL(url)
+    isHomepage = parsed.pathname === '/' || parsed.pathname === ''
+  } catch {}
+
+  const keywords = getTopicKeywords(headline, entityName)
 
   // Try Jina Reader first (gives clean markdown, avoids bot protection blocks)
   try {
@@ -362,19 +395,29 @@ async function verifyUrl(url: string, entityName: string): Promise<boolean> {
     
     if (res.ok) {
       const text = await res.text()
-      const cleanName = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-      const words = cleanName.split(' ').filter(w => w.length > 2)
-      if (words.length === 0) return true
-      
       const markdownLower = text.toLowerCase()
-      if (words.length >= 2) {
-        const firstTwo = words.slice(0, 2).join(' ')
-        if (markdownLower.includes(firstTwo) || markdownLower.includes(cleanName)) return true
-        
-        const matchCount = words.filter(w => markdownLower.includes(w)).length
-        return (matchCount / words.length) >= 0.7
+      
+      const cleanName = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+      const nameWords = cleanName.split(' ').filter(w => w.length > 2)
+      let nameMatch = false
+      if (nameWords.length > 0) {
+        const matchCount = nameWords.filter(w => markdownLower.includes(w)).length
+        nameMatch = (matchCount / nameWords.length) >= 0.7
+      } else {
+        nameMatch = true
       }
-      return markdownLower.includes(words[0])
+
+      if (!nameMatch) return false
+
+      if (!isHomepage && keywords.length > 0) {
+        const matchedKeywords = keywords.filter(w => markdownLower.includes(w))
+        if (matchedKeywords.length === 0) {
+          console.warn(`[verification] failed topic keywords for: ${url}`)
+          return false
+        }
+      }
+
+      return true
     }
   } catch {
     // Ignore and fall back to direct fetch
@@ -392,22 +435,29 @@ async function verifyUrl(url: string, entityName: string): Promise<boolean> {
     
     if (!res.ok) return false
     const text = await res.text()
+    const htmlLower = text.toLowerCase()
     
-    // Verify that the entity name (or parts of it) is mentioned in the HTML body
     const cleanName = entityName.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
     const words = cleanName.split(' ').filter(w => w.length > 2)
-    if (words.length === 0) return true
-    
-    const htmlLower = text.toLowerCase()
-    if (words.length >= 2) {
-      const firstTwo = words.slice(0, 2).join(' ')
-      if (htmlLower.includes(firstTwo) || htmlLower.includes(cleanName)) return true
-      
+    let nameMatch = false
+    if (words.length > 0) {
       const matchCount = words.filter(w => htmlLower.includes(w)).length
-      return (matchCount / words.length) >= 0.7
+      nameMatch = (matchCount / words.length) >= 0.7
+    } else {
+      nameMatch = true
+    }
+
+    if (!nameMatch) return false
+
+    if (!isHomepage && keywords.length > 0) {
+      const matchedKeywords = keywords.filter(w => htmlLower.includes(w))
+      if (matchedKeywords.length === 0) {
+        console.warn(`[verification] failed topic keywords direct for: ${url}`)
+        return false
+      }
     }
     
-    return htmlLower.includes(words[0])
+    return true
   } catch {
     return false
   }
@@ -549,9 +599,9 @@ Deno.serve(async (req: Request) => {
       const sourceUrl = cleanText(signal.source_url)
       const citations: string[] = signal._citations || []
       if (sourceUrl) {
-        const inCitations = isInCitations(sourceUrl, citations)
+        const inCitations = isExactUrlInCitations(sourceUrl, citations)
         if (!inCitations) {
-          const urlLive = await verifyUrl(sourceUrl, entityName)
+          const urlLive = await verifyUrl(sourceUrl, entityName, headline)
           if (!urlLive) {
             console.warn(`[hallucination] rejected: ${entityName} — ${sourceUrl}`)
             skippedHallucinated++
