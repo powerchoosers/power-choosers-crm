@@ -9017,6 +9017,9 @@ Decision rules:
 - If market context is secondary, keep it to one short clause or leave it out.
 - Extract specific physical machinery, production equipment, facility details, or heavy operational assets mentioned in the company description or research payload (such as "CNC routers", "thermoforming lines", "powder coat ovens", "MIG/TIG welding", "extruders", "injection molding", "chillers", "refrigeration compressors", or "stamping presses").
 - You MUST explicitly reference these specific equipment/machinery assets inside the talk track and opportunity angle prompts to make the conversation extremely personalized to their physical operations, instead of using generic placeholder words like "production equipment", "facility operations", or "manufacturing processes".
+- Adjust the talk track and opportunity angle vocabulary directly based on the AUDIENCE_PROFILE role/title to match their professional lenses:
+  * For CFOs, Finance Leaders, or Purchasing/Procurement titles: Speak in financial terms such as "line-item budget variance", "unhedged exposure on the balance sheet", or "contract optimization ahead of the fiscal year reset".
+  * For COOs, Operations, Facilities, or Plant Manager titles: Speak in operational/machinery terms such as "machinery scheduling limits", "peak load shaving during ERCOT summer adders", or "facility machinery uptime".
 
 Talk Track angle selection for fallback mode (choose based on what you found):
 
