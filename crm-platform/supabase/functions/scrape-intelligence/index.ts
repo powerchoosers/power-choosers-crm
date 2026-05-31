@@ -101,6 +101,13 @@ function determineTdspZone(city: string, state: string, foundTdsp?: string): str
 async function verifyWithApollo(entityName: string): Promise<{ domain: string; logo_url: string; employee_count?: number } | null> {
   if (!APOLLO_API_KEY || !entityName) return null
 
+  // Clean the entity name for a more successful Apollo search query
+  const cleanSearchName = entityName
+    .replace(/\s*\(.*?\)/g, '') // Remove parentheticals
+    .replace(/\s+[-–—]\s+.*/g, '') // Remove trailing dash/hyphen descriptions
+    .replace(/[,.]?\s*\b(inc|llc|corp|ltd|co|corporation|incorporated)\b.*/gi, '') // Remove business entity suffixes
+    .trim()
+
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 3000)
@@ -112,7 +119,7 @@ async function verifyWithApollo(entityName: string): Promise<{ domain: string; l
         'Content-Type': 'application/json',
         'X-Api-Key': APOLLO_API_KEY,
       },
-      body: JSON.stringify({ q_organization_name: entityName, per_page: 1 }),
+      body: JSON.stringify({ q_organization_name: cleanSearchName, per_page: 1 }),
     }).finally(() => clearTimeout(timeout))
 
     if (!response.ok) return null
