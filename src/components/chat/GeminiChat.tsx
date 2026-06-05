@@ -3084,6 +3084,14 @@ export function GeminiChatPanel() {
     }
   }
 
+  const [messages, setMessages] = useState<GeminiMessage[]>([])
+  const [lastProvider, setLastProvider] = useState<string>('openrouter')
+  const [lastModel, setLastModel] = useState<string>('google/gemini-2.5-flash')
+  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
+  const [internetAssistEnabled, setInternetAssistEnabled] = useState(true)
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
+  const [showDiagnostics, setShowDiagnostics] = useState(false)
+
   const buildSessionTitle = useCallback((seed: string) => {
     const text = seed.trim()
     const cleanedContext = (contextInfo.displayLabel || contextInfo.type || 'general')
@@ -3109,7 +3117,32 @@ export function GeminiChatPanel() {
     pendingSessionPromiseRef.current = (async () => {
       await ensureFreshSupabaseSession()
       const contextId = typeof contextInfo.id === 'string' ? contextInfo.id : null
-      const title = buildSessionTitle(seedText)
+      
+      // Let's ask Gemini/AI to generate a brief 3-5 word title from the user prompt
+      let title = buildSessionTitle(seedText)
+      try {
+        const response = await fetch('/api/gemini/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [{ role: 'user', content: seedText }],
+            context: contextInfo,
+            model: selectedModel,
+            jsonMode: true,
+            systemPrompt: "Generate a short, concise, and descriptive chat title (3 to 5 words max) based on the user's message. Output JSON format: { \"title\": \"generated title\" } only."
+          })
+        })
+        const json = await response.json()
+        if (json.content) {
+          const parsed = JSON.parse(json.content)
+          if (parsed.title) {
+            title = parsed.title.trim().slice(0, 96)
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to generate AI title, using fallback buildSessionTitle:', err)
+      }
+
       const { data, error } = await supabase.from('chat_sessions').insert({
         title,
         context_type: contextInfo.type,
@@ -3133,7 +3166,7 @@ export function GeminiChatPanel() {
     } finally {
       pendingSessionPromiseRef.current = null
     }
-  }, [buildSessionTitle, contextInfo.id, contextInfo.type])
+  }, [buildSessionTitle, contextInfo.id, contextInfo.type, selectedModel, contextInfo])
 
   const saveMessageToDb = async (role: 'user' | 'model', content: string, metadata?: Record<string, unknown>) => {
     try {
@@ -3160,14 +3193,6 @@ export function GeminiChatPanel() {
       console.error('Failed to save message:', err)
     }
   }
-
-  const [messages, setMessages] = useState<GeminiMessage[]>([])
-  const [lastProvider, setLastProvider] = useState<string>('openrouter')
-  const [lastModel, setLastModel] = useState<string>('google/gemini-2.5-flash')
-  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
-  const [internetAssistEnabled, setInternetAssistEnabled] = useState(true)
-  const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
-  const [showDiagnostics, setShowDiagnostics] = useState(false)
 
   const isBackupFallback = useMemo(() => {
     if (!diagnostics || diagnostics.length < 2) return false
