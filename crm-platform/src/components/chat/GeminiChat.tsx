@@ -16,7 +16,9 @@ import { useContact, useCreateContact, useUpdateContact } from '@/hooks/useConta
 import { useAccount, useUpdateAccount, useUpsertAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
-import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
+import { ensureFreshSupabaseSession, getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session'
+import { useQueryClient } from '@tanstack/react-query'
+
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { DecryptionText } from '@/components/chat/DecryptionText'
@@ -1056,6 +1058,97 @@ function ApolloCompanyCardView({ card }: { card: ApolloCompanyCardData }) {
 
 function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
   const router = useRouter()
+  const queryClient = useQueryClient()
+  const [enrichingContactId, setEnrichingContactId] = useState<string | null>(null)
+  const [enrichedContactIds, setEnrichedContactIds] = useState<Map<string, string>>(new Map()) // Maps raw Apollo ID to CRM UUID
+
+  const handleEnrichContact = async (item: ApolloResultItem) => {
+    if (enrichingContactId) return
+    setEnrichingContactId(item.id)
+
+    try {
+      const token = await getFreshSupabaseAccessToken(true)
+      const res = await fetch('/api/apollo/enrich', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          contactIds: [item.id],
+          contacts: [{
+            id: item.id,
+            name: item.name,
+            email: item.email || 'N/A',
+            title: item.title,
+            linkedin: item.linkedin,
+            location: item.location || [item.city, item.state].filter(Boolean).join(', ')
+          }],
+          revealEmails: true,
+          revealPhones: true,
+          company: { name: item.company || '', domain: item.domain || '' }
+        })
+      })
+
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error(errText || `Enrichment failed with status ${res.status}`)
+      }
+
+      const responseData = await res.json()
+      const enriched = responseData.contacts?.[0]
+      if (!enriched) {
+        throw new Error('No contact enrichment details returned by API')
+      }
+
+      // We need to look up or construct the CRM contact record using standard CRM creation or letting the API handle it.
+      // The API at /api/apollo/enrich handles database saving under the hood, but let's query the database to find the CRM UUID or read the result.
+      // Let's verify what the API returns. Usually it returns the contact array. Let's lookup our newly created contact in the DB.
+      let crmId: string | null = null
+
+      const emailToCheck = enriched.email || item.email
+      if (emailToCheck && emailToCheck !== 'N/A') {
+        const { data: matchedContact } = await supabase
+          .from('contacts')
+          .select('id')
+          .ilike('email', emailToCheck)
+          .maybeSingle()
+        if (matchedContact?.id) {
+          crmId = matchedContact.id
+        }
+      }
+
+      if (!crmId) {
+        const { data: matchedContact } = await supabase
+          .from('contacts')
+          .select('id')
+          .eq('metadata->>apollo_person_id', item.id)
+          .maybeSingle()
+        if (matchedContact?.id) {
+          crmId = matchedContact.id
+        }
+      }
+
+      if (crmId) {
+        setEnrichedContactIds(prev => {
+          const next = new Map(prev)
+          next.set(item.id, crmId!)
+          return next
+        })
+        toast.success(`Enriched and ingested: ${item.name}`)
+        queryClient.invalidateQueries({ queryKey: ['contacts'] })
+        queryClient.invalidateQueries({ queryKey: ['targets'] })
+      } else {
+        throw new Error('Contact enriched but CRM record could not be resolved. Please check the DB.')
+      }
+    } catch (err) {
+      console.error('Contact enrichment error:', err)
+      toast.error(`Failed to enrich contact: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setEnrichingContactId(null)
+    }
+  }
+
   const accounts = Array.isArray(card.accounts) ? card.accounts : []
   const contacts = Array.isArray(card.contacts) ? card.contacts : []
   const total = accounts.length + contacts.length
@@ -1116,7 +1209,9 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
 
   const renderContactRow = (item: ApolloResultItem) => {
     const initials = item.initials ?? ((item.name.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()) || '?')
-    const canOpen = Boolean(item.id && item.id.trim())
+    const canOpen = Boolean(item.id && item.id.trim() && item.id.length > 20) // CRM UUIDs are >20 chars, raw Apollo IDs are usually shorter strings
+    const isEnriched = enrichedContactIds.has(item.id) || canOpen
+    const isEnriching = enrichingContactId === item.id
 
     return (
       <div key={`contact-${item.id}`} className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-center gap-3 overflow-hidden">
@@ -1131,9 +1226,9 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
             </div>
             <span className={cn(
               'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border whitespace-nowrap',
-              item.status === 'verified' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
+              (item.status === 'verified' || isEnriched) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
             )}>
-              {item.status || 'contact'}
+              {(item.status === 'verified' || isEnriched) ? 'verified' : item.status || 'contact'}
             </span>
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-600 min-w-0 overflow-hidden">
@@ -1142,18 +1237,37 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
             {item.source && <span className="truncate">{item.source}</span>}
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="shrink-0 h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (canOpen) router.push(`/network/contacts/${item.id}`)
-          }}
-          disabled={!canOpen}
-        >
-          Open
-        </Button>
+        {isEnriched ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="shrink-0 h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
+            onClick={(e) => {
+              e.stopPropagation()
+              const targetId = enrichedContactIds.get(item.id) || item.id
+              router.push(`/network/contacts/${targetId}`)
+            }}
+          >
+            Open
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="shrink-0 h-8 px-3 font-mono text-[9px] uppercase tracking-widest bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleEnrichContact(item)
+            }}
+            disabled={isEnriching}
+          >
+            {isEnriching ? <Loader2 size={10} className="animate-spin" /> : (
+              <>
+                <Sparkles className="w-3 h-3 mr-1" />
+                Enrich
+              </>
+            )}
+          </Button>
+        )}
       </div>
     )
   }
@@ -3327,9 +3441,8 @@ SELECT * FROM hybrid_search_accounts(
       if (data.error) throw new Error(data.message || data.error)
       setLastProvider(typeof data.provider === 'string' ? data.provider : 'gemini')
       setLastModel(typeof data.model === 'string' ? data.model : '')
-      // Only update dropdown if the returned model is one we show (avoids "no model selected" when backend fallback used)
-      const allowedGemini = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'openai/gpt-5-nano', 'google/gemini-flash-1.5', 'google/gemini-pro-1.5', 'google/gemini-2.0-flash-001']
-      if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
+      // Do not automatically override the user's dropdown model selection with the backend-chosen model/fallback
+
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
       const isDeepDiveRequest = /deep[-\s]?dive|forensic analysis|forensic brief|intel brief|account intelligence/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
