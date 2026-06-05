@@ -2687,6 +2687,19 @@ function buildStructuredIdentityProfile(
   if (hasTruckLeasingSignals(text) || hasStrongDmeSignals(text) || hasRvSupportSignals(text)) {
     cluster = 'logistics'
   }
+
+  // CFO safeguard: Overrule cluster if the company name contains obvious indicators of a different sector
+  const companyNameLower = (account.name || '').toLowerCase()
+  if (/\b(pie|pizza|caf[eé]|restaurant|diner|bakery|kitchen|bistro|grills?|brewery|donuts?|burgers?|steakhouse|subs\b|deli\b)/i.test(companyNameLower)) {
+    cluster = 'restaurant'
+  } else if (/\b(schools?|academy|college|university|isd\b|charter|district\b)/i.test(companyNameLower)) {
+    cluster = 'school_district'
+  } else if (/\b(hospitals?|clinics?|medical\b|dental\b|dentist|orthodont)/i.test(companyNameLower)) {
+    cluster = 'healthcare'
+  } else if (/\b(hotels?|motels?|resorts?|inns?\b|lodging)/i.test(companyNameLower)) {
+    cluster = 'hotel_owner'
+  }
+
   const multiSiteInfo = detectMultiSiteScale(synthesizedAccount, primaryCandidate)
 
   if (!text && !savedProfile) return null
@@ -4275,8 +4288,30 @@ function inferIndustryClusterFromSignals(account: AccountRow, candidate: Researc
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const cleanCandidate = candidate?.label === 'Industry Trends' ? null : candidate
   const savedProfile = getAccountIdentityProfile(account, cleanCandidate)
-  if (savedProfile?.industryCluster) {
-    return savedProfile.industryCluster
+  let cluster: IndustryCluster = savedProfile?.industryCluster || 'unknown'
+
+  // CFO safeguard: Overrule saved or inferred cluster if the company name contains obvious indicators of a different sector
+  const companyName = (account.name || '').toLowerCase()
+  if (/\b(pie|pizza|caf[eé]|restaurant|diner|bakery|kitchen|bistro|grills?|brewery|donuts?|burgers?|steakhouse|subs\b|deli\b)/i.test(companyName)) {
+    if (cluster === 'banking' || cluster === 'office_services' || cluster === 'technology' || cluster === 'unknown') {
+      cluster = 'restaurant'
+    }
+  } else if (/\b(schools?|academy|college|university|isd\b|charter|district\b)/i.test(companyName)) {
+    if (cluster === 'banking' || cluster === 'office_services' || cluster === 'retail' || cluster === 'unknown') {
+      cluster = 'school_district'
+    }
+  } else if (/\b(hospitals?|clinics?|medical\b|dental\b|dentist|orthodont)/i.test(companyName)) {
+    if (cluster === 'banking' || cluster === 'office_services' || cluster === 'retail' || cluster === 'unknown') {
+      cluster = 'healthcare'
+    }
+  } else if (/\b(hotels?|motels?|resorts?|inns?\b|lodging)/i.test(companyName)) {
+    if (cluster === 'banking' || cluster === 'office_services' || cluster === 'retail' || cluster === 'unknown') {
+      cluster = 'hotel_owner'
+    }
+  }
+
+  if (cluster !== 'unknown') {
+    return cluster
   }
 
   const coreText = cleanText(`${account.name || ''} ${account.industry || ''} ${getPublicAccountDescription(account)} ${getAccountNotes(account)}`).toLowerCase()
@@ -6035,7 +6070,16 @@ function buildTalkTrackContext(
     ...industryGuidance.focus,
     ...signalGuidance.focus,
   ], 7)
-  const companyIdentity = cleanText(identity?.companyType || industryGuidance.label || account.industry || 'commercial account')
+  let companyIdentity = cleanText(identity?.companyType || industryGuidance.label || account.industry || 'commercial account')
+  if (industryCluster === 'restaurant' && /financial|office|bank|corporate/i.test(companyIdentity)) {
+    companyIdentity = 'restaurant'
+  } else if (industryCluster === 'school_district' && /financial|office|retail/i.test(companyIdentity)) {
+    companyIdentity = 'school district'
+  } else if (industryCluster === 'healthcare' && /financial|office|retail/i.test(companyIdentity)) {
+    companyIdentity = 'healthcare facility'
+  } else if (industryCluster === 'hotel_owner' && /financial|office|retail/i.test(companyIdentity)) {
+    companyIdentity = 'hotel property'
+  }
   const personaLens = audienceProfile
     ? `${audienceProfile.contactFirstName || audienceProfile.contactName || 'The contact'} is ${audienceProfile.contactTitle || 'the contact'}; frame the question for ${audienceProfile.roleFamily}. ${audienceProfile.questionHint || ''}`
     : 'No specific contact selected; use owner/controller/facilities-friendly language.'
@@ -6248,7 +6292,7 @@ You must generate a customized "headline" and "talk_track" for each of the 6 ang
 2. "renewalTiming": Focus on their specific renewal timing. If the 'contract_end_date' is known, you MUST weave it in (e.g. "With y'all's current agreement coming up in October..." or "heading into your October renewal..."). If it is not known, frame it around auditing the renewal terms of their specific clinical/manufacturing equipment load (e.g. "With the clinic's clinical equipment and HVAC running daily, auditing the terms before the next renewal window..."). NEVER use generic starter phrases like "Many businesses just let their electricity contracts auto-renew...".
 3. "loadFactor": Focus on their specific operational load profile. If 'meter_count' or 'annual_usage' is known, weave it in (e.g. "managing three utility meters..." or "drawing over a million kilowatt-hours..."). Hook them on their specific machinery (e.g. imaging systems, batching plants, refrigeration compressors) and peak pricing hours.
 4. "demandResponse": Focus on earning revenue from their specific flexibility. Reference their specific flexible loads (e.g. non-critical HVAC, secondary compressors, vehicle charging) and getting paid by ERCOT during grid stress.
-5. "billingOptimization": Focus on auditing and tax exemptions for their specific entity type. If they are a religious/nonprofit/educational entity, highlight the "utility sales tax exemption" or "tax exemptions" immediately. If they are a clinic/office/manufacturing firm, focus on auditing line-item pass-through charges.
+5. "billingOptimization": Focus on auditing and billing errors. If they are a verified tax-exempt entity (like a school district, religious organization, public/government entity, or registered charity), or a manufacturing/agricultural operation eligible for a predominant use utility sales tax exemption, highlight the "utility sales tax exemption" or "tax exemptions" immediately. If they are a standard commercial business (like a retail shop, restaurant, office, logistics/distribution center, or general service firm), do NOT mention tax exemptions or being tax-exempt, and focus ONLY on auditing line-item pass-through charges, demand fee accuracy, or billing errors.
 6. "esgRenewables": Focus on hitting sustainability goals for their specific company/brand without paying green premiums.
 
 Each talk_track in the "angles" must be exactly 2 sentences and follow the TALK_TRACK_RULES (start with operational pacing, end with curiosity question + safety-valve).
@@ -6449,7 +6493,7 @@ Return JSON only with this shape:
     // Validate the AI-generated talk track
     const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
     const sentenceCount = splitTalkTrackSentences(talkTrack).length
-    if (sentenceCount !== 2 || wordCount < 14 || wordCount > 95) {
+    if (sentenceCount !== 2 || wordCount < 14 || wordCount > 115) {
       console.warn('[Intelligence Brief] AI talk track word count/sentence count out of range:', wordCount, sentenceCount)
       return null
     }
@@ -6580,6 +6624,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const accountMaterialHandlingManufacturingJargon = accountIsMaterialHandlingEquipment &&
     /\b(manufacturing operation|production lines?|process loads?|compressed air|machine startup|startup sequence|plant|factory)\b/i.test(lower)
   const accountMaterialHandlingGenericLogisticsJargon = accountIsMaterialHandlingEquipment &&
+    !accountIsLogistics &&
     /\b(distribution operation|logistics operation|warehouse group|freight|cargo|dock activity|dock doors?|storage climate control)\b/i.test(lower)
   const accountOfficeIndustrialJargon = accountIsOfficeServices &&
     /\b(production lines?|machine startup|startup sequence|plant|factory|manufacturing|industrial|warehouse|logistics|distribution|dock activity|dock doors?|terminal throughput)\b/i.test(lower)
@@ -6610,7 +6655,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
   const overstuffed = matchedAngleBuckets > 2 || marketFeelsBoltedOn
   const structuredFactDrift = talkTrackDriftsFromStructuredFacts(text, context)
 
-  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountRestaurantRetailJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || structuredFactDrift || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 95 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
+  const needsRewrite = genericHits > 0 || genericOpening || isCompetitor || bannedJargonTerms || redundantFootprint || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || accountSchoolManufacturingJargon || accountSchoolPracticeJargon || accountSchoolRetailJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || accountDentalHospitalJargon || accountDmeHospitalJargon || accountAutoPartsDealershipJargon || accountAutomotiveHotelJargon || accountAutomotiveRetailJargon || accountFoodLogisticsJargon || accountPetrochemicalLogisticsJargon || accountRestaurantManufacturingJargon || accountRestaurantRetailJargon || accountLogisticsManufacturingJargon || accountMaterialHandlingManufacturingJargon || accountMaterialHandlingGenericLogisticsJargon || accountOfficeIndustrialJargon || accountRetailIndustrialJargon || accountRetailLogisticsJargon || structuredFactDrift || unexplainedJargon || sentenceCount !== 2 || wordCount < 14 || wordCount > 115 || overstuffed || (mismatchedIndustryLabel && !accountDmeMedicalAllowance)
 
   if (needsRewrite) {
     console.warn('[Intelligence Brief Rewrite Validation] Rejected talk track:', {
@@ -6639,7 +6684,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, acc
         hotelEventSpaceJargon,
         unexplainedJargon,
         sentenceCount: sentenceCount !== 2 ? sentenceCount : false,
-        wordCount: (wordCount < 14 || wordCount > 95) ? wordCount : false,
+        wordCount: (wordCount < 14 || wordCount > 115) ? wordCount : false,
         overstuffed,
         mismatchedIndustryLabel: mismatchedIndustryLabel && !accountDmeMedicalAllowance
       }
@@ -6710,9 +6755,24 @@ function buildIndustryContextOpeners(greeting: string, account: AccountRow, cont
   const multiSiteInfo = detectMultiSiteScale(account, null)
   const palletManagementSignals = hasPalletManagementSignals(accountText)
   const profile = getAccountIdentityProfile(account)
-  const companyType = cleanText(profile?.companyType || '')
-  const facilityType = cleanText(profile?.facilityType || '')
+  let companyType = cleanText(profile?.companyType || '')
+  let facilityType = cleanText(profile?.facilityType || '')
   const cluster = context.industryCluster
+
+  // CFO safeguard: Overrule legacy companyType if it contradicts the corrected industryCluster
+  if (cluster === 'restaurant' && /financial|office|bank|corporate/i.test(companyType)) {
+    companyType = 'restaurant'
+    facilityType = 'restaurant'
+  } else if (cluster === 'school_district' && /financial|office|retail/i.test(companyType)) {
+    companyType = 'school district'
+    facilityType = 'school'
+  } else if (cluster === 'healthcare' && /financial|office|retail/i.test(companyType)) {
+    companyType = 'healthcare facility'
+    facilityType = 'clinic'
+  } else if (cluster === 'hotel_owner' && /financial|office|retail/i.test(companyType)) {
+    companyType = 'hotel'
+    facilityType = 'hotel property'
+  }
   const isHospitalityGroupCompany = /\bhospitality group\b/i.test(companyType)
   const isHotelOwnerCompany = /\bhotel owner\b/i.test(companyType)
   const isGolfClubCompany = /\bgolf club\b|\bcountry club\b|\bprivate club\b/i.test(companyType) || hasGolfClubSignals(accountText)
@@ -7114,7 +7174,7 @@ function extractTitle(html: string) {
  * Titles like "Home - Company Name", "Welcome to Company Name", "Company Name | Home" etc.
  * should never be used as a signal_headline — they are meaningless as research hits.
  */
-function isBoilerplatePageTitle(title: string, accountName: string): boolean {
+function isBoilerplatePageTitle(title: string, accountName: string, isGeneratedBrief = false): boolean {
   const t = cleanText(title)
   if (!t) return true
   const lower = t.toLowerCase()
@@ -7167,22 +7227,24 @@ function isBoilerplatePageTitle(title: string, accountName: string): boolean {
   // Repetitive company name check (e.g. "Shine Pediatrics At Shine Pediatrics...")
   if (companyLower.length > 3 && lower.split(companyLower).length > 2) return true
 
-  // SEO title tags: company name followed by a marketing tagline — not a news signal
-  // e.g. 'My Pharmacy USA - Find your Daily Medications Need Here'
-  //      'Team Worldwide - Large Enough to Serve You'
-  //      'Danmar Industries | Compressed Air Solutions | Houston TX'
-  if (companyLower.length > 3 && lower.startsWith(companyLower)) {
-    const afterName = lower.slice(companyLower.length).trim()
-    const startsWithFiller = /^(is|at|we|our|the|your|welcome|offers|provides|serves|specializes|specialise|specialises|helping)\b/i.test(afterName)
-    const startsWithSeparator = /^[-|–|,|:|]/.test(afterName)
-    // Title is just the name plus a short tagline or filler phrase
-    if ((startsWithSeparator && afterName.split(/\s+/).length <= 15) || (startsWithFiller && afterName.split(/\s+/).length <= 25)) return true
-  }
-  // Title that is just the company name with location appended (directory style)
-  if (companyLower.length > 3) {
-    const nameVariant = companyLower.replace(/[-|–|,|\s]+/g, '')
-    const titleVariant = lower.replace(/[-|–|,|\s]+/g, '')
-    if (titleVariant.startsWith(nameVariant) && titleVariant.length - nameVariant.length < 30) return true
+  if (!isGeneratedBrief) {
+    // SEO title tags: company name followed by a marketing tagline — not a news signal
+    // e.g. 'My Pharmacy USA - Find your Daily Medications Need Here'
+    //      'Team Worldwide - Large Enough to Serve You'
+    //      'Danmar Industries | Compressed Air Solutions | Houston TX'
+    if (companyLower.length > 3 && lower.startsWith(companyLower)) {
+      const afterName = lower.slice(companyLower.length).trim()
+      const startsWithFiller = /^(is|at|we|our|the|your|welcome|offers|provides|serves|specializes|specialise|specialises|helping)\b/i.test(afterName)
+      const startsWithSeparator = /^[-|–|,|:|]/.test(afterName)
+      // Title is just the name plus a short tagline or filler phrase
+      if ((startsWithSeparator && afterName.split(/\s+/).length <= 15) || (startsWithFiller && afterName.split(/\s+/).length <= 25)) return true
+    }
+    // Title that is just the company name with location appended (directory style)
+    if (companyLower.length > 3) {
+      const nameVariant = companyLower.replace(/[-|–|,|\s]+/g, '')
+      const titleVariant = lower.replace(/[-|–|,|\s]+/g, '')
+      if (titleVariant.startsWith(nameVariant) && titleVariant.length - nameVariant.length < 30) return true
+    }
   }
 
   return false
@@ -8180,7 +8242,7 @@ function normalizeFinalSignalHeadline(headline: string, account: AccountRow, can
     !/\b(OPENS|EXPANDS|ACQUIRES|APPOINTS|ANNOUNCES|LAUNCHES|BUILDS|BREAKS GROUND|MERGES)\b/.test(cleaned)
   if (!cleaned) return buildCompanyContextHeadline(account, null)
   if ((candidate?.priority || 0) >= 8 && (!candidate || !isOfficialCompanyAnnouncement(account, candidate))) return buildCompanyContextHeadline(account, null)
-  if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '')) return buildCompanyContextHeadline(account, null)
+  if (isBoilerplatePageTitle(cleaned, cleanText(account.name) || '', true)) return buildCompanyContextHeadline(account, null)
   if (isPhoneLikeHeadline(cleaned)) return buildCompanyContextHeadline(account, null)
   if (navOnlyHeadline || looksLikeRawNavigationText(cleaned)) return buildCompanyContextHeadline(account, null)
   if (/\b(dealership|service operations|vehicle inventory|auto dealer)\b/i.test(cleaned) && !hasStrongAutomotiveSignals(accountText)) {
@@ -8277,7 +8339,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
 
   // Reject briefs where the headline is a raw page/browser title or directory stub
   // e.g. 'Home', 'Homepage - Team Worldwide', 'Spicy Pickle profile', 'My Pharmacy USA - Find your Daily Medications Here'
-  if (isBoilerplatePageTitle(headline, cleanText(account.name) || '')) {
+  if (isBoilerplatePageTitle(headline, cleanText(account.name) || '', true)) {
     console.warn('[Intelligence Brief Validation] Boilerplate page title headline:', headline)
     return null
   }
@@ -8339,7 +8401,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   // Validate talk track length (two short sentences)
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
   const talkTrackSentenceCount = splitTalkTrackSentences(talkTrack).length
-  if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 95) {
+  if (talkTrackSentenceCount !== 2 || talkTrackWordCount < 14 || talkTrackWordCount > 115) {
     console.warn('[Intelligence Brief Validation] Length constraints failed:', { talkTrack, sentenceCount: talkTrackSentenceCount, wordCount: talkTrackWordCount })
     return null
   }
@@ -8400,7 +8462,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
 
   return {
     signal_headline: shortenText(
-      isBoilerplatePageTitle(headline, companyName) || /\bcompany overview\b/i.test(headline)
+      isBoilerplatePageTitle(headline, companyName, true) || /\bcompany overview\b/i.test(headline)
         ? buildCompanyContextHeadline(account, candidate)
         : headline,
       120,
@@ -8775,7 +8837,7 @@ You must generate a customized "headline" and "talk_track" for each of the 6 ang
 2. "renewalTiming": Focus on contract auto-renewals, estimated renewal window, or auditing renewal terms.
 3. "loadFactor": Focus on shifting usage, capacity factor, flat load vs spiky load, or peak pricing hours.
 4. "demandResponse": Focus on getting paid for flexibility during grid stress (ERCOT events).
-5. "billingOptimization": Focus on line-item auditing, pass-throughs, sales tax exemptions, or billing errors.
+5. "billingOptimization": Focus on line-item auditing, pass-throughs, demand fee accuracy, or billing errors. Do NOT mention sales tax exemptions or being tax-exempt unless they are a verified nonprofit/school/government/religious organization or a manufacturing operation.
 6. "esgRenewables": Focus on hitting sustainability/renewable goals without green premiums.
 
 Each talk_track in the "angles" must be exactly 2 sentences and follow the TALK_TRACK_RULES (start with operational pacing, end with curiosity question + safety-valve).
@@ -9267,6 +9329,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!account) {
       return res.status(404).json({ ok: false, message: 'Account not found' })
+    }
+
+    // CFO safeguard: If the company name implies a restaurant but the website/domain is for a financial/wealth entity,
+    // strip the website and domain so we do not crawl mismatched data.
+    const companyName = (account.name || '').toLowerCase()
+    if (/\b(pie|pizza|caf[eé]|restaurant|diner|bakery|kitchen|bistro|grills?|brewery|donuts?|burgers?|steakhouse|subs\b|deli\b)/i.test(companyName)) {
+      if (account.domain && /(wealth|capital|bank|finance|investment|advisor|usca\b|uscallc)/i.test(account.domain)) {
+        account.domain = ''
+      }
     }
 
     const audienceProfile = await resolveAudienceProfileForBrief(account as AccountRow)
