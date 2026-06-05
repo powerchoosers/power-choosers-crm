@@ -7867,14 +7867,18 @@ function determinePrimaryAndSecondaryAngles(
     angles.find(a => a.angleName === 'budgetCertainty')!.score += 10
   }
 
+  const employees = Number(account.employees || account.metadata?.employees || 0)
   const isBrandOrRetail = ['retail', 'restaurant', 'hotel_owner', 'hospitality_group'].includes(cluster) ||
-                          /retail|restaurant|hotel|hospitality|brand|real estate|office|headquarters/i.test(industry + ' ' + description)
+                           /retail|restaurant|hotel|hospitality|brand|real estate|office|headquarters/i.test(industry + ' ' + description)
   if (isBrandOrRetail) {
-    angles.find(a => a.angleName === 'esgRenewables')!.score += 8
-    angles.find(a => a.angleName === 'budgetCertainty')!.score += 6
+    angles.find(a => a.angleName === 'budgetCertainty')!.score += 8
+    angles.find(a => a.angleName === 'billingOptimization')!.score += 6
+    // Only boost ESG for hotels/hospitality lodging or large brands with >= 100 employees
+    if (cluster === 'hotel_owner' || cluster === 'hospitality_group' || /hotel|hospitality/i.test(industry + ' ' + description) || employees >= 100) {
+      angles.find(a => a.angleName === 'esgRenewables')!.score += 5
+    }
   }
 
-  const employees = Number(account.employees || account.metadata?.employees || 0)
   if (employees > 0 && employees < 20) {
     angles.find(a => a.angleName === 'billingOptimization')!.score += 10
   } else if (employees >= 250) {
