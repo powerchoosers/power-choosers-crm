@@ -4443,12 +4443,15 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
 
     console.log(`[AI Router] Routing decision - targetModel: ${targetModel}, provider: ${provider}`);
 
+    const isApolloOrCrmIntent = /\b(apollo|crm|database|internal|tool|lookup|system|search_prospects|enrich_organization)\b/i.test(prompt || '');
     const shouldUseWebResearch = webEnabled
       && !jsonMode
+      && !isApolloOrCrmIntent
       && !!perplexityApiKey
       && provider !== 'perplexity'
       && publicResearchPattern.test(String(prompt || ''))
       && !internalOnlyPattern.test(String(prompt || ''));
+
 
     if (shouldUseWebResearch) {
       try {
