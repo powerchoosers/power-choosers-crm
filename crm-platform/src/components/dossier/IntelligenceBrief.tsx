@@ -249,9 +249,12 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       }
 
       if (payload?.account) {
-        queryClient.setQueriesData({ queryKey: ['account', account.id] }, (cached: any) => (
-          cached?.id === account.id ? { ...cached, ...payload.account } : cached
-        ))
+        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+          if (cached && typeof cached === 'object' && 'id' in cached && cached.id === account.id) {
+            return { ...cached, ...payload.account }
+          }
+          return cached
+        })
       }
 
       return payload
@@ -261,6 +264,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       void queryClient.invalidateQueries({
         predicate: (query) => query.queryKey.some((part) => part === account.id),
       })
+      void queryClient.invalidateQueries({ queryKey: ['account', account.id] })
       toast.success(payload?.message || 'Primary angle updated.')
     },
     onError: (error) => {
@@ -268,9 +272,16 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     }
   })
 
-  const displayAccount = useMemo(() => (
-    refreshMutation.data?.account ? { ...account, ...refreshMutation.data.account } : account
-  ), [account, refreshMutation.data?.account])
+  const displayAccount = useMemo(() => {
+    let result = account
+    if (refreshMutation.data?.account) {
+      result = result ? { ...result, ...refreshMutation.data.account } : refreshMutation.data.account
+    }
+    if (updateAngleMutation.data?.account) {
+      result = result ? { ...result, ...updateAngleMutation.data.account } : updateAngleMutation.data.account
+    }
+    return result
+  }, [account, refreshMutation.data?.account, updateAngleMutation.data?.account])
 
   const brief = useMemo(() => ({
     headline: displayAccount?.intelligenceBriefHeadline?.trim() || '',
