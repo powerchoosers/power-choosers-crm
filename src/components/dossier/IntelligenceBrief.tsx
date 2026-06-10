@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { isPrivilegedRole } from '@/lib/auth/roles'
 
+import { queryPredicateById } from '@/lib/queryKeys'
+
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const EMPTY_MESSAGE = 'No intelligence brief generated yet. Click Research to run research.'
 const RESEARCH_COOLDOWN_MS = 60 * 60 * 1000
@@ -252,15 +254,20 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       return payload
     },
     onMutate: async (angleKey) => {
+      const accountId = account?.id
+      if (!accountId) return { previousQueries: [] }
+
+      const accountPredicate = queryPredicateById('account', accountId)
+
       // Cancel outgoing refetches for accounts so they don't overwrite our optimistic update
-      await queryClient.cancelQueries({ queryKey: ['account'] })
+      await queryClient.cancelQueries({ predicate: accountPredicate })
 
       // Snapshot the previous values
-      const previousQueries = queryClient.getQueriesData<any>({ queryKey: ['account'] })
+      const previousQueries = queryClient.getQueriesData<any>({ predicate: accountPredicate })
 
       // Optimistically update the query cache directly so the parent hook and UI update instantly
       if (account?.id) {
-        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+        queryClient.setQueriesData({ predicate: accountPredicate }, (cached: any) => {
           if (cached && typeof cached === 'object' && 'id' in cached && cached.id === account.id) {
             const allAngles = cached.metadata?.intelligenceBriefAngles?.all
             const selectedAngle = allAngles?.[angleKey]
@@ -289,7 +296,8 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     onSuccess: (payload) => {
       setOptimisticAngleKey(null)
       if (account?.id && payload?.account) {
-        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+        const accountPredicate = queryPredicateById('account', account.id)
+        queryClient.setQueriesData({ predicate: accountPredicate }, (cached: any) => {
           if (cached && typeof cached === 'object' && 'id' in cached && cached.id === account.id) {
             return {
               ...cached,
