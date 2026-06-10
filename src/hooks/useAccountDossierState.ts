@@ -203,20 +203,47 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
 
     useEffect(() => {
         if (account && !isEditing && !suppressHydrationRef.current) {
-            setEditAccountName(account.name || '')
-            setEditNotes(account.description || '')
-            setEditAnnualUsage(account.annualUsage?.toString() || '')
-            setEditStrikePrice(account.currentRate || '')
-            setEditMills(formatMillValue(account.mills ?? account.metadata?.mills))
-            setEditIndustry(account.industry || '')
-            setEditLocation(account.location || '')
-            setEditEmployees(account.employees?.toString() || '')
-            setEditLogoUrl(account.logoUrl || '')
-            setEditSupplier(account.electricitySupplier || '')
-            setEditDomain(account.domain || '')
-            setEditLinkedinUrl(account.linkedinUrl || '')
-            setEditCompanyPhone(account.companyPhone || '')
-            setEditAddress(account.address || '')
+            const nextName = account.name || ''
+            if (editAccountName !== nextName) setEditAccountName(nextName)
+
+            const nextNotes = account.description || ''
+            if (editNotes !== nextNotes) setEditNotes(nextNotes)
+
+            const nextUsage = account.annualUsage?.toString() || ''
+            if (editAnnualUsage !== nextUsage) setEditAnnualUsage(nextUsage)
+
+            const nextPrice = account.currentRate || ''
+            if (editStrikePrice !== nextPrice) setEditStrikePrice(nextPrice)
+
+            const nextMills = formatMillValue(account.mills ?? account.metadata?.mills)
+            if (editMills !== nextMills) setEditMills(nextMills)
+
+            const nextIndustry = account.industry || ''
+            if (editIndustry !== nextIndustry) setEditIndustry(nextIndustry)
+
+            const nextLocation = account.location || ''
+            if (editLocation !== nextLocation) setEditLocation(nextLocation)
+
+            const nextEmployees = account.employees?.toString() || ''
+            if (editEmployees !== nextEmployees) setEditEmployees(nextEmployees)
+
+            const nextLogoUrl = account.logoUrl || ''
+            if (editLogoUrl !== nextLogoUrl) setEditLogoUrl(nextLogoUrl)
+
+            const nextSupplier = account.electricitySupplier || ''
+            if (editSupplier !== nextSupplier) setEditSupplier(nextSupplier)
+
+            const nextDomain = account.domain || ''
+            if (editDomain !== nextDomain) setEditDomain(nextDomain)
+
+            const nextLinkedin = account.linkedinUrl || ''
+            if (editLinkedinUrl !== nextLinkedin) setEditLinkedinUrl(nextLinkedin)
+
+            const nextPhone = account.companyPhone || ''
+            if (editCompanyPhone !== nextPhone) setEditCompanyPhone(nextPhone)
+
+            const nextAddress = account.address || ''
+            if (editAddress !== nextAddress) setEditAddress(nextAddress)
 
             const transformedMeters = (account.serviceAddresses || []).map((addr: any, idx: number) => {
                 if (typeof addr === 'string') {
@@ -230,10 +257,35 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
                 }
                 return { ...addr, id: addr?.id ?? `meter_${idx}` }
             })
-            setEditMeters(account.meters?.length ? account.meters : transformedMeters)
-            setEditContractEnd(account.contractEnd || '')
+            const targetMeters = account.meters?.length ? account.meters : transformedMeters
+            const metersChanged = JSON.stringify(editMeters) !== JSON.stringify(targetMeters)
+            if (metersChanged) {
+                setEditMeters(targetMeters)
+            }
+
+            const nextContractEnd = account.contractEnd || ''
+            if (editContractEnd !== nextContractEnd) setEditContractEnd(nextContractEnd)
         }
-    }, [account, isEditing])
+    }, [
+        account,
+        isEditing,
+        editAccountName,
+        editNotes,
+        editAnnualUsage,
+        editStrikePrice,
+        editMills,
+        editIndustry,
+        editLocation,
+        editEmployees,
+        editLogoUrl,
+        editSupplier,
+        editDomain,
+        editLinkedinUrl,
+        editCompanyPhone,
+        editAddress,
+        editMeters,
+        editContractEnd
+    ])
 
     useEffect(() => {
         if (prevIsEditing.current === isEditing) return

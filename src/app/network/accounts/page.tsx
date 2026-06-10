@@ -154,6 +154,7 @@ export default function AccountsPage() {
       industry: (columnFilters.find(f => f.id === 'industry')?.value as string[]) || [],
       status: (columnFilters.find(f => f.id === 'status')?.value as string[]) || [],
       location: (columnFilters.find(f => f.id === 'location')?.value as string[]) || [],
+      supplier: (columnFilters.find(f => f.id === 'supplier')?.value as string[]) || [],
     };
   }, [columnFilters]);
 
@@ -238,6 +239,7 @@ export default function AccountsPage() {
     'contractEnd',
     'updated',
     'status',
+    'electricitySupplier',
     'targetLists',
     'actions'
   ], [])
@@ -515,6 +517,17 @@ export default function AccountsPage() {
             </div>
           )
         },
+      },
+      {
+        accessorKey: 'electricitySupplier',
+        header: ({ column }) => (
+          <SortableHeaderButton
+            label="Supplier"
+            column={column}
+            title="Sort by supplier"
+          />
+        ),
+        cell: ({ row }) => <div className="text-zinc-400 font-semibold">{row.original.electricitySupplier || '--'}</div>,
       },
       {
         accessorKey: 'location',

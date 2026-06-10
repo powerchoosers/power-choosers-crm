@@ -162,6 +162,7 @@ export interface AccountFilters {
   industry?: string[]
   status?: string[]
   location?: string[]
+  supplier?: string[] | boolean | string
 }
 
 const PAGE_SIZE = 50
@@ -205,6 +206,8 @@ function normalizeAccountSort(sorting?: SortingState, defaultColumn = 'name') {
       return { column: 'ownerId', ascending: !sort.desc, secondary: null as string | null }
     case 'companyPhone':
       return { column: 'phone', ascending: !sort.desc, secondary: null as string | null }
+    case 'electricitySupplier':
+      return { column: 'electricity_supplier', ascending: !sort.desc, secondary: null as string | null }
     default:
       return { column: defaultColumn, ascending: true, secondary: null as string | null }
   }
@@ -462,6 +465,12 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           const locConditions = locationTerms.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%,zip.ilike.%${loc}%`).join(',');
           query = query.or(locConditions);
         }
+        if (filters?.supplier) {
+          const supplierVal = Array.isArray(filters.supplier) ? filters.supplier : [filters.supplier];
+          if (supplierVal.includes('known') || supplierVal.includes('identified') || supplierVal.includes(true) || supplierVal.includes('true')) {
+            query = query.not('electricity_supplier', 'is', null).neq('electricity_supplier', '').neq('electricity_supplier', 'TBD');
+          }
+        }
 
         const to = from + PAGE_SIZE - 1;
 
@@ -693,6 +702,12 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       if (filters?.location && filters.location.length > 0) {
         const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%,zip.ilike.%${loc}%`).join(',');
         query = query.or(locConditions);
+      }
+      if (filters?.supplier) {
+        const supplierVal = Array.isArray(filters.supplier) ? filters.supplier : [filters.supplier];
+        if (supplierVal.includes('known') || supplierVal.includes('identified') || supplierVal.includes(true) || supplierVal.includes('true')) {
+          query = query.not('electricity_supplier', 'is', null).neq('electricity_supplier', '').neq('electricity_supplier', 'TBD');
+        }
       }
 
       const { count, error } = await query
