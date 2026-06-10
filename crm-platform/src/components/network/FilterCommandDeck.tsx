@@ -85,6 +85,7 @@ export default function FilterCommandDeck({
     onFilterChange('industry', undefined);
     onFilterChange('location', undefined);
     onFilterChange('title', undefined);
+    onFilterChange('supplier', undefined);
   };
 
   const statusOptions = type === 'people'
@@ -125,10 +126,9 @@ export default function FilterCommandDeck({
         >
           <div className={cn(
             "p-6 grid gap-8",
-            type === 'people' ? "grid-cols-1 md:grid-cols-5" :
-              type === 'account' ? "grid-cols-1 md:grid-cols-4" :
-                "grid-cols-1 md:grid-cols-4"
-
+            type === 'people' ? "grid-cols-1 md:grid-cols-6" :
+              type === 'account' ? "grid-cols-1 md:grid-cols-5" :
+                "grid-cols-1 md:grid-cols-5"
           )}>
 
             {/* COLUMN 1: STATUS VECTORS */}
@@ -229,6 +229,22 @@ export default function FilterCommandDeck({
                 ))}
               </div>
             </div>
+
+            {/* COLUMN 5: SUPPLIER INTEL */}
+            {type !== 'deals' && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                  SUPPLIER_INTEL
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  <FilterChip
+                    label="Supplier Identified"
+                    active={isActive('supplier', 'known')}
+                    onClick={() => toggleFilter('supplier', 'known')}
+                  />
+                </div>
+              </div>
+            )}
 
           </div>
 
