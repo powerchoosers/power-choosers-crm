@@ -14,7 +14,7 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter, GripVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter, GripVertical, ArrowUpDown } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -79,6 +79,40 @@ import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import { normalizeStatusToken, statusMatchesFilter } from '@/lib/status-filters'
 import { FrozenHoverText } from '@/components/network/frozenTable'
 
+function SortableHeaderButton({
+  label,
+  column,
+  className,
+  title,
+}: {
+  label: string
+  column: any
+  className?: string
+  title?: string
+  }) {
+  const sortState = column.getIsSorted()
+  return (
+    <button
+      type="button"
+      onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+      className={cn(
+        "flex items-center gap-1 -ml-1 font-mono text-[10px] uppercase tracking-widest leading-none text-zinc-500 transition-colors hover:text-zinc-300",
+        className
+      )}
+      title={title || `Sort by ${label.toLowerCase()}`}
+    >
+      <span>{label}</span>
+      <ArrowUpDown
+        className={cn(
+          "h-2.5 w-2.5 transition-transform",
+          sortState === 'desc' && "rotate-180",
+          sortState ? "text-[#002FA7]" : "text-zinc-500"
+        )}
+      />
+    </button>
+  )
+}
+
 const PAGE_SIZE = 50
 
 export default function PeoplePage() {
@@ -108,6 +142,7 @@ export default function PeoplePage() {
       industry: (columnFilters.find(f => f.id === 'industry')?.value as string[]) || [],
       status: (columnFilters.find(f => f.id === 'status')?.value as string[]) || [],
       location: (columnFilters.find(f => f.id === 'location')?.value as string[]) || [],
+      supplier: (columnFilters.find(f => f.id === 'supplier')?.value as string[]) || [],
     };
   }, [columnFilters]);
 
@@ -192,6 +227,7 @@ export default function PeoplePage() {
     'location',
     'phone',
     'status',
+    'electricitySupplier',
     'targetLists',
     'actions'
   ], [])
@@ -474,6 +510,17 @@ export default function PeoplePage() {
             </div>
           )
         },
+      },
+      {
+        accessorKey: 'electricitySupplier',
+        header: ({ column }) => (
+          <SortableHeaderButton
+            label="Supplier"
+            column={column}
+            title="Sort by supplier"
+          />
+        ),
+        cell: ({ row }) => <div className="text-zinc-400 font-semibold">{row.original.electricitySupplier || '--'}</div>,
       },
       {
         accessorKey: 'lastContact',

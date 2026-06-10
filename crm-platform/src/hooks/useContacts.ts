@@ -50,6 +50,7 @@ export interface Contact {
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
   additionalPhones?: ContactAdditionalPhone[]
   communicationSignals?: ContactSignalCollection | null
+  electricitySupplier?: string
   metadata?: any
 }
 
@@ -139,6 +140,7 @@ export interface ContactFilters {
   status?: string[]
   location?: string[]
   title?: string[]
+  supplier?: string[] | boolean | string
 }
 
 type ContactMetadata = {
@@ -286,7 +288,7 @@ const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
 const CONTACT_ACCOUNT_SELECT = 'id, name, domain, website, logo_url, city, state, address, zip, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, metadata'
 const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, phone, mobile, workPhone, otherPhone, companyPhone, accountId, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, website, logo_url, phone, city, state, address, zip, industry)'
-const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, website, logo_url, phone, metadata, industry, city, state, address, service_addresses)'
+const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, website, logo_url, phone, metadata, industry, city, state, address, service_addresses, electricity_supplier)'
 const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
           email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt,
@@ -521,6 +523,7 @@ function mapContactRowToContact(item: ContactRow, account?: ContactAccountRow | 
     location: cityLocation || fallbackLocation || accountLocation,
     website: account?.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
     metadata,
+    electricitySupplier: account?.electricity_supplier || '',
   } as Contact
 }
 
@@ -952,6 +955,9 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         const from = pageParam * PAGE_SIZE;
         const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
+        
+        const supplierVal = Array.isArray(filters?.supplier) ? filters.supplier : (filters?.supplier !== undefined && filters?.supplier !== null) ? [filters.supplier] : [];
+        const supplierKnown = supplierVal.includes('known') || supplierVal.includes('identified') || supplierVal.includes(true) || supplierVal.includes('true') ? true : supplierVal.includes('unknown') || supplierVal.includes(false) || supplierVal.includes('false') ? false : null;
 
         const response = await supabase
           .rpc('get_contacts_by_list_filtered', {
@@ -964,6 +970,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             p_owner_ids: ownerIds,
             p_limit: PAGE_SIZE,
             p_offset: from,
+            p_supplier_known: supplierKnown,
           })
           .select(CONTACT_LIST_SELECT)
 
@@ -1077,6 +1084,10 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       if (!user) return 0
 
       const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
+      
+      const supplierVal = Array.isArray(filters?.supplier) ? filters.supplier : (filters?.supplier !== undefined && filters?.supplier !== null) ? [filters.supplier] : [];
+      const supplierKnown = supplierVal.includes('known') || supplierVal.includes('identified') || supplierVal.includes(true) || supplierVal.includes('true') ? true : supplierVal.includes('unknown') || supplierVal.includes(false) || supplierVal.includes('false') ? false : null;
+
       const { data: filteredCount, error: filteredCountError } = await supabase
         .rpc('get_contacts_count_by_list_filtered', {
           p_list_id: listId ?? null,
@@ -1086,6 +1097,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
           p_locations: toRpcTextArray(filters?.location),
           p_titles: toRpcTextArray(filters?.title),
           p_owner_ids: ownerIds,
+          p_supplier_known: supplierKnown,
         })
 
       if (filteredCountError) {

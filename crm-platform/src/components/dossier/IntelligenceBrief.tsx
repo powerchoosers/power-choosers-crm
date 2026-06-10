@@ -226,7 +226,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     },
   })
 
-  const updateAngleMutation = useMutation<any, Error, string>({
+  const updateAngleMutation = useMutation<any, Error, string, { previousQueries: [any, any][] }>({
     mutationFn: async (angleKey: string) => {
       if (!account?.id) throw new Error('Missing account ID')
 
@@ -249,31 +249,66 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
         throw new Error(payload?.message || 'Failed to update angle.')
       }
 
-      if (payload?.account) {
+      return payload
+    },
+    onMutate: async (angleKey) => {
+      // Cancel outgoing refetches for accounts so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['account'] })
+
+      // Snapshot the previous values
+      const previousQueries = queryClient.getQueriesData<any>({ queryKey: ['account'] })
+
+      // Optimistically update the query cache directly so the parent hook and UI update instantly
+      if (account?.id) {
         queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
           if (cached && typeof cached === 'object' && 'id' in cached && cached.id === account.id) {
-            return { ...cached, ...payload.account }
+            const allAngles = cached.metadata?.intelligenceBriefAngles?.all
+            const selectedAngle = allAngles?.[angleKey]
+            if (selectedAngle) {
+              return {
+                ...cached,
+                intelligenceBriefHeadline: selectedAngle.headline,
+                intelligenceBriefTalkTrack: selectedAngle.talk_track,
+                metadata: {
+                  ...cached.metadata,
+                  intelligenceBriefAngles: {
+                    ...cached.metadata.intelligenceBriefAngles,
+                    primary: angleKey
+                  }
+                }
+              }
+            }
           }
           return cached
         })
       }
 
-      return payload
-    },
-    onMutate: (angleKey) => {
       setOptimisticAngleKey(angleKey)
+      return { previousQueries }
     },
     onSuccess: (payload) => {
       setOptimisticAngleKey(null)
-      if (!account?.id) return
-      void queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey.some((part) => part === account.id),
-      })
-      void queryClient.invalidateQueries({ queryKey: ['account', account.id] })
+      if (account?.id && payload?.account) {
+        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+          if (cached && typeof cached === 'object' && 'id' in cached && cached.id === account.id) {
+            return {
+              ...cached,
+              ...payload.account
+            }
+          }
+          return cached
+        })
+      }
       toast.success(payload?.message || 'Primary angle updated.')
     },
-    onError: (error) => {
+    onError: (error, angleKey, context) => {
       setOptimisticAngleKey(null)
+      // Roll back to the previous snapshot on failure
+      if (context?.previousQueries) {
+        for (const [key, value] of context.previousQueries) {
+          queryClient.setQueryData(key, value)
+        }
+      }
       toast.error(error.message)
     }
   })
@@ -708,7 +743,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
                                     type="button"
                                     variant="ghost"
                                     size="sm"
-                                    disabled={updateAngleMutation.isPending}
+                                    disabled={updateAngleMutation.isPending && updateAngleMutation.variables === angle.key}
                                     onClick={() => updateAngleMutation.mutate(angle.key)}
                                     className="h-8 text-[11px] font-mono text-zinc-400 hover:text-white border border-transparent hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5 cursor-pointer px-2"
                                   >
