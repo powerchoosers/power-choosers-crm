@@ -173,6 +173,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
   const [mainCopied, setMainCopied] = useState(false)
   const [copiedAngleKey, setCopiedAngleKey] = useState<string | null>(null)
   const [copiedQuestionText, setCopiedQuestionText] = useState<string | null>(null)
+  const [optimisticAngleKey, setOptimisticAngleKey] = useState<string | null>(null)
   const isPrivilegedUser = isPrivilegedRole(role)
 
   const refreshMutation = useMutation<RefreshPayload>({
@@ -259,7 +260,11 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
 
       return payload
     },
+    onMutate: (angleKey) => {
+      setOptimisticAngleKey(angleKey)
+    },
     onSuccess: (payload) => {
+      setOptimisticAngleKey(null)
       if (!account?.id) return
       void queryClient.invalidateQueries({
         predicate: (query) => query.queryKey.some((part) => part === account.id),
@@ -268,6 +273,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       toast.success(payload?.message || 'Primary angle updated.')
     },
     onError: (error) => {
+      setOptimisticAngleKey(null)
       toast.error(error.message)
     }
   })
@@ -280,8 +286,26 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     if (updateAngleMutation.data?.account) {
       result = result ? { ...result, ...updateAngleMutation.data.account } : updateAngleMutation.data.account
     }
+
+    // Apply optimistic update for the selected angle immediately on click
+    if (optimisticAngleKey && result?.metadata?.intelligenceBriefAngles?.all?.[optimisticAngleKey]) {
+      const selectedAngle = result.metadata.intelligenceBriefAngles.all[optimisticAngleKey]
+      result = {
+        ...result,
+        intelligenceBriefHeadline: selectedAngle.headline || selectedAngle.headline || result.intelligenceBriefHeadline,
+        intelligenceBriefTalkTrack: selectedAngle.talk_track || selectedAngle.talkTrack || result.intelligenceBriefTalkTrack,
+        metadata: {
+          ...result.metadata,
+          intelligenceBriefAngles: {
+            ...result.metadata?.intelligenceBriefAngles,
+            primary: optimisticAngleKey
+          }
+        }
+      }
+    }
+
     return result
-  }, [account, refreshMutation.data?.account, updateAngleMutation.data?.account])
+  }, [account, refreshMutation.data?.account, updateAngleMutation.data?.account, optimisticAngleKey])
 
   const brief = useMemo(() => ({
     headline: displayAccount?.intelligenceBriefHeadline?.trim() || '',
