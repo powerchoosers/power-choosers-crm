@@ -170,42 +170,126 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
             const c = contact as any
             const first = c.firstName ?? (contact.name || '').split(/\s+/)[0] ?? ''
             const last = c.lastName ?? (contact.name || '').split(/\s+/).slice(1).join(' ') ?? ''
-            setEditName(contact.name || '')
-            setEditFirstName(first)
-            setEditLastName(last)
-            setEditTitle(contact.title || '')
-            setEditCompany(contact.companyName || contact.company || '')
-            setEditPhone(contact.phone || '')
-            setEditEmail(contact.email || '')
-            setEditNotes(contact.notes || contact.accountDescription || '')
-            setEditLocation(contact.location || '')
-            setEditLogoUrl(contact.logoUrl || contact.avatarUrl || '')
-            setEditWebsite(contact.website || '')
-            setEditLinkedinUrl(contact.linkedinUrl || '')
-            setEditMobile(contact.mobile || '')
-            setEditWorkDirect(contact.workDirectPhone || '')
-            setEditOther(contact.otherPhone || '')
-            setEditCompanyPhone(contact.companyPhone || '')
-            setEditAdditionalPhones(Array.isArray(contact.additionalPhones) ? contact.additionalPhones : [])
-            setEditPrimaryField(contact.primaryPhoneField || 'mobile')
-            setEditServiceAddresses(Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : [])
+
+            const nextName = contact.name || ''
+            if (editName !== nextName) setEditName(nextName)
+
+            const nextFirstName = first
+            if (editFirstName !== nextFirstName) setEditFirstName(nextFirstName)
+
+            const nextLastName = last
+            if (editLastName !== nextLastName) setEditLastName(nextLastName)
+
+            const nextTitle = contact.title || ''
+            if (editTitle !== nextTitle) setEditTitle(nextTitle)
+
+            const nextCompany = contact.companyName || contact.company || ''
+            if (editCompany !== nextCompany) setEditCompany(nextCompany)
+
+            const nextPhone = contact.phone || ''
+            if (editPhone !== nextPhone) setEditPhone(nextPhone)
+
+            const nextEmail = contact.email || ''
+            if (editEmail !== nextEmail) setEditEmail(nextEmail)
+
+            const nextNotes = contact.notes || contact.accountDescription || ''
+            if (editNotes !== nextNotes) setEditNotes(nextNotes)
+
+            const nextLocation = contact.location || ''
+            if (editLocation !== nextLocation) setEditLocation(nextLocation)
+
+            const nextLogoUrl = contact.logoUrl || contact.avatarUrl || ''
+            if (editLogoUrl !== nextLogoUrl) setEditLogoUrl(nextLogoUrl)
+
+            const nextWebsite = contact.website || ''
+            if (editWebsite !== nextWebsite) setEditWebsite(nextWebsite)
+
+            const nextLinkedin = contact.linkedinUrl || ''
+            if (editLinkedinUrl !== nextLinkedin) setEditLinkedinUrl(nextLinkedin)
+
+            const nextMobile = contact.mobile || ''
+            if (editMobile !== nextMobile) setEditMobile(nextMobile)
+
+            const nextWorkDirect = contact.workDirectPhone || ''
+            if (editWorkDirect !== nextWorkDirect) setEditWorkDirect(nextWorkDirect)
+
+            const nextOther = contact.otherPhone || ''
+            if (editOther !== nextOther) setEditOther(nextOther)
+
+            const nextCompanyPhone = contact.companyPhone || ''
+            if (editCompanyPhone !== nextCompanyPhone) setEditCompanyPhone(nextCompanyPhone)
+
+            const nextAdditionalPhones = Array.isArray(contact.additionalPhones) ? contact.additionalPhones : []
+            if (JSON.stringify(editAdditionalPhones) !== JSON.stringify(nextAdditionalPhones)) {
+                setEditAdditionalPhones(nextAdditionalPhones)
+            }
+
+            const nextPrimaryField = contact.primaryPhoneField || 'mobile'
+            if (editPrimaryField !== nextPrimaryField) setEditPrimaryField(nextPrimaryField)
+
+            const nextServiceAddresses = Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : []
+            if (JSON.stringify(editServiceAddresses) !== JSON.stringify(nextServiceAddresses)) {
+                setEditServiceAddresses(nextServiceAddresses)
+            }
 
             // Energy & Forensic fields come from Account as the source of truth
+            let nextSupplier = ''
+            let nextStrikePrice = ''
+            let nextAnnualUsage = ''
+            let nextContractEnd = ''
+            let nextMills = ''
+
             if (account) {
-                setEditSupplier(account.electricitySupplier || '')
-                setEditStrikePrice(account.currentRate || '')
-                setEditAnnualUsage(account.annualUsage || '')
-                setEditContractEnd(account.contractEnd ? String(account.contractEnd).slice(0, 10) : '')
-                setEditMills(formatMillValue(account.mills ?? account.metadata?.mills))
+                nextSupplier = account.electricitySupplier || ''
+                nextStrikePrice = account.currentRate || ''
+                nextAnnualUsage = account.annualUsage || ''
+                nextContractEnd = account.contractEnd ? String(account.contractEnd).slice(0, 10) : ''
+                nextMills = formatMillValue(account.mills ?? account.metadata?.mills)
             } else {
-                setEditSupplier(contact.electricitySupplier || '')
-                setEditStrikePrice(contact.currentRate || '')
-                setEditAnnualUsage(contact.annualUsage || '')
-                setEditContractEnd(contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : '')
-                setEditMills(formatMillValue((contact as any)?.mills ?? (contact as any)?.metadata?.mills))
+                nextSupplier = contact.electricitySupplier || ''
+                nextStrikePrice = contact.currentRate || ''
+                nextAnnualUsage = contact.annualUsage || ''
+                nextContractEnd = contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : ''
+                nextMills = formatMillValue((contact as any)?.mills ?? (contact as any)?.metadata?.mills)
             }
+
+            if (editSupplier !== nextSupplier) setEditSupplier(nextSupplier)
+            if (editStrikePrice !== nextStrikePrice) setEditStrikePrice(nextStrikePrice)
+            if (editAnnualUsage !== nextAnnualUsage) setEditAnnualUsage(nextAnnualUsage)
+            if (editContractEnd !== nextContractEnd) setEditContractEnd(nextContractEnd)
+            if (editMills !== nextMills) setEditMills(nextMills)
         }
-    }, [contact, account, isEditing, lastEnrichedContactId, id])
+    }, [
+        contact,
+        account,
+        isEditing,
+        lastEnrichedContactId,
+        id,
+        editName,
+        editFirstName,
+        editLastName,
+        editTitle,
+        editCompany,
+        editPhone,
+        editEmail,
+        editNotes,
+        editLocation,
+        editLogoUrl,
+        editWebsite,
+        editLinkedinUrl,
+        editMobile,
+        editWorkDirect,
+        editOther,
+        editCompanyPhone,
+        editAdditionalPhones,
+        editPrimaryField,
+        editServiceAddresses,
+        editSupplier,
+        editStrikePrice,
+        editAnnualUsage,
+        editContractEnd,
+        editMills
+    ])
 
     useEffect(() => {
         setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
