@@ -106,9 +106,9 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                     isRecalibrating && 'grayscale backdrop-blur-2xl'
                 )}>
                     <div>
-                        <div className="flex min-w-0 flex-wrap items-end justify-between gap-x-3 gap-y-1 mb-2">
-                            <h4 className="shrink-0 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
-                            <div className="flex min-w-0 basis-full items-center justify-between gap-2 text-right">
+                        <div className="mb-2 space-y-2">
+                            <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Position Maturity</h4>
+                            <div className="flex min-w-0 items-center gap-2">
                                 <span className="shrink-0 text-xs text-zinc-500">Expiration:</span>
                                 {isEditing ? (
                                     <input
@@ -116,19 +116,20 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                         value={editContractEnd}
                                         onChange={(e) => setEditContractEnd(e.target.value)}
                                         onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                        className="min-w-0 w-full max-w-[10rem] bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                                        className="min-w-0 w-[9.5rem] max-w-full bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                                     />
                                 ) : (
                                     <span className={cn(
-                                        "min-w-0 max-w-full text-white font-mono font-bold tabular-nums transition-all duration-800",
+                                        "min-w-0 text-white font-mono font-bold tabular-nums transition-all duration-800",
                                         glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                                     )}>
                                         <ForensicDataPoint
                                             value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
                                             copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
-                                            className="justify-end"
-                                            valueClassName={cn("text-right text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                            className="max-w-full"
+                                            valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
                                             inline
+                                            compact
                                         />
                                     </span>
                                 )}
