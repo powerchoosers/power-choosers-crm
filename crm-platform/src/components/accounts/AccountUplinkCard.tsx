@@ -211,12 +211,12 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
             onClick={handleCallClick}
             disabled={!account.companyPhone}
           >
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div className="relative">
                 <Phone className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                 <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
               </div>
-              <div className="flex flex-col items-start min-w-0 flex-1">
+              <div className="flex flex-col items-start min-w-0 flex-1 [container-type:inline-size]">
                   <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
                     <span className="flex items-center gap-2">
                       Corporate Phone
@@ -228,8 +228,11 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
                 <ForensicDataPoint
                   value={account.companyPhone || 'No phone'}
                   copyValue={account.companyPhone || undefined}
-                  valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full text-left"
+                  valueClassName="font-mono tabular-nums text-[clamp(10px,4.8cqw,13px)] tracking-tight text-white group-hover:text-white whitespace-nowrap leading-none"
+                  className="flex-1 min-w-0"
                   inline
+                  compact
+                  compactFill
                 />
               </div>
             </div>

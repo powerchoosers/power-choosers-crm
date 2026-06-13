@@ -120,14 +120,14 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                     />
                                 ) : (
                                     <span className={cn(
-                                        "min-w-0 text-white font-mono font-bold tabular-nums transition-all duration-800",
+                                        "min-w-0 text-white font-mono font-semibold tabular-nums transition-all duration-800",
                                         glowingFields.has('contractEnd') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
                                     )}>
                                         <ForensicDataPoint
                                             value={contractEndDate ? format(contractEndDate, 'MMM dd, yyyy') : 'TBD'}
                                             copyValue={contractEndDate ? format(contractEndDate, 'yyyy-MM-dd') : undefined}
                                             className="max-w-full"
-                                            valueClassName={cn("text-white font-mono font-bold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
+                                            valueClassName={cn("text-sm text-white font-mono font-semibold tabular-nums", glowingFields.has('contractEnd') && "text-[#002FA7]")}
                                             inline
                                             compact
                                         />
