@@ -2874,9 +2874,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                       }}
                                       className="w-full flex flex-col items-start gap-0.5 text-zinc-400 uppercase min-w-0 transition duration-200 transform hover:scale-[1.02] hover:text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7] group"
                                     >
-                                      <div className="flex items-center gap-1.5 w-full min-w-0">
+                                      <div className="flex items-center gap-1.5 w-full min-w-0 [container-type:inline-size]">
                                         <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0 transition-colors duration-200 group-hover:text-white" />
-                                        <span className="font-mono text-[9px] text-zinc-300 whitespace-nowrap transition-colors duration-200 group-hover:text-white">
+                                        <span className="min-w-0 flex-1 truncate font-mono text-[clamp(8px,5cqw,9px)] text-zinc-300 whitespace-nowrap transition-colors duration-200 group-hover:text-white">
                                           {num}
                                         </span>
                                       </div>
