@@ -240,6 +240,23 @@
   [data-sonner-toast][data-styled='true'] [data-icon] svg {
     color: var(--toast-description) !important;
   }
+
+  [data-sonner-toast][data-styled='true'] [data-close-button] {
+    top: 10px !important;
+    right: 10px !important;
+    left: auto !important;
+    width: 22px !important;
+    height: 22px !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    background: rgba(9, 9, 11, 0.82) !important;
+    color: rgb(161, 161, 170) !important;
+    transform: none !important;
+  }
+
+  [data-sonner-toast][data-styled='true'] [data-close-button]:hover {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+    color: rgb(244, 244, 245) !important;
+  }
 }
 
 /* Custom Scrollbar Styles */
