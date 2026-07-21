@@ -8,7 +8,7 @@ import {
   type SVGProps
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail } from 'lucide-react';
+import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail, Copy, Check, X, Clock, Database, UserPlus } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { supabase } from '@/lib/supabase';
@@ -307,6 +307,10 @@ interface ApolloContactRow {
   linkedin?: string;
   crmId?: string;
   phones?: PhoneEntry[];
+  source?: 'apollo' | 'crm';
+  duplicateReason?: 'Apollo ID' | 'Email' | 'LinkedIn' | 'Name + company';
+  seniority?: string;
+  departments?: string[];
 }
 
 interface ApolloCompany {
@@ -360,6 +364,24 @@ interface RevealState {
   phoneTimedOut: boolean;
   phoneWarned: boolean;
 }
+
+const ROLE_TITLE_SUGGESTIONS = [
+  'Owner',
+  'President',
+  'Chief Financial Officer',
+  'CFO',
+  'Controller',
+  'Corporate Controller',
+  'Operations Manager',
+  'Facilities Manager',
+  'Building Manager',
+  'Director of Operations',
+  'Procurement Manager',
+  'Energy Manager',
+];
+
+const DECISION_MAKER_SHORTCUTS = ['Owner', 'President', 'CFO', 'Controller', 'Operations', 'Facilities'];
+const RECENT_SEARCH_LIMIT = 5;
 
 type MeterRecord = {
   id: string;
@@ -829,11 +851,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
   const [contactsLoading, setContactsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [appliedSearchTerm, setAppliedSearchTerm] = useState('');
+  const [resultFilterTerm, setResultFilterTerm] = useState('');
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(0);
+  const [searchRecoveryLabel, setSearchRecoveryLabel] = useState<string | null>(null);
+  const [selectedResultIndex, setSelectedResultIndex] = useState(-1);
+  const [expandedPersonIds, setExpandedPersonIds] = useState<Set<string>>(() => new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [revealStates, setRevealStates] = useState<Record<string, RevealState>>({});
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [copiedDetailKey, setCopiedDetailKey] = useState<string | null>(null);
   const phoneRevealTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const phoneRevealWarningTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const copiedDetailResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resultCardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cacheLoadVersionRef = useRef(0);
   const { initiateCall } = useCallStore();
   const openCompose = useComposeStore((s) => s.openCompose);
@@ -841,6 +874,61 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const setLastEnrichedAccountId = useUIStore((s) => s.setLastEnrichedAccountId);
   const setLastEnrichedContactId = useUIStore((s) => s.setLastEnrichedContactId);
   const CONTACTS_PER_PAGE = 5;
+
+  const titleSuggestions = useMemo(() => {
+    const normalized = searchTerm.trim().toLowerCase();
+    if (!normalized) return [];
+    return ROLE_TITLE_SUGGESTIONS.filter((title) =>
+      title.toLowerCase().startsWith(normalized) && title.toLowerCase() !== normalized
+    ).slice(0, 5);
+  }, [searchTerm]);
+
+  const activeTitleSuggestion = titleSuggestions[suggestionIndex] || titleSuggestions[0] || '';
+
+  useEffect(() => {
+    setSuggestionIndex(0);
+  }, [searchTerm]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedDetailResetTimer.current) clearTimeout(copiedDetailResetTimer.current);
+    };
+  }, []);
+
+  const copyContactDetail = async (value: string, key: string) => {
+    if (!value || !navigator.clipboard) return;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedDetailKey(key);
+      if (copiedDetailResetTimer.current) clearTimeout(copiedDetailResetTimer.current);
+      copiedDetailResetTimer.current = setTimeout(() => {
+        setCopiedDetailKey(null);
+        copiedDetailResetTimer.current = null;
+      }, 2000);
+    } catch {
+      // The icon state is the only feedback for successful copies.
+    }
+  };
+
+  const rememberSearch = (term: string) => {
+    const normalized = term.trim();
+    if (!normalized) return;
+    setRecentSearches((current) => {
+      const next = [normalized, ...current.filter((value) => value.toLowerCase() !== normalized.toLowerCase())].slice(0, RECENT_SEARCH_LIMIT);
+      localStorage.setItem(recentSearchStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const togglePersonPreview = (personId: string) => {
+    setExpandedPersonIds((current) => {
+      const next = new Set(current);
+      if (next.has(personId)) next.delete(personId);
+      else next.add(personId);
+      return next;
+    });
+  };
 
   const patchRevealState = (personId: string, patch: Partial<RevealState>) => {
     setRevealStates((prev) => {
@@ -907,6 +995,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       return website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
     }
   }, [initialDomain, website, companyName]);
+
+  const recentSearchStorageKey = useMemo(
+    () => `org_intel_recent_searches_${accountId || domain || companyName || 'global'}`,
+    [accountId, companyName, domain]
+  );
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(recentSearchStorageKey) || '[]');
+      setRecentSearches(Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string').slice(0, RECENT_SEARCH_LIMIT) : []);
+    } catch {
+      setRecentSearches([]);
+    }
+  }, [recentSearchStorageKey]);
 
   /** Normalize cache key to hostname only; full URLs can cause Supabase 406. */
   const cacheKeyFromDomainOrName = (d: string | undefined, name: string | undefined) => {
@@ -1756,24 +1858,31 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         ...newPhonesTyped
       ]);
 
-      const updatedData = data.map(p =>
-        p.id === person.id ? {
-          ...p,
-          isMonitored: true,
-          crmId: crmId,
-          name: resolvedIdentity.name,
-          firstName: resolvedIdentity.firstName || p.firstName,
-          lastName: resolvedIdentity.lastName || p.lastName,
-          photoUrl: enriched.photoUrl || p.photoUrl,
-          email: safeEmail || p.email,
-          title: enriched.jobTitle || p.title,
-          linkedin: sanitizeContactText(enriched.linkedin) || p.linkedin,
-          location: enriched.location || p.location,
-          phones: mergedPhones
-        } : p
-      );
-
-      setData(updatedData);
+      setData((currentData) => {
+        const updatedData = currentData.map(p =>
+          p.id === person.id ? {
+            ...p,
+            isMonitored: true,
+            crmId: crmId,
+            name: resolvedIdentity.name,
+            firstName: resolvedIdentity.firstName || p.firstName,
+            lastName: resolvedIdentity.lastName || p.lastName,
+            photoUrl: enriched.photoUrl || p.photoUrl,
+            email: safeEmail || p.email,
+            title: enriched.jobTitle || p.title,
+            linkedin: sanitizeContactText(enriched.linkedin) || p.linkedin,
+            location: enriched.location || p.location,
+            phones: mergedPhones,
+            source: 'crm' as const,
+            duplicateReason: p.duplicateReason || 'Apollo ID'
+          } : p
+        );
+        saveToCache(companySummary, updatedData, {
+          searchTerm: searchTerm.trim(),
+          currentPage,
+        });
+        return updatedData;
+      });
       patchRevealState(person.id, {
         revealingEmail: false,
         revealingPhone: type === 'phone' || type === 'both' ? !hasImmediatePhones : false,
@@ -1784,13 +1893,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         clearAllPhoneRevealTimers(person.id);
       }
 
-      // 4. Save updated contact list to cache so refresh doesn't lose revealed data
-      saveToCache(companySummary, updatedData, {
-        searchTerm: searchTerm.trim(),
-        currentPage,
-      });
-
-      // 5. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
+      // 4. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
       // Poll phone-retrieve until ready, then update contact and local state.
       if ((type === 'phone' || type === 'both') && crmId) {
         toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
@@ -2148,8 +2251,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
-  const handleSearch = async () => {
-    const term = searchTerm.trim();
+  const handleSearch = async (overrideTerm?: string) => {
+    const term = (overrideTerm ?? searchTerm).trim();
     if (!term) {
       setCurrentPage(1);
       return;
@@ -2160,6 +2263,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
 
     setContactsLoading(true);
+    setSearchTerm(term);
+    setAppliedSearchTerm(term);
+    setResultFilterTerm(term);
+    setSearchRecoveryLabel(null);
+    rememberSearch(term);
     
     // Load cache to get previously revealed data
     const cacheKey = cacheKeyFromDomainOrName(domain, companyName);
@@ -2184,7 +2292,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const hasDomainScope = Boolean(domain && domain.trim());
 
       // Domain-first query avoids false negatives when CRM account name differs from Apollo org name.
-      const runApolloSearch = async (includeCompanyName: boolean): Promise<unknown[]> => {
+      const runApolloSearch = async (includeCompanyName: boolean, queryTerm = term): Promise<unknown[]> => {
         const peopleResp = await fetch('/api/apollo/search-people', {
           method: 'POST',
           headers: {
@@ -2194,7 +2302,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           body: JSON.stringify({
             page: 1,
             per_page: 50,
-            q_keywords: term,
+            q_keywords: queryTerm,
             q_organization_domains: hasDomainScope ? domain : undefined,
             q_organization_domains_list: hasDomainScope ? [domain] : undefined,
             q_organization_name: (!hasDomainScope || includeCompanyName) ? companyName || undefined : undefined
@@ -2216,6 +2324,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         // Fallback: add company-name constraint only if domain-only query came back empty.
         apolloContacts = await runApolloSearch(true);
       }
+
+      let resolvedFilterTerm = term;
+      if (apolloContacts.length === 0) {
+        const nameParts = term.split(/\s+/).filter(Boolean);
+        if (nameParts.length >= 2) {
+          const firstName = nameParts[0];
+          const lastName = nameParts[nameParts.length - 1];
+          const recoveryTerms = [`${firstName} ${lastName.charAt(0)}`, firstName];
+          for (const recoveryTerm of recoveryTerms) {
+            apolloContacts = await runApolloSearch(false, recoveryTerm);
+            if (apolloContacts.length > 0) {
+              resolvedFilterTerm = recoveryTerm;
+              setSearchRecoveryLabel(`Broadened from “${term}” to “${recoveryTerm}”`);
+              break;
+            }
+          }
+        }
+      }
+      setResultFilterTerm(resolvedFilterTerm);
 
       const lookups = await buildExistingContactLookups();
 
@@ -2245,11 +2372,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const emailKey = sanitizeContactText(email).toLowerCase();
           const linkedInKey = normalizeLinkedinUrl(linkedin);
           const nameKey = buildNameKey(firstName, lastName);
-          const crmId =
-            lookups.apolloIdToCrmId.get(id) ||
-            (emailKey ? lookups.emailToCrmId.get(emailKey) : undefined) ||
-            (linkedInKey ? lookups.linkedinToCrmId.get(linkedInKey) : undefined) ||
-            (nameKey ? lookups.nameToCrmId.get(nameKey) : undefined);
+          const apolloIdMatch = lookups.apolloIdToCrmId.get(id);
+          const emailMatch = emailKey ? lookups.emailToCrmId.get(emailKey) : undefined;
+          const linkedinMatch = linkedInKey ? lookups.linkedinToCrmId.get(linkedInKey) : undefined;
+          const nameMatch = nameKey ? lookups.nameToCrmId.get(nameKey) : undefined;
+          const crmId = apolloIdMatch || emailMatch || linkedinMatch || nameMatch;
+          const duplicateReason: ApolloContactRow['duplicateReason'] = apolloIdMatch
+            ? 'Apollo ID'
+            : emailMatch
+              ? 'Email'
+              : linkedinMatch
+                ? 'LinkedIn'
+                : nameMatch
+                  ? 'Name + company'
+                  : undefined;
           const isMonitored = Boolean(crmId);
 
           const location = [
@@ -2299,7 +2435,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             location,
             linkedin: linkedin || undefined,
             photoUrl,
-            phones
+            phones,
+            source: 'apollo',
+            duplicateReason,
+            seniority: typeof c.seniority === 'string' ? c.seniority : undefined,
+            departments: Array.isArray(c.departments) ? c.departments.filter((value): value is string => typeof value === 'string') : undefined
           };
         })
         .filter((v): v is ApolloContactRow => v !== null);
@@ -2363,7 +2503,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   location: [sanitizeContactText(c.city), sanitizeContactText(c.state)].filter(Boolean).join(', ') || undefined,
                   linkedin: sanitizeContactText(c.linkedinUrl) || undefined,
                   photoUrl: resolveContactPhotoUrl(c, c.metadata),
-                  phones
+                  phones,
+                  source: 'crm'
                 };
               });
           }
@@ -2402,8 +2543,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   };
 
   const filteredData = useMemo(() => {
-    return data.filter((person) => matchesContactSearch(person, searchTerm));
-  }, [data, searchTerm]);
+    const filterTerm = searchTerm === appliedSearchTerm && resultFilterTerm
+      ? resultFilterTerm
+      : searchTerm;
+    return data.filter((person) => matchesContactSearch(person, filterTerm));
+  }, [appliedSearchTerm, data, resultFilterTerm, searchTerm]);
 
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * CONTACTS_PER_PAGE;
@@ -2411,6 +2555,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   }, [filteredData, currentPage]);
 
   const totalPages = Math.ceil(filteredData.length / CONTACTS_PER_PAGE);
+
+  useEffect(() => {
+    setSelectedResultIndex(-1);
+  }, [currentPage, searchTerm]);
 
   const contentExpanded = scanStatus === 'complete';
 
@@ -2437,6 +2585,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 setScanStatus('idle');
                 setData([]);
                 setSearchTerm('');
+                setAppliedSearchTerm('');
+                setResultFilterTerm('');
+                setSearchRecoveryLabel(null);
                 setCurrentPage(1);
               }}
               className="text-[10px] font-mono text-zinc-600 hover:text-white transition-colors uppercase tracking-widest"
@@ -2450,29 +2601,62 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       {/* SEARCH BAR (Visible when complete) */}
       {scanStatus === 'complete' && (
-        <div className="px-4 py-2 border-b border-white/5">
+        <div className="px-4 py-2 border-b border-white/5 space-y-2">
           <div className="flex items-center gap-2">
             <div className="relative group flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
+              <Search className="absolute z-20 left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
+              {searchFocused && activeTitleSuggestion && (
+                <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-8 right-16 z-0 flex items-center overflow-hidden whitespace-pre text-[10px] font-mono">
+                  <span className="text-transparent">{searchTerm}</span>
+                  <span className="text-zinc-700">{activeTitleSuggestion.slice(searchTerm.length)}</span>
+                </div>
+              )}
               <input
                 type="text"
                 placeholder="Search decision makers..."
                 value={searchTerm}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
+                  setSearchRecoveryLabel(null);
                 }}
                 onKeyDown={(e) => {
+                  if (e.key === 'Tab' && activeTitleSuggestion) {
+                    e.preventDefault();
+                    setSearchTerm(activeTitleSuggestion);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp' && titleSuggestions.length > 0) {
+                    e.preventDefault();
+                    setSuggestionIndex((current) => (current - 1 + titleSuggestions.length) % titleSuggestions.length);
+                    return;
+                  }
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    if (titleSuggestions.length > 0) {
+                      setSuggestionIndex((current) => (current + 1) % titleSuggestions.length);
+                    } else if (paginatedData.length > 0) {
+                      setSelectedResultIndex(0);
+                      resultCardRefs.current[0]?.focus();
+                    }
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    setSuggestionIndex(0);
+                    return;
+                  }
                   if (e.key === 'Enter') {
-                    handleSearch();
+                    void handleSearch();
                   }
                 }}
-                className="w-full bg-zinc-950/40 border border-white/5 rounded-lg pl-8 pr-16 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
+                className="relative z-10 w-full bg-transparent border border-white/5 rounded-lg pl-8 pr-16 py-1.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 transition-all placeholder:text-zinc-700"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {searchTerm && (
                   <button
-                    onClick={handleSearch}
+                    onClick={() => void handleSearch()}
                     className="p-1 rounded bg-zinc-950/20 hover:bg-zinc-950/40 text-[#002FA7] transition-colors"
                     title="Search Apollo"
                   >
@@ -2492,6 +2676,59 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               </button>
             )}
           </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex h-5 items-center gap-1 rounded border border-white/5 bg-white/[0.02] px-1.5 text-[8px] font-mono uppercase tracking-wider text-zinc-600">
+              {domain || companyName || 'Company scope'}
+              <Lock className="h-2.5 w-2.5" />
+            </span>
+            {appliedSearchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setAppliedSearchTerm('');
+                  setResultFilterTerm('');
+                  setSearchRecoveryLabel(null);
+                  setCurrentPage(1);
+                }}
+                className="inline-flex h-5 items-center gap-1 rounded border border-[#002FA7]/25 bg-[#002FA7]/10 px-1.5 text-[8px] font-mono uppercase tracking-wider text-[#8ba6ff] hover:border-[#002FA7]/60"
+              >
+                {appliedSearchTerm}
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+            {searchRecoveryLabel && (
+              <span className="text-[8px] font-mono text-amber-500/80">{searchRecoveryLabel}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+            {DECISION_MAKER_SHORTCUTS.map((title) => (
+              <button
+                key={title}
+                type="button"
+                onClick={() => void handleSearch(title)}
+                className="shrink-0 rounded px-1.5 py-1 text-[8px] font-mono uppercase tracking-wider text-zinc-600 transition-colors hover:bg-white/[0.04] hover:text-zinc-300"
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+          {searchFocused && recentSearches.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none]">
+              <Clock className="h-2.5 w-2.5 shrink-0 text-zinc-700" />
+              {recentSearches.map((term) => (
+                <button
+                  key={term}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => void handleSearch(term)}
+                  className="shrink-0 text-[8px] font-mono text-zinc-600 hover:text-zinc-300"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -2668,7 +2905,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 </div>
               ) : paginatedData.length > 0 ? (
                 <AnimatePresence initial={false} mode="popLayout">
-                  {paginatedData.map((person) => (
+                  {paginatedData.map((person, personIndex) => (
                     (() => {
                       const revealState = revealStates[person.id] || {
                         revealingEmail: false,
@@ -2685,6 +2922,37 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       return (
                     <motion.div
                       key={person.id}
+                      ref={(node) => { resultCardRefs.current[personIndex] = node; }}
+                      tabIndex={0}
+                      onFocus={() => setSelectedResultIndex(personIndex)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                          event.preventDefault();
+                          const delta = event.key === 'ArrowDown' ? 1 : -1;
+                          const nextIndex = (personIndex + delta + paginatedData.length) % paginatedData.length;
+                          setSelectedResultIndex(nextIndex);
+                          resultCardRefs.current[nextIndex]?.focus();
+                          return;
+                        }
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          if (person.isMonitored && person.crmId) router.push(`/network/contacts/${person.crmId}`);
+                          else togglePersonPreview(person.id);
+                          return;
+                        }
+                        if (event.key.toLowerCase() === 'a' && !person.isMonitored && !revealState.revealingEmail && !revealState.revealingPhone) {
+                          event.preventDefault();
+                          void handleAcquire(person, 'email');
+                          return;
+                        }
+                        if (event.key.toLowerCase() === 'c') {
+                          const copyValue = person.email !== 'N/A' ? person.email : person.phones?.[0] ? phoneDisplayNumber(person.phones[0]) : '';
+                          if (copyValue) {
+                            event.preventDefault();
+                            void copyContactDetail(copyValue, `keyboard:${person.id}`);
+                          }
+                        }
+                      }}
                       layout
                       initial={{ opacity: 0, scale: 0.98, y: 10 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -2696,7 +2964,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         layout: { duration: 0.3 }
                       }}
                       className={cn(
-                        'flex flex-col p-2.5 rounded-xl transition-all border border-transparent hover:border-white/5 hover:bg-zinc-950/40 space-y-2',
+                        'flex flex-col p-2.5 rounded-xl transition-all border border-transparent hover:border-white/5 hover:bg-zinc-950/40 space-y-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#002FA7]/70',
+                        selectedResultIndex === personIndex && 'border-white/5 bg-zinc-950/30',
                         person.isMonitored && 'bg-zinc-950/40 border-white/5'
                       )}
                     >
@@ -2725,6 +2994,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
                                 {person.title || 'Nodal Analyst'}
                               </span>
+                              <span className="mt-0.5 flex items-center gap-1 text-[7px] font-mono uppercase tracking-wider text-emerald-500/70">
+                                <Database className="h-2 w-2" /> CRM{person.duplicateReason ? ` · ${person.duplicateReason}` : ''}
+                              </span>
                             </div>
                           </button>
                         ) : (
@@ -2745,6 +3017,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
                                 {person.title || 'Nodal Analyst'}
                               </span>
+                              <span className="mt-0.5 flex items-center gap-1 text-[7px] font-mono uppercase tracking-wider text-[#8ba6ff]/70">
+                                <Sparkles className="h-2 w-2" /> Live Apollo
+                              </span>
                             </div>
                           </div>
                         )}
@@ -2762,8 +3037,70 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               </a>
                             ) : null
                           ) : null}
+                          <button
+                            type="button"
+                            onClick={() => togglePersonPreview(person.id)}
+                            aria-label={`${expandedPersonIds.has(person.id) ? 'Collapse' : 'Preview'} ${contactFullName}`}
+                            title="Preview contact"
+                            className="icon-button-forensic w-7 h-7 flex items-center justify-center"
+                          >
+                            <ChevronDown className={cn('h-3 w-3 transition-transform', expandedPersonIds.has(person.id) && 'rotate-180')} />
+                          </button>
                         </div>
                       </div>
+
+                      <AnimatePresence initial={false}>
+                        {expandedPersonIds.has(person.id) && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+                            className="overflow-hidden"
+                          >
+                            <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 border-t border-white/5 pt-2 text-[8px] font-mono uppercase tracking-wider">
+                              <div className="min-w-0">
+                                <span className="block text-zinc-700">Identity</span>
+                                <span className="block truncate text-zinc-400">{contactFullName}</span>
+                              </div>
+                              <div className="min-w-0">
+                                <span className="block text-zinc-700">Source</span>
+                                <span className={person.isMonitored ? 'text-emerald-500/80' : 'text-[#8ba6ff]/80'}>
+                                  {person.isMonitored ? `CRM${person.duplicateReason ? ` · ${person.duplicateReason}` : ''}` : 'Apollo live'}
+                                </span>
+                              </div>
+                              {person.seniority && (
+                                <div className="min-w-0">
+                                  <span className="block text-zinc-700">Seniority</span>
+                                  <span className="block truncate text-zinc-400">{person.seniority}</span>
+                                </div>
+                              )}
+                              {person.departments && person.departments.length > 0 && (
+                                <div className="min-w-0">
+                                  <span className="block text-zinc-700">Department</span>
+                                  <span className="block truncate text-zinc-400">{person.departments.join(', ')}</span>
+                                </div>
+                              )}
+                              {person.location && (
+                                <div className="col-span-2 min-w-0">
+                                  <span className="block text-zinc-700">Location</span>
+                                  <span className="block truncate text-zinc-400">{person.location}</span>
+                                </div>
+                              )}
+                              {person.linkedin && (
+                                <a
+                                  href={person.linkedin}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="col-span-2 inline-flex items-center gap-1 text-zinc-500 hover:text-white"
+                                >
+                                  <Linkedin className="h-2.5 w-2.5" /> Open LinkedIn
+                                </a>
+                              )}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
 
                       {/* GATED DETAILS */}
                       {person.isMonitored ? (
@@ -2788,9 +3125,28 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                     {person.email}
                                   </span>
                                 </button>
-                                <span className="pl-5 text-[8px] font-mono text-zinc-500 tracking-[0.18em] uppercase transition duration-200 group-hover/email:text-white">
-                                  EMAIL
-                                </span>
+                                <div className="pl-5 flex items-center gap-1">
+                                  <span className="text-[8px] font-mono text-zinc-500 tracking-[0.18em] uppercase transition duration-200 group-hover/email:text-white">
+                                    EMAIL
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label={`Copy ${contactFullName}'s email`}
+                                    title="Copy email"
+                                    onClick={(event) => {
+                                      event.preventDefault();
+                                      event.stopPropagation();
+                                      void copyContactDetail(person.email, `email:${person.id}`);
+                                    }}
+                                    className="p-0.5 text-zinc-500 opacity-0 transition-opacity hover:text-white focus:opacity-100 focus:outline-none group-hover/email:opacity-100"
+                                  >
+                                    {copiedDetailKey === `email:${person.id}` ? (
+                                      <Check className="w-3 h-3 text-emerald-500" />
+                                    ) : (
+                                      <Copy className="w-3 h-3" />
+                                    )}
+                                  </button>
+                                </div>
                               </motion.div>
                             ) : (
                               <RevealActionButton
@@ -2813,12 +3169,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 {person.phones.map((entry, idx) => {
                                   const num = phoneDisplayNumber(entry);
                                   const label = phoneTypeLabel(entry, idx);
+                                  const copyKey = `phone:${person.id}:${num}`;
                                   return (
-                                    <button
-                                      key={num}
-                                      type="button"
-                                      aria-label={`Call ${contactFullName} (${label})`}
-                                      onClick={() => {
+                                    <div key={num} className="group/phone flex flex-col items-start gap-0.5 min-w-0 w-full">
+                                      <button
+                                        type="button"
+                                        aria-label={`Call ${contactFullName} (${label})`}
+                                        onClick={() => {
                                         const callName = contactFullName;
                                         const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
                                         const domainForCall =
@@ -2835,18 +3192,32 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                         });
                                         toast.info(`Calling ${callName}...`);
                                       }}
-                                      className="w-full flex flex-col items-start gap-0.5 text-zinc-400 uppercase min-w-0 transition duration-200 transform hover:scale-[1.02] hover:text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7] group"
-                                    >
-                                      <div className="flex items-center gap-1.5 w-full min-w-0 [container-type:inline-size]">
-                                        <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0 transition-colors duration-200 group-hover:text-white" />
-                                        <span className="min-w-0 flex-1 truncate font-mono text-[clamp(8px,5cqw,9px)] text-zinc-300 whitespace-nowrap transition-colors duration-200 group-hover:text-white">
+                                        className="w-full flex items-center gap-1.5 text-zinc-400 uppercase min-w-0 transition duration-200 transform hover:scale-[1.02] hover:text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7]"
+                                      >
+                                        <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0 transition-colors duration-200 group-hover/phone:text-white" />
+                                        <span className="min-w-0 flex-1 truncate font-mono text-[clamp(8px,5cqw,9px)] text-zinc-300 whitespace-nowrap transition-colors duration-200 group-hover/phone:text-white">
                                           {num}
                                         </span>
+                                      </button>
+                                      <div className="pl-5 flex items-center gap-1">
+                                        <span className="font-mono text-[8px] text-zinc-500 tracking-[0.18em] transition duration-200 group-hover/phone:text-white">
+                                          {label}
+                                        </span>
+                                        <button
+                                          type="button"
+                                          aria-label={`Copy ${contactFullName}'s ${label.toLowerCase()} phone number`}
+                                          title="Copy phone number"
+                                          onClick={() => void copyContactDetail(num, copyKey)}
+                                          className="p-0.5 text-zinc-500 opacity-0 transition-opacity hover:text-white focus:opacity-100 focus:outline-none group-hover/phone:opacity-100"
+                                        >
+                                          {copiedDetailKey === copyKey ? (
+                                            <Check className="w-3 h-3 text-emerald-500" />
+                                          ) : (
+                                            <Copy className="w-3 h-3" />
+                                          )}
+                                        </button>
                                       </div>
-                                      <span className="pl-5 font-mono text-[8px] text-zinc-500 tracking-[0.18em] transition-colors duration-200 group-hover:text-white">
-                                        {label}
-                                      </span>
-                                    </button>
+                                    </div>
                                   );
                                 })}
                               </motion.div>
