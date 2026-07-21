@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     // 1. Get contact data (phones)
     const { data: contact, error: contactError } = await supabaseAdmin
       .from('contacts')
-      .select('id, mobile, workPhone, otherPhone, accountId')
+      .select('id, phone, mobile, workPhone, otherPhone, companyPhone, accountId')
       .eq('id', contactId)
       .single();
 
@@ -103,9 +103,11 @@ export default async function handler(req, res) {
     }
 
     const contactPhones = new Set();
+    if (contact.phone) contactPhones.add(normalizePhone(contact.phone));
     if (contact.mobile) contactPhones.add(normalizePhone(contact.mobile));
     if (contact.workPhone) contactPhones.add(normalizePhone(contact.workPhone));
     if (contact.otherPhone) contactPhones.add(normalizePhone(contact.otherPhone));
+    if (contact.companyPhone) contactPhones.add(normalizePhone(contact.companyPhone));
 
     // 2. Query calls from Supabase
     let callsQuery = supabaseAdmin
