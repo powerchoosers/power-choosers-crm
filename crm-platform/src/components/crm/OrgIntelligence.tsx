@@ -34,6 +34,7 @@ import {
   type ContactPhoneBucket
 } from '@/lib/contact-signals';
 import { formatHeadcountLabel, headcountMetadata, parseHeadcount } from '@/lib/headcount';
+import { matchesContactSearch } from '@/lib/contact-search';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -2401,45 +2402,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   };
 
   const filteredData = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    if (!term) return data;
-    
-    // Split search term into words for multi-word matching (e.g., "John Smith")
-    const searchWords = term.split(/\s+/).filter(Boolean);
-    
-    return data.filter((p) => {
-      const name = (p.name ?? '').toLowerCase();
-      const first = (p.firstName ?? '').toLowerCase();
-      const last = (p.lastName ?? '').toLowerCase();
-      const title = (p.title ?? '').toLowerCase();
-      
-      // Simple single-term search
-      if (searchWords.length === 1) {
-        return name.includes(term) || first.includes(term) || last.includes(term) || title.includes(term);
-      }
-      
-      // Multi-word search: handle "John Smith" matching "John S." (redacted last name)
-      // Check if all search words match somewhere in the contact data
-      return searchWords.every((word) => {
-        // Direct match in any field
-        if (name.includes(word) || first.includes(word) || last.includes(word) || title.includes(word)) {
-          return true;
-        }
-        
-        // Fuzzy match: if word looks like a last name (2+ chars), check if it matches first char of last name
-        // This handles: searching "Smith" matches contact with lastName "S." or "S"
-        if (word.length >= 2 && last.length >= 1) {
-          const firstCharMatch = word.charAt(0) === last.charAt(0);
-          // Also check if the stored last name is redacted (single char or char + period)
-          const isRedacted = last.length <= 2 && (last.endsWith('.') || last.length === 1);
-          if (firstCharMatch && isRedacted) {
-            return true;
-          }
-        }
-        
-        return false;
-      });
-    });
+    return data.filter((person) => matchesContactSearch(person, searchTerm));
   }, [data, searchTerm]);
 
   const paginatedData = useMemo(() => {
