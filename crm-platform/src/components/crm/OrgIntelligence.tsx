@@ -8,7 +8,7 @@ import {
   type SVGProps
 } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail, Copy, Check, X, Clock, Database, UserPlus } from 'lucide-react';
+import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail, Copy, Check, X, Clock, Database } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { supabase } from '@/lib/supabase';
@@ -2926,6 +2926,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       tabIndex={0}
                       onFocus={() => setSelectedResultIndex(personIndex)}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                           event.preventDefault();
                           const delta = event.key === 'ArrowDown' ? 1 : -1;
@@ -2994,7 +2995,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
                                 {person.title || 'Nodal Analyst'}
                               </span>
-                              <span className="mt-0.5 flex items-center gap-1 text-[7px] font-mono uppercase tracking-wider text-emerald-500/70">
+                              <span className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-[7px] font-mono uppercase tracking-wider text-emerald-500/70">
                                 <Database className="h-2 w-2" /> CRM{person.duplicateReason ? ` · ${person.duplicateReason}` : ''}
                               </span>
                             </div>
@@ -3017,7 +3018,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
                                 {person.title || 'Nodal Analyst'}
                               </span>
-                              <span className="mt-0.5 flex items-center gap-1 text-[7px] font-mono uppercase tracking-wider text-[#8ba6ff]/70">
+                              <span className="mt-0.5 flex min-w-0 items-center gap-1 truncate text-[7px] font-mono uppercase tracking-wider text-[#8ba6ff]/70">
                                 <Sparkles className="h-2 w-2" /> Live Apollo
                               </span>
                             </div>
