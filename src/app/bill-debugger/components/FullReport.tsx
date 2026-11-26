@@ -1,10 +1,11 @@
 import React, { useMemo } from 'react'
-import { motion } from 'framer-motion'
-import { Zap, Truck, Activity, Info, Calendar, AlertCircle, Warehouse } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { Reveal } from '@/components/landing/Reveal'
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
 import { BillReviewLens } from './BillReviewLens'
 import { NextStepsCard } from './NextStepsCard'
+import { EASE, StepBand } from './StepBand'
 
 interface ExtractedData {
     customer_name?: string
@@ -90,7 +91,11 @@ function formatCents(value: number) {
     return `${(value * 100).toFixed(2)}¢/kWh`
 }
 
+const panel = 'rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8'
+const figure = 'text-3xl font-semibold tracking-[-0.02em] text-zinc-950 tabular-nums'
+
 export function FullReport({ data, email, redactedMode = false }: FullReportProps) {
+    const reduceMotion = useReducedMotion()
     const usage = parseNumber(data.total_usage_kwh)
     const actualDemand = Math.max(
         parseNumber(data.actual_demand_kw),
@@ -141,281 +146,234 @@ export function FullReport({ data, email, redactedMode = false }: FullReportProp
         }, "Oncor")
     }, [actualDemand, billedDemand, data.analysis?.feedback, data.billing_period, data.contract_end_date, data.provider_name, data.retail_plan_name, deliveryCharges, deliveryShare, energyCharges, powerFactor, supplyShare, totalBill, usage])
 
-    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'N/A'
+    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'an unknown rate'
     const summaryText = printedSupplyRate > 0
         ? `The bill prints ${formatCents(printedSupplyRate)} on the supply line, but the invoice lands at ${invoiceRateText} once delivery and taxes are included.`
         : (redactedMode
             ? 'The bill is being driven by delivery and demand, not just the supply rate.'
             : (feedback.description || 'The bill is being driven by delivery and demand, not just the supply rate.'))
-    const siteLabel = redactedMode ? 'Redacted facility' : 'Logistics warehouse'
-    const providerLabel = redactedMode ? 'Redacted provider' : data.provider_name
-    const utilityName = redactedMode ? 'the utility' : 'Oncor'
-    const powerFactorLine = redactedMode
-        ? 'Below the utility adjustment line.'
-        : 'Below Oncor’s 95% adjustment line.'
+    const providerLabel = redactedMode ? 'Hidden on this example' : data.provider_name
+    const utilityName = redactedMode ? 'The utility' : 'Oncor'
+    const powerFactorRule = `${utilityName} can raise the demand it bills when power factor falls below 95%.`
+
+    const facts = [
+        { label: 'Supplier', value: providerLabel },
+        { label: 'Billing period', value: data.billing_period },
+        { label: 'Contract ends', value: data.contract_end_date || 'Not found on this bill' },
+    ]
+
+    const findings = [
+        `Supply, the electricity itself, is ${supplyShare.toFixed(1)}% of the charges we could read.`,
+        `Delivery, the utility's charge for bringing power to your site, is ${deliveryShare.toFixed(1)}% of the charges we could read.`,
+        totalDemandGap > 0
+            ? `The demand you are billed on is ${totalDemandGap.toLocaleString()} kW above this month's actual peak.`
+            : 'We did not see a gap between your actual peak and the demand you are billed on. Any minimum demand level is worth a second look.',
+        powerFactor > 0
+            ? `Power factor is ${powerFactor.toFixed(1)}%. ${powerFactorRule}`
+            : 'The bill did not show a power factor figure, so that still needs checking.',
+    ]
+
+    const enter = (index: number) =>
+        reduceMotion
+            ? {}
+            : {
+                initial: { opacity: 0, y: 10, filter: 'blur(4px)' },
+                animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+                transition: { duration: 0.4, delay: 0.1 + index * 0.07, ease: EASE },
+            }
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-4 pb-20">
-            <motion.div
-                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                className="mb-12"
-            >
-                <div className="flex flex-col lg:flex-row gap-8 items-start">
-                    <div className="flex-1">
-                        <FeedbackBadge
-                            status={feedback.status}
-                            title={feedback.title}
-                            isLarge={feedback.facilitySize === 'large'}
-                        />
+        <>
+            <StepBand title="Your bill review" lead={summaryText} />
 
-                        <div className="mt-5 flex items-center gap-2 text-[10px] md:text-xs font-mono tracking-widest text-[#002FA7] uppercase opacity-80">
-                            <Warehouse className="w-4 h-4" />
-                            <span>{siteLabel}</span>
-                        </div>
+            {/* Verdict, total and demand */}
+            <section className="bg-white px-6 py-12 lg:px-10 lg:py-16">
+                <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-16">
+                    <div>
+                        <motion.div {...enter(0)}>
+                            <FeedbackBadge
+                                status={feedback.status}
+                                title={feedback.title}
+                                isLarge={feedback.facilitySize === 'large'}
+                            />
+                        </motion.div>
 
-                        <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mt-4 mb-4">
-                            Review complete
-                        </h1>
+                        <motion.div {...enter(1)} className="mt-6">
+                            <p className="text-sm font-medium text-zinc-950">Total on this bill</p>
+                            <p className="np-display mt-2 text-5xl text-zinc-950 [font-variant-numeric:lining-nums_tabular-nums] sm:text-6xl">
+                                {formatMoney(totalBill)}
+                            </p>
+                        </motion.div>
 
-                        <p className="text-zinc-600 max-w-3xl text-lg leading-relaxed mb-6">
-                            {summaryText}
+                        <motion.dl {...enter(2)} className="mt-8 border-t border-zinc-200">
+                            {facts.map((fact) => (
+                                <div
+                                    key={fact.label}
+                                    className="grid gap-1 border-b border-zinc-200 py-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-8"
+                                >
+                                    <dt className="text-sm font-medium text-zinc-950">{fact.label}</dt>
+                                    <dd className="text-base text-zinc-600 tabular-nums">{fact.value}</dd>
+                                </div>
+                            ))}
+                        </motion.dl>
+
+                        {redactedMode ? (
+                            <p className="mt-5 text-sm text-zinc-500">
+                                This is an example bill. Names, addresses and account numbers are hidden.
+                            </p>
+                        ) : null}
+                    </div>
+
+                    <motion.div {...enter(3)} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+                        <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Peak demand</h2>
+                        <p className="mt-1 text-sm leading-6 text-zinc-500">
+                            Demand is your highest rate of use in the month, measured in kW. Part of the
+                            delivery charge is based on it.
                         </p>
 
-                        <div className="flex flex-wrap items-center gap-2">
-                            <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1.5 text-sm text-zinc-600 border border-zinc-200">
-                            <span className="font-medium text-zinc-900">{providerLabel}</span>
-                                <span>•</span>
-                                <span>{data.billing_period}</span>
-                            </div>
-                            {data.contract_end_date ? (
-                                <div className="inline-flex items-center gap-2 bg-amber-50 rounded-full px-4 py-1.5 text-sm text-amber-700 border border-amber-100">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    <span className="font-medium uppercase tracking-tighter">Contract ends {data.contract_end_date}</span>
-                                </div>
-                            ) : (
-                                <div className="inline-flex items-center gap-2 bg-zinc-50 rounded-full px-4 py-1.5 text-sm text-zinc-400 border border-zinc-100">
-                                    <AlertCircle className="w-3.5 h-3.5" />
-                                    <span className="font-medium uppercase tracking-tighter">Contract date not found</span>
-                                </div>
-                            )}
-                            <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-4 py-1.5 text-sm text-blue-700 border border-blue-100">
-                                <span className="font-medium uppercase tracking-tighter">{formatMoney(totalBill)} total</span>
-                            </div>
-                        </div>
-                    </div>
+                        <p className="mt-6 text-4xl font-semibold tracking-[-0.02em] text-zinc-950 tabular-nums">
+                            {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'Not available'}
+                        </p>
+                        <p className="mt-2 text-base leading-7 text-zinc-600">
+                            Your actual peak. The bill uses {billedDemand > 0 ? `${billedDemand.toLocaleString()} kW` : 'a higher demand figure'} to work out delivery charges.
+                        </p>
 
-                    <div className="w-full lg:w-[360px]">
-                        <div className="glass-card p-6 md:p-7 h-full">
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <div className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1">Demand snapshot</div>
-                                    <div className="text-lg font-semibold text-zinc-900">Peak and billing demand</div>
+                        <dl className="mt-6 border-t border-zinc-200">
+                            <div className="border-b border-zinc-200 py-4">
+                                <div className="flex items-baseline justify-between gap-4">
+                                    <dt className="text-sm font-medium text-zinc-950">Power factor</dt>
+                                    <dd className="text-lg font-semibold text-zinc-950 tabular-nums">
+                                        {powerFactor > 0 ? `${powerFactor.toFixed(1)}%` : 'Not shown'}
+                                    </dd>
                                 </div>
-                                <Activity className="w-5 h-5 text-[#002FA7]" />
+                                <p className="mt-1 text-sm leading-6 text-zinc-500">
+                                    {powerFactor > 0
+                                        ? `How efficiently your site uses the power it draws. ${powerFactorRule}`
+                                        : 'No power factor figure was visible on the bill.'}
+                                </p>
                             </div>
-
-                            <div className="text-4xl font-semibold text-zinc-900 tracking-tight mb-2">
-                                {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'N/A'}
-                            </div>
-                            <div className="text-sm text-zinc-500 mb-5">
-                                Actual peak demand. The bill is using {billedDemand > 0 ? `${billedDemand.toLocaleString()} kW` : 'a higher demand figure'} for delivery math.
-                            </div>
-
-                            <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4 mb-4">
-                                <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Power factor</div>
-                                <div className="text-2xl font-mono font-semibold text-zinc-900">
-                                    {powerFactor > 0 ? `${powerFactor.toFixed(1)}%` : 'Not shown'}
+                            <div className="pt-4">
+                                <div className="flex items-baseline justify-between gap-4">
+                                    <dt className="text-sm font-medium text-zinc-950">Gap between actual and billed demand</dt>
+                                    <dd className="shrink-0 text-lg font-semibold text-zinc-950 tabular-nums">
+                                        {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'None found'}
+                                    </dd>
                                 </div>
-                                <div className="text-xs text-zinc-500 mt-2">
-                                    {powerFactor > 0 ? powerFactorLine : 'No PF figure was visible on the bill.'}
-                                </div>
-                            </div>
-
-                            <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4">
-                                <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Billing gap</div>
-                                <div className="text-2xl font-mono font-semibold text-zinc-900">
-                                    {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'N/A'}
-                                </div>
-                                <div className="text-xs text-zinc-500 mt-2">
+                                <p className="mt-1 text-sm leading-6 text-zinc-500">
                                     {totalDemandGap > 0
-                                        ? 'That gap is why the delivery side can stay higher than the current month suggests.'
-                                        : 'No demand gap was visible in the extracted data.'}
-                                </div>
+                                        ? 'That gap is why delivery charges can stay higher than this month’s usage suggests.'
+                                        : 'No demand gap was visible in the figures we could read.'}
+                                </p>
                             </div>
+                        </dl>
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* Breakdown */}
+            <section className="bg-zinc-100 px-6 py-16 lg:px-10 lg:py-24">
+                <div className="mx-auto max-w-7xl">
+                    <Reveal>
+                        <h2 className="np-display max-w-2xl text-4xl text-zinc-950 md:text-[3.25rem]">Where the bill comes from</h2>
+                    </Reveal>
+
+                    <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)]">
+                        <Reveal>
+                            <BillReviewLens
+                                usageKwh={usage}
+                                totalBill={totalBill}
+                                printedSupplyRate={printedSupplyRate}
+                                supplyAmount={energyCharges}
+                                deliveryAmount={deliveryCharges}
+                                taxesAmount={taxesCharges}
+                            />
+                        </Reveal>
+
+                        <div className="grid gap-6">
+                            <Reveal delay={0.07} className={panel}>
+                                <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Supply</h3>
+                                <p className="mt-1 text-sm text-zinc-500">The electricity itself, for the month.</p>
+                                <p className={`mt-4 ${figure}`}>{formatMoney(energyCharges)}</p>
+                                <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 text-sm">
+                                    <span className="text-zinc-600">Rate printed on the bill</span>
+                                    <span className="font-semibold text-zinc-950 tabular-nums">
+                                        {printedSupplyRate > 0 ? formatCents(printedSupplyRate) : 'Not shown'}
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                                    This rate covers supply only. It is not what you paid per kWh overall.
+                                </p>
+                            </Reveal>
+
+                            <Reveal delay={0.14} className={panel}>
+                                <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Delivery</h3>
+                                <p className="mt-1 text-sm text-zinc-500">
+                                    Charges from the utility that delivers your power, including charges tied to demand.
+                                </p>
+                                <p className={`mt-4 ${figure}`}>{formatMoney(deliveryCharges)}</p>
+                                <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 text-sm">
+                                    <span className="text-zinc-600">Share of the bill</span>
+                                    <span className="font-semibold text-zinc-950 tabular-nums">{deliveryShare.toFixed(1)}%</span>
+                                </div>
+                            </Reveal>
+
+                            <Reveal delay={0.21} className={panel}>
+                                <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Demand</h3>
+                                <p className="mt-1 text-sm text-zinc-500 tabular-nums">
+                                    {billedDemand > 0
+                                        ? `Billed on ${billedDemand.toLocaleString()} kW, with ${powerFactor > 0 ? `a power factor of ${powerFactor.toFixed(1)}%` : 'no power factor shown'}.`
+                                        : 'We could not clearly read the billed demand.'}
+                                </p>
+                                <p className={`mt-4 ${figure}`}>
+                                    {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'Not available'}
+                                </p>
+                                <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-zinc-200 pt-4 text-sm">
+                                    <span className="text-zinc-600">Gap between actual and billed</span>
+                                    <span className="font-semibold text-[#002FA7] tabular-nums">
+                                        {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'None found'}
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-sm leading-6 text-zinc-500">
+                                    {powerFactorRule} It can also keep billing on an earlier, higher peak.
+                                </p>
+                            </Reveal>
                         </div>
                     </div>
                 </div>
-            </motion.div>
+            </section>
 
-            <div className="mb-10">
-                <BillReviewLens
-                    usageKwh={usage}
-                    totalBill={totalBill}
-                    printedSupplyRate={printedSupplyRate}
-                    supplyAmount={energyCharges}
-                    deliveryAmount={deliveryCharges}
-                    taxesAmount={taxesCharges}
-                />
-            </div>
+            {/* Findings and next steps */}
+            <section className="bg-white px-6 py-16 lg:px-10 lg:py-24">
+                <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-2 lg:gap-20">
+                    <Reveal>
+                        <h2 className="np-display text-3xl text-zinc-950 md:text-4xl">What the bill is telling us</h2>
+                        <ul className="mt-8 border-t border-zinc-200">
+                            {findings.map((item, i) => (
+                                <li key={i} className="border-b border-zinc-200 py-4 text-base leading-7 text-zinc-600 tabular-nums">
+                                    {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </Reveal>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 text-left">
-                <motion.div
-                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    transition={{ delay: 0.08 }}
-                    className="glass-card p-8 flex flex-col justify-between"
-                >
-                    <div>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Supply</h3>
-                            <Zap className="w-5 h-5 text-[#002FA7]" />
-                        </div>
-                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {formatMoney(energyCharges)}
-                        </div>
-                        <div className="text-sm text-zinc-500">
-                            Supply-side subtotal for the month.
-                        </div>
-                    </div>
-
-                    <div className="border-t border-zinc-100 pt-4 mt-8">
-                        <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">Printed rate</span>
-                            <span className="text-zinc-900 font-mono font-medium">
-                                {printedSupplyRate > 0 ? formatCents(printedSupplyRate) : 'Not shown'}
-                            </span>
-                        </div>
-                        <div className="text-xs text-zinc-400 mt-2">
-                            This is the bill line rate, not the full invoice rate.
-                        </div>
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    transition={{ delay: 0.16 }}
-                    className="glass-card p-8 flex flex-col justify-between"
-                >
-                    <div>
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Delivery</h3>
-                            <Truck className="w-5 h-5 text-[#002FA7]" />
-                        </div>
-                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {formatMoney(deliveryCharges)}
-                        </div>
-                        <div className="text-sm text-zinc-500">
-                            Utility delivery and demand-related charges.
-                        </div>
-                    </div>
-
-                    <div className="border-t border-zinc-100 pt-4 mt-8">
-                        <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">Share of bill</span>
-                            <span className="text-zinc-900 font-mono font-medium">
-                                {deliveryShare.toFixed(1)}%
-                            </span>
-                        </div>
-                        <div className="text-xs text-zinc-400 mt-2">
-                            Delivery is roughly equal to supply in the extracted sections, so the utility side is doing a lot of the damage.
-                        </div>
-                    </div>
-                </motion.div>
-
-                <motion.div
-                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    transition={{ delay: 0.24 }}
-                    className="glass-card p-8 shadow-xl shadow-[#002FA7]/5 flex flex-col justify-between relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#002FA7]/10 blur-3xl rounded-full pointer-events-none z-0" />
-
-                    <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#002FA7]">Demand</h3>
-                            <Activity className="w-5 h-5 text-[#002FA7]" />
-                        </div>
-                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'N/A'}
-                        </div>
-                        <div className="text-sm text-zinc-500">
-                            {billedDemand > 0
-                                ? `Billed at ${billedDemand.toLocaleString()} kW with ${powerFactor > 0 ? `${powerFactor.toFixed(1)}% PF` : 'no PF shown'}`
-                                : 'Billing demand not clearly extracted'}
-                        </div>
-                    </div>
-
-                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
-                        <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">Demand gap</span>
-                            <span className="text-[#002FA7] font-mono font-semibold">
-                                {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'N/A'}
-                            </span>
-                        </div>
-                        <div className="text-xs text-zinc-400 mt-2 flex gap-2 items-start">
-                            <Info className="w-3 h-3 mt-0.5 shrink-0 text-zinc-300" />
-                            <span>
-                                {redactedMode
-                                    ? 'The utility can adjust billing demand when power factor falls below 95%, and it can still hold the bill up after a higher historical peak.'
-                                    : 'Oncor can adjust billing demand when power factor falls below 95%, and the utility can still hold the bill up after a higher historical peak.'}
-                            </span>
-                        </div>
-                    </div>
-                </motion.div>
-            </div>
-
-            <motion.div
-                initial={{ opacity: 0, filter: 'blur(10px)' }}
-                whileInView={{ opacity: 1, filter: 'blur(0px)' }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="mb-20 glass-card p-10 shadow-xl"
-            >
-                <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                    What the bill is telling us
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                        'Supply is fixed-price and predictable, so it is not the first problem to solve.',
-                        `Delivery is ${deliveryShare.toFixed(1)}% of the extracted sections, which means the utility side is doing most of the damage.`,
-                        totalDemandGap > 0
-                            ? `Billing demand is still above the current peak by ${totalDemandGap.toLocaleString()} kW.`
-                            : 'The extracted bill did not show a clear billing gap, so the demand floor needs a second look.',
-                        powerFactor > 0
-                            ? `Power factor is ${powerFactor.toFixed(1)}%, which is below ${utilityName}’s 95% adjustment line.`
-                            : 'The bill did not show a power factor figure, so that lever still needs verification.'
-                    ].map((item, i) => (
-                        <div key={i} className="flex items-start gap-4 p-5 bg-white/50 backdrop-blur-sm rounded-2xl border border-zinc-200">
-                            <div className="mt-1.5 w-2 h-2 rounded-full shrink-0 bg-[#002FA7]" />
-                            <p className="text-zinc-700 text-sm md:text-base leading-snug">{item}</p>
-                        </div>
-                    ))}
+                    <Reveal delay={0.08}>
+                        <h2 className="np-display text-3xl text-zinc-950 md:text-4xl">Recommended next steps</h2>
+                        <ol className="mt-8 border-t border-zinc-200">
+                            {feedback.actionItems.map((item: string, i: number) => (
+                                <li
+                                    key={i}
+                                    className="flex gap-4 border-b border-zinc-200 py-4 transition-[padding] duration-300 ease-out hover:pl-2"
+                                >
+                                    <span className="w-5 shrink-0 text-base font-semibold leading-7 text-[#002FA7] tabular-nums">{i + 1}</span>
+                                    <span className="text-base leading-7 text-zinc-950">{item}</span>
+                                </li>
+                            ))}
+                        </ol>
+                    </Reveal>
                 </div>
-            </motion.div>
-
-            <motion.div
-                initial={{ opacity: 0, filter: 'blur(10px)' }}
-                whileInView={{ opacity: 1, filter: 'blur(0px)' }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.1 }}
-                className="mb-20 glass-card p-10 shadow-xl"
-            >
-                <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                    Recommended next steps
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {feedback.actionItems.map((item: string, i: number) => (
-                        <div key={i} className="flex items-start gap-4 p-5 bg-white/50 backdrop-blur-sm rounded-2xl border border-zinc-200 hover:border-[#002FA7]/30 transition-all">
-                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${feedback.status === 'green' ? 'bg-emerald-500' : feedback.status === 'yellow' ? 'bg-amber-500' : 'bg-red-500'}`} />
-                            <p className="text-zinc-700 text-sm md:text-base leading-snug">{item}</p>
-                        </div>
-                    ))}
-                </div>
-            </motion.div>
+            </section>
 
             <NextStepsCard email={email} />
-        </div>
+        </>
     )
 }

@@ -1,67 +1,42 @@
 import React from 'react'
-import { motion } from 'framer-motion'
-import { ArrowRight, CalendarDays, ShieldCheck } from 'lucide-react'
-import Link from 'next/link'
+import { PrimaryLink } from '@/components/landing/ui'
+import { Reveal } from '@/components/landing/Reveal'
 
 interface NextStepsCardProps {
     email?: string;
 }
 
+/** Dark closing section of the full report. Runs into the footer. */
 export function NextStepsCard({ email }: NextStepsCardProps) {
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="glass-card p-8 md:p-14 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden"
+        <section
+            data-header-tone="dark"
+            className="relative isolate overflow-hidden bg-zinc-950 px-6 py-20 text-white lg:px-10 lg:py-28"
         >
-            {/* Background Glow */}
-            <div className="absolute -top-24 -left-24 w-80 h-80 bg-blue-100/30 blur-[100px] rounded-full pointer-events-none"></div>
-            <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-blue-50/30 blur-[100px] rounded-full pointer-events-none"></div>
-
-            <div className="relative z-10">
-                <div className="flex justify-center mb-8">
-                    <div className="px-4 py-1.5 rounded-full bg-blue-50 text-[#002FA7] font-mono text-[10px] uppercase tracking-[0.3em] font-bold border border-blue-100 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                        Next step
-                    </div>
-                </div>
-
-                <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tighter text-zinc-900 leading-[0.95] max-w-2xl mx-auto">
-                    Want us to walk through <br />
-                    <span className="text-[#002FA7]">the report with you?</span>
+            <div
+                aria-hidden
+                className="pointer-events-none absolute -bottom-64 left-1/3 -z-10 h-[30rem] w-[44rem] rounded-full bg-[#002FA7]/35 blur-[150px]"
+            />
+            <Reveal className="mx-auto max-w-7xl">
+                <h2 className="np-display max-w-3xl text-4xl sm:text-5xl lg:text-[4.25rem]">
+                    Want us to walk through the report with you?
                 </h2>
-
-                <p className="text-zinc-500 mb-12 max-w-2xl mx-auto text-xl font-medium leading-relaxed">
-                    If the report shows a real issue, we&apos;ll walk through the bill, answer questions, and decide whether a quote or renewal review makes sense.
+                <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-300">
+                    If the report shows a real issue, we&apos;ll walk through the bill, answer questions,
+                    and decide whether a quote or renewal review makes sense.
                 </p>
-
-                <div className="flex flex-col items-center gap-8">
-                    <Link
+                <div className="mt-9">
+                    <PrimaryLink
                         href={`/book?${email ? `email=${encodeURIComponent(email)}&` : ''}from=%2Fbill-debugger`}
-                        className="group px-12 py-6 bg-black text-white rounded-full font-bold text-xl hover:scale-105 transition-all flex items-center gap-4 shadow-[#000]/20 shadow-2xl hover:shadow-black/30 active:scale-95"
+                        surface="dark"
                     >
-                        <CalendarDays className="w-6 h-6" />
-                        Book a Strategy Call
-                        <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                    </Link>
-
-                    <div className="flex flex-col md:flex-row items-center gap-4 md:gap-12 text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-mono font-bold">
-                        <div className="flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>Private call</span>
-                        </div>
-                        <span className="hidden md:block opacity-30">•</span>
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                            <span>Usually 30 minutes</span>
-                        </div>
-                        <span className="hidden md:block opacity-30">•</span>
-                        <span>No commitment required</span>
-                    </div>
+                        Book a call
+                    </PrimaryLink>
                 </div>
-            </div>
-        </motion.div>
+                <p className="mt-5 text-sm text-zinc-400">
+                    A private call, usually 30 minutes. No commitment required.
+                </p>
+            </Reveal>
+        </section>
     )
 }

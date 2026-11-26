@@ -1,20 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import {
-    LogOut, FileText, AlertTriangle, Activity,
-    CalendarDays, ArrowRight, Download, TrendingDown, TrendingUp,
-    Shield, Wifi, Lock, CheckCircle2, Flame, Zap,
-} from 'lucide-react';
+import { LogOut, FileText, AlertTriangle, Download, TrendingDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns';
 import { useScrollEffect } from '@/hooks/useScrollEffect';
 import { mapLocationToZone } from '@/lib/market-mapping';
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel';
-import { PageReveal } from '@/components/motion/PageReveal';
+import { displayFontClass } from '@/components/landing/fonts';
+import { Reveal } from '@/components/landing/Reveal';
+import { focusOnDark, focusOnLight, OutlineLink, PrimaryLink, TextLink } from '@/components/landing/ui';
 
 // ─────────────────────────────────────────────
 // Types
@@ -112,19 +110,19 @@ interface MarketWindow {
 
 function getMarketWindow(month: number): MarketWindow {
     if (BEST_MONTHS.includes(month)) return {
-        status: 'optimal', label: 'Optimal Window', color: 'emerald',
+        status: 'optimal', label: 'Best time to buy', color: 'emerald',
         headline: "You're in the best buying window of the year.",
         body: 'Spring forward prices are at their seasonal low. Locking a contract now captures the lowest expected rates before summer demand drives wholesale prices up 160%+.',
         nextWindow: 'Oct – Nov 2026 (next good window)',
     };
     if (GOOD_MONTHS.includes(month)) return {
-        status: 'good', label: 'Good Window', color: 'blue',
+        status: 'good', label: 'Good time to buy', color: 'blue',
         headline: 'Fall buying window is open.',
         body: 'October and November see a seasonal dip after summer peaks. This is the second-best window of the year to lock a new contract before winter premiums arrive.',
         nextWindow: 'March 2027 (optimal spring window)',
     };
     if (AVOID_MONTHS.includes(month)) return {
-        status: 'avoid', label: 'Elevated Prices', color: 'rose',
+        status: 'avoid', label: 'Prices are high', color: 'rose',
         headline: 'Forward prices are elevated right now.',
         body: month === 8
             ? 'August is the most expensive time to lock a contract — summer peak demand drives wholesale to seasonal highs. Wait for the September cool-down.'
@@ -132,7 +130,7 @@ function getMarketWindow(month: number): MarketWindow {
         nextWindow: month === 8 ? 'Oct – Nov 2026 (fall window)' : 'March 2026 (optimal spring window)',
     };
     return {
-        status: 'neutral', label: 'Moderate Pricing', color: 'zinc',
+        status: 'neutral', label: 'Prices are moderate', color: 'zinc',
         headline: 'Prices are moderate — not peak, not optimal.',
         body: 'Forward prices are in a mid-range. If renewal is approaching, your advisor can begin sourcing quotes. The next optimal window is March (spring low).',
         nextWindow: 'March 2027 (optimal spring window)',
@@ -180,25 +178,72 @@ function gridStress(reserves?: number, load?: number): { label: string; sub: str
 
 function rateProtection(contracted: number, benchmark: number): { label: string; sub: string; color: 'emerald' | 'amber' | 'rose' } {
     const diff = benchmark - contracted;
-    if (diff > 3) return { label: 'Well Protected', sub: `You're paying ${diff.toFixed(2)}¢ below the Texas average`, color: 'emerald' };
+    if (diff > 3) return { label: 'Well protected', sub: `You're paying ${diff.toFixed(2)}¢ below the Texas average`, color: 'emerald' };
     if (diff > 0) return { label: 'Favorable', sub: `Slightly below the Texas average`, color: 'emerald' };
     if (diff > -1) return { label: 'Monitor', sub: 'Near market rate — worth watching', color: 'amber' };
-    return { label: 'Above Market', sub: 'Your rate is above the Texas average', color: 'rose' };
+    return { label: 'Above market', sub: 'Your rate is above the Texas average', color: 'rose' };
 }
 
 // ─────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────
-function SectionLabel({ children }: { children: React.ReactNode }) {
+type Tone = 'emerald' | 'amber' | 'rose' | 'zinc' | 'blue';
+
+/** Status colours on a light background. Colour always comes with a word, never alone. */
+const TONE: Record<Tone, { text: string; panel: string; dot: string }> = {
+    emerald: { text: 'text-emerald-700', panel: 'border-emerald-200 bg-emerald-50', dot: 'bg-emerald-500' },
+    amber: { text: 'text-amber-800', panel: 'border-amber-200 bg-amber-50', dot: 'bg-amber-500' },
+    rose: { text: 'text-rose-700', panel: 'border-rose-200 bg-rose-50', dot: 'bg-rose-500' },
+    zinc: { text: 'text-zinc-600', panel: 'border-zinc-200 bg-zinc-50', dot: 'bg-zinc-400' },
+    blue: { text: 'text-[#002FA7]', panel: 'border-[#002FA7]/20 bg-[#002FA7]/5', dot: 'bg-[#002FA7]' },
+};
+
+/** Deal stages as a client would say them. */
+const STAGE_LABEL: Record<string, string> = {
+    SECURED: 'Active contract',
+    OUT_FOR_SIGNATURE: 'Out for signature',
+    ENGAGED: 'In progress',
+};
+
+function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+    return <section className={`rounded-2xl border border-zinc-200 bg-white ${className}`}>{children}</section>;
+}
+
+function PanelHeading({ title, sub, aside }: { title: string; sub?: string; aside?: React.ReactNode }) {
     return (
-        <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-1">{children}</p>
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <div>
+                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">{title}</h2>
+                {sub ? <p className="mt-1 text-sm leading-6 text-zinc-500">{sub}</p> : null}
+            </div>
+            {aside}
+        </div>
     );
 }
 
-function CardShell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+function StatusTag({ tone, children }: { tone: Tone; children: React.ReactNode }) {
     return (
-        <div className={`rounded-2xl border border-white/5 bg-zinc-900 overflow-hidden ${className}`}>
+        <span className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-sm font-medium ${TONE[tone].panel} ${TONE[tone].text}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${TONE[tone].dot}`} aria-hidden />
             {children}
+        </span>
+    );
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex items-baseline justify-between gap-6 border-b border-zinc-100 py-3 last:border-b-0">
+            <dt className="text-sm text-zinc-500">{label}</dt>
+            <dd className="text-right text-sm font-medium tabular-nums text-zinc-950">{children}</dd>
+        </div>
+    );
+}
+
+function Callout({ tone, title, children }: { tone: Tone; title?: string; children: React.ReactNode }) {
+    return (
+        <div className={`rounded-xl border p-4 ${TONE[tone].panel}`}>
+            {title ? <p className={`text-sm font-semibold ${TONE[tone].text}`}>{title}</p> : null}
+            <div className={`text-sm leading-6 text-zinc-700 ${title ? 'mt-1' : ''}`}>{children}</div>
         </div>
     );
 }
@@ -217,7 +262,10 @@ export function ClientDashboard() {
     const [ercotGrid, setErcotGrid] = useState<ErcotGrid | null>(null);
     const [signedDocs, setSignedDocs] = useState<SignedDoc[]>([]);
     const [meters, setMeters] = useState<MeterData[]>([]);
-    const isScrolled = useScrollEffect((y) => y > 30, false);
+    const isScrolled = useScrollEffect((y) => y > 8, false);
+    // The header turns from white-on-dark to dark-on-white once the welcome band scrolls away.
+    const bandRef = useRef<HTMLDivElement>(null);
+    const pastBand = useScrollEffect((y) => y > (bandRef.current?.offsetHeight ?? 320) - 32, false);
 
     useEffect(() => {
         async function init() {
@@ -291,10 +339,10 @@ export function ClientDashboard() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+            <div className="flex min-h-screen items-center justify-center bg-zinc-100 font-sans" role="status">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-6 h-6 border-2 border-zinc-700 border-t-[#002FA7] rounded-full animate-spin" />
-                    <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Loading your portal...</p>
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-zinc-300 border-t-[#002FA7]" aria-hidden />
+                    <p className="text-sm text-zinc-500">Loading your dashboard…</p>
                 </div>
             </div>
         );
@@ -317,16 +365,16 @@ export function ClientDashboard() {
 
     // Default to ERCOT Hub Average
     let wholesalePrice = ercotPrices?.hub_avg;
-    let wholesaleLabel = 'Wholesale Spot Price';
-    let wholesaleDescription = 'ERCOT Hub Average · excludes delivery & capacity';
+    let wholesaleLabel = 'Wholesale price right now';
+    let wholesaleDescription = 'Texas-wide average, before delivery and capacity charges.';
 
     if (account && ercotPrices) {
         const loadZone = mapLocationToZone(account.city ?? '', account.state ?? '');
         const zoneKey = loadZone.replace('LZ_', '').toLowerCase() as keyof ErcotPrices;
         if (ercotPrices[zoneKey] !== undefined) {
             wholesalePrice = ercotPrices[zoneKey];
-            wholesaleLabel = `${loadZone.replace('LZ_', '')} Spot Price`;
-            wholesaleDescription = `${loadZone} wholesale node · excludes delivery`;
+            wholesaleLabel = 'Wholesale price in your area';
+            wholesaleDescription = `ERCOT ${loadZone.replace('LZ_', '').toLowerCase()} zone, before delivery charges.`;
         }
     }
     const spotPriceKwh = wholesalePrice !== undefined ? (wholesalePrice / 10).toFixed(2) : null;
@@ -346,185 +394,191 @@ export function ClientDashboard() {
     const yourBarPct = contractedRate ? Math.min((contractedRate / rateBarMax) * 100, 100) : 0;
     const avgBarPct = Math.min((TX_COMMERCIAL_BENCHMARK / rateBarMax) * 100, 100);
 
-    return (
-        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+    const dark = !pastBand;
+    const firstName = contactName ? contactName.split(' ')[0] : '';
+    const expiryTone: Tone = expiryDays === null ? 'zinc' : expiryDays < 0 ? 'rose' : expiryDays <= 60 ? 'amber' : 'emerald';
+    const expiryOnDark = expiryTone === 'rose' ? 'text-rose-300' : expiryTone === 'amber' ? 'text-amber-300' : 'text-emerald-300';
+    const focusRing = dark ? focusOnDark : focusOnLight;
 
-            {/* ── HEADER ── */}
-            <header className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${isScrolled ? 'h-16 bg-zinc-950/90 backdrop-blur-xl border-b border-white/5' : 'h-20 bg-transparent border-b border-white/5'
-                }`}>
-                <Link href="/" className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
-                        <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-full w-auto object-contain" />
+    return (
+        <div className={`${displayFontClass} min-h-screen bg-zinc-100 font-sans text-zinc-600 antialiased selection:bg-[#002FA7] selection:text-white`}>
+
+            {/* ── HEADER: glass that follows what is behind it ── */}
+            <header
+                className={`fixed inset-x-0 top-0 z-40 h-16 border-b transition-[background-color,border-color,color,box-shadow] duration-300 ${
+                    isScrolled
+                        ? dark
+                            ? 'border-white/10 bg-zinc-950/55 backdrop-blur-xl backdrop-saturate-150'
+                            : 'border-zinc-950/[0.06] bg-white/70 shadow-[0_1px_24px_-12px_rgba(0,0,0,0.25)] backdrop-blur-xl backdrop-saturate-150'
+                        : 'border-transparent bg-transparent'
+                } ${dark ? 'text-white' : 'text-zinc-950'}`}
+            >
+                <div className="mx-auto flex h-full w-full max-w-7xl items-center justify-between px-6 lg:px-10">
+                    <Link href="/" className={`flex items-center gap-2.5 rounded-md ${focusRing}`}>
+                        <Image src="/images/nodalpoint.png" alt="" width={32} height={32} className="h-8 w-8 rounded-lg bg-white p-0.5" priority />
+                        <span className="text-lg font-semibold tracking-[-0.02em]">Nodal Point</span>
+                    </Link>
+                    <div className="flex items-center gap-5">
+                        {account?.name && (
+                            <div className="hidden text-right md:block">
+                                <p className="text-sm font-medium">{account.name}</p>
+                                <p className={`text-xs ${dark ? 'text-zinc-400' : 'text-zinc-500'}`}>{userEmail}</p>
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={async () => { await supabase.auth.signOut(); router.replace('/portal'); }}
+                            className={`inline-flex items-center gap-2 rounded-[10px] border px-4 py-2 text-sm font-medium transition-[background-color,border-color,transform] duration-200 active:scale-[0.97] ${
+                                dark ? 'border-white/25 hover:border-white/60 hover:bg-white/5' : 'border-zinc-300 bg-white hover:border-zinc-950'
+                            } ${focusRing}`}
+                        >
+                            <LogOut className="h-4 w-4" aria-hidden />
+                            Sign out
+                        </button>
                     </div>
-                    <span className="font-bold text-lg tracking-tighter text-white">
-                        Nodal <span className="text-[#002FA7]">Point</span>
-                    </span>
-                </Link>
-                <div className="flex items-center gap-6">
-                    {account?.name && (
-                        <div className="hidden md:flex flex-col items-end">
-                            <p className="text-sm font-semibold text-white">{account.name}</p>
-                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">{userEmail}</p>
-                        </div>
-                    )}
-                    <button
-                        onClick={async () => { await supabase.auth.signOut(); router.replace('/portal'); }}
-                        className="flex items-center gap-2 px-4 py-2 rounded-lg border border-white/10 text-zinc-500 hover:text-zinc-200 hover:border-white/20 font-mono text-[10px] uppercase tracking-wider transition-all"
-                    >
-                        <LogOut className="w-3.5 h-3.5" />
-                        Sign Out
-                    </button>
                 </div>
             </header>
 
-            {/* ── MAIN ── */}
-            <main className="flex-1 px-6 xl:px-12 pt-28 pb-16 max-w-[1400px] mx-auto w-full">
-                <PageReveal delay={0.05}>
-
-                {/* Welcome */}
-                <div className="mb-8">
-                    <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-2">CLIENT_PORTAL</p>
-                    <h1 className="text-3xl font-bold tracking-tighter text-white">
-                        {contactName ? `Welcome back, ${contactName.split(' ')[0]}.` : 'Energy Intelligence Dashboard.'}
+            {/* ── WELCOME BAND ── */}
+            <div ref={bandRef} className="relative isolate overflow-hidden bg-zinc-950 px-6 pb-12 pt-28 text-white lg:px-10 lg:pb-16 lg:pt-32">
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute -right-48 -top-56 -z-10 h-[36rem] w-[36rem] rounded-full bg-[#002FA7]/45 blur-[150px]"
+                />
+                <div className="mx-auto max-w-7xl">
+                    <h1 className="np-display np-enter text-4xl sm:text-5xl lg:text-6xl">
+                        {firstName ? `Welcome back, ${firstName}.` : 'Your energy dashboard.'}
                     </h1>
-                    {location !== '—' && (
-                        <p className="text-zinc-500 text-sm mt-1 font-mono">{location} · ERCOT Grid</p>
+                    {(account?.name || location !== '—') && (
+                        <p className="np-enter mt-4 text-lg leading-8 text-zinc-300" style={{ animationDelay: '80ms' }}>
+                            {[account?.name, location !== '—' ? location : null].filter(Boolean).join(', ')}
+                        </p>
+                    )}
+
+                    {/* Contract status at a glance */}
+                    {account && activeDeal && (
+                        <ul className="np-enter mt-8 flex flex-wrap gap-x-10 gap-y-4 border-t border-white/10 pt-6" style={{ animationDelay: '160ms' }}>
+                            <li>
+                                <p className="text-sm text-zinc-400">Status</p>
+                                <p className="mt-1 flex items-center gap-2 text-base font-medium">
+                                    <span className={`h-2 w-2 rounded-full ${activeDeal.stage === 'SECURED' ? 'bg-emerald-400' : 'bg-amber-400'}`} aria-hidden />
+                                    {STAGE_LABEL[activeDeal.stage] ?? activeDeal.stage}
+                                </p>
+                            </li>
+                            <li className="min-w-0 max-w-full">
+                                <p className="text-sm text-zinc-400">Agreement</p>
+                                <p className="mt-1 truncate text-base font-medium">{activeDeal.title}</p>
+                            </li>
+                            {expiryDays !== null && (
+                                <li>
+                                    <p className="text-sm text-zinc-400">Time left</p>
+                                    <p className={`mt-1 text-base font-medium tabular-nums ${expiryOnDark}`}>
+                                        {expiryDays < 0 ? 'Expired' : `${expiryDays} days remaining`}
+                                    </p>
+                                </li>
+                            )}
+                            {activeDeal.amount && (
+                                <li>
+                                    <p className="text-sm text-zinc-400">Contract value</p>
+                                    <p className="mt-1 text-base font-medium tabular-nums">${activeDeal.amount.toLocaleString()} a year</p>
+                                </li>
+                            )}
+                        </ul>
                     )}
                 </div>
+            </div>
+
+            {/* ── MAIN ── */}
+            <main className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-10 lg:py-14">
 
                 {/* NO ACCOUNT */}
                 {!account ? (
-                    <div className="rounded-2xl border border-white/5 bg-zinc-900 p-16 text-center">
-                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-4">
-                            <Activity className="w-6 h-6 text-zinc-600" />
-                        </div>
-                        <p className="font-mono text-sm text-zinc-400 mb-2">No account linked to your profile yet.</p>
-                        <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">
-                            Contact your Nodal Point advisor to complete setup.
+                    <Panel className="p-8 sm:p-12">
+                        <h2 className="np-display text-3xl text-zinc-950 md:text-4xl">Your account is not linked yet.</h2>
+                        <p className="mt-4 max-w-xl text-lg leading-8 text-zinc-600">
+                            We could not find an account for {userEmail || 'this sign-in'}. Your Nodal Point advisor can finish the setup for you.
                         </p>
-                    </div>
+                        <div className="mt-8 flex flex-wrap gap-x-8 gap-y-3">
+                            <TextLink href="/contact">Contact us</TextLink>
+                            <TextLink href={`/book${userEmail ? `?email=${encodeURIComponent(userEmail)}&from=/client` : ''}`}>Book a call</TextLink>
+                        </div>
+                    </Panel>
                 ) : (
-                    <div className="space-y-5">
+                    <div className="space-y-6">
 
-                        {/* ── CONTRACT STATUS BAR ── */}
-                        {activeDeal && (
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4 rounded-xl bg-zinc-900/60 border border-white/5">
-                                <div className="flex items-center gap-2">
-                                    <span className={`h-2 w-2 rounded-full shrink-0 ${activeDeal.stage === 'SECURED' ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-                                    <span className="font-mono text-[10px] text-zinc-300 uppercase tracking-widest font-semibold">{activeDeal.stage}</span>
-                                </div>
-                                <span className="text-white/20">·</span>
-                                <span className="font-mono text-[10px] text-zinc-400 truncate">{activeDeal.title}</span>
-                                <span className="text-white/20">·</span>
-                                {expiryDays !== null && (
-                                    <span className={`font-mono text-[10px] flex items-center gap-1 ${expiryDays < 0 ? 'text-rose-400' : expiryDays <= 60 ? 'text-amber-400' : 'text-emerald-400'
-                                        }`}>
-                                        {expiryDays <= 60 && expiryDays >= 0 && <AlertTriangle className="w-3 h-3" />}
-                                        {expiryDays < 0 ? 'Expired' : `${expiryDays} days remaining`}
-                                    </span>
-                                )}
-                                {activeDeal.amount && (
-                                    <>
-                                        <span className="text-white/20">·</span>
-                                        <span className="font-mono text-[10px] text-zinc-500">${activeDeal.amount.toLocaleString()}/yr contract value</span>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {/* ── RATE PROTECTION HERO (full width) ── */}
+                        {/* ── YOUR RATE (full width) ── */}
                         {contractedRate && protection && (
-                            <CardShell>
-                                <div className="p-6 md:p-8">
-                                    {/* Header row */}
-                                    <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-                                        <div>
-                                            <SectionLabel>Rate Protection</SectionLabel>
-                                            <h2 className="text-lg font-semibold text-white">How your contracted rate compares to the Texas market</h2>
-                                            <p className="text-zinc-500 text-sm mt-0.5">EIA Texas commercial retail average · Updated monthly</p>
-                                        </div>
-                                        <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${protection.color === 'emerald' ? 'bg-emerald-500/10 border border-emerald-500/20' :
-                                            protection.color === 'amber' ? 'bg-amber-500/10 border border-amber-500/20' :
-                                                'bg-rose-500/10 border border-rose-500/20'
-                                            }`}>
-                                            {protection.color === 'emerald'
-                                                ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                                                : <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                                            }
-                                            <span className={`font-mono text-[10px] uppercase tracking-widest font-semibold ${protection.color === 'emerald' ? 'text-emerald-400' :
-                                                protection.color === 'amber' ? 'text-amber-400' : 'text-rose-400'
-                                                }`}>{protection.label}</span>
+                            <Panel className="p-6 sm:p-8">
+                                <PanelHeading
+                                    title="Your rate compared with the Texas average"
+                                    sub="Texas commercial retail average from the U.S. Energy Information Administration."
+                                    aside={<StatusTag tone={protection.color}>{protection.label}</StatusTag>}
+                                />
+
+                                <div className="mt-8 grid gap-10 md:grid-cols-2">
+                                    <div>
+                                        <p className="text-sm font-medium text-zinc-950">Your contracted rate</p>
+                                        <p className="mt-2 flex items-baseline gap-2">
+                                            <span className="np-display text-6xl text-zinc-950 [font-variant-numeric:lining-nums_tabular-nums]">{contractedRate.toFixed(2)}</span>
+                                            <span className="text-base text-zinc-500">¢ per kWh</span>
+                                        </p>
+                                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
+                                            <div className="h-full rounded-full bg-[#002FA7] transition-[width] duration-700 ease-out" style={{ width: `${yourBarPct}%` }} />
                                         </div>
                                     </div>
-
-                                    {/* Rate comparison numbers + bars */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
-                                        {/* Your rate */}
-                                        <div>
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-[0.25em] mb-2">Your contracted rate</p>
-                                            <div className="flex items-end gap-2 mb-3">
-                                                <span className="font-mono text-5xl font-bold text-white">{contractedRate.toFixed(2)}</span>
-                                                <span className="font-mono text-lg text-zinc-400 mb-1">¢/kWh</span>
-                                            </div>
-                                            <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full bg-[#002FA7] transition-all duration-1000"
-                                                    style={{ width: `${yourBarPct}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                        {/* TX Average */}
-                                        <div>
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-[0.25em] mb-2">Texas commercial average</p>
-                                            <div className="flex items-end gap-2 mb-3">
-                                                <span className="font-mono text-5xl font-bold text-zinc-500">{TX_COMMERCIAL_BENCHMARK.toFixed(1)}</span>
-                                                <span className="font-mono text-lg text-zinc-600 mb-1">¢/kWh</span>
-                                            </div>
-                                            <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
-                                                <div
-                                                    className="h-full rounded-full bg-zinc-600 transition-all duration-1000"
-                                                    style={{ width: `${avgBarPct}%` }}
-                                                />
-                                            </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-zinc-950">Texas commercial average</p>
+                                        <p className="mt-2 flex items-baseline gap-2">
+                                            <span className="np-display text-6xl text-zinc-400 [font-variant-numeric:lining-nums_tabular-nums]">{TX_COMMERCIAL_BENCHMARK.toFixed(1)}</span>
+                                            <span className="text-base text-zinc-500">¢ per kWh</span>
+                                        </p>
+                                        <div className="mt-4 h-2 overflow-hidden rounded-full bg-zinc-100">
+                                            <div className="h-full rounded-full bg-zinc-400 transition-[width] duration-700 ease-out" style={{ width: `${avgBarPct}%` }} />
                                         </div>
                                     </div>
-
-                                    {/* Savings callout */}
-                                    {savingsPerKwh !== null && savingsPerKwh > 0 && (
-                                        <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
-                                            <TrendingDown className="w-4 h-4 text-emerald-400 shrink-0" />
-                                            <p className="font-mono text-sm text-emerald-300">
-                                                You are saving <strong>{savingsPerKwh.toFixed(2)}¢ per kWh</strong> compared to the Texas market average.
-                                                {usage > 0 && annualSavings > 0 && (
-                                                    <span className="text-emerald-400/70"> That's <strong className="text-emerald-300">{fmtDollars(annualSavings)}/year</strong> of contract protection.</span>
-                                                )}
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
-                            </CardShell>
+
+                                {!(savingsPerKwh !== null && savingsPerKwh > 0) && (
+                                    <p className="mt-6 text-sm leading-6 text-zinc-500">{protection.sub}.</p>
+                                )}
+
+                                {savingsPerKwh !== null && savingsPerKwh > 0 && (
+                                    <div className="mt-4">
+                                        <Callout tone="emerald">
+                                            <span className="flex items-start gap-3">
+                                                <TrendingDown className="mt-1 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                                                <span>
+                                                    You are paying <strong className="font-semibold text-zinc-950">{savingsPerKwh.toFixed(2)}¢ less per kWh</strong> than the Texas average.
+                                                    {usage > 0 && annualSavings > 0 && (
+                                                        <> At your usage, that is about <strong className="font-semibold text-zinc-950">{fmtDollars(annualSavings)} a year</strong>.</>
+                                                    )}
+                                                </span>
+                                            </span>
+                                        </Callout>
+                                    </div>
+                                )}
+                            </Panel>
                         )}
 
-                        {/* ── RENEWAL READINESS: only show within 2 years of expiry ── */}
+                        {/* ── RENEWAL: only shown within 2 years of expiry ── */}
                         {expiryDays !== null && expiryDays <= 730 && (() => {
                             const marketWindow = getMarketWindow(new Date().getMonth() + 1);
                             const priceMin = Math.min(...FORWARD_PRICES.map(p => p.price));
                             const priceMax = Math.max(...FORWARD_PRICES.map(p => p.price));
                             const priceRange = priceMax - priceMin;
-                            const W = 380; const H = 90;
-                            const padX = 15; const padY = 10; const drawH = H - padY * 2;
+                            const W = 380; const H = 96;
+                            const padX = 15; const padY = 14; const drawH = H - padY * 2;
                             const pts = FORWARD_PRICES.map((p, i) => ({
                                 x: padX + (i / (FORWARD_PRICES.length - 1)) * (W - padX * 2),
                                 y: (padY + drawH) - ((p.price - priceMin) / priceRange) * drawH,
                                 ...p,
                             }));
                             const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-                            const currentMonth = new Date().getMonth() + 1;
 
                             // Tier thresholds:
-                            // expired   → < 0d
-                            // urgent    → 0–90d   (act now, don't wait)
-                            // planning  → 90–180d  (plan now, source quotes)
+                            // expired     → < 0d
+                            // urgent      → 0–90d    (act now, don't wait)
+                            // planning    → 90–180d  (plan now, source quotes)
                             // approaching → 180–365d (renewal window open)
                             // monitoring  → 365–730d (watch the market, 1 yr out)
                             const urgency = expiryDays < 0 ? 'expired'
@@ -534,90 +588,55 @@ export function ClientDashboard() {
                                             : 'monitoring';
 
                             const urgencyConfig = {
-                                expired: { color: 'rose', badge: 'Contract Expired', text: 'Your contract has lapsed. You may be on a variable spot rate — contact your advisor immediately to re-secure coverage.', icon: AlertTriangle },
-                                urgent: { color: 'rose', badge: 'Act Now', text: 'Less than 3 months remain. Begin the renewal process now to avoid auto-rolling onto a variable spot rate.', icon: AlertTriangle },
-                                planning: { color: 'amber', badge: 'Source Quotes Now', text: 'Under 6 months to expiry. Your advisor should begin sourcing supplier offers now — lead time matters for competitive pricing.', icon: AlertTriangle },
-                                approaching: { color: 'amber', badge: 'Renewal Window Open', text: 'You are within 12 months of expiry — this is when renewal planning begins. Engage your advisor now to monitor market windows.', icon: AlertTriangle },
-                                monitoring: { color: 'emerald', badge: 'Begin Monitoring', text: 'You are 1–2 years from expiry. Start tracking forward prices and identify the optimal buying window before committing.', icon: CheckCircle2 },
+                                expired: { color: 'rose', badge: 'Contract expired', text: 'Your contract has ended. You may be on a variable rate that moves with the market. Contact your advisor now to lock in a new one.' },
+                                urgent: { color: 'rose', badge: 'Act now', text: 'Less than 3 months remain. Start the renewal now so you do not roll onto a variable rate when the contract ends.' },
+                                planning: { color: 'amber', badge: 'Time to get quotes', text: 'Under 6 months to go. Your advisor should start collecting supplier offers now; lead time matters for competitive pricing.' },
+                                approaching: { color: 'amber', badge: 'Renewal window is open', text: 'You are within 12 months of the end of your contract. This is when renewal planning begins. Ask your advisor to watch for a good time to buy.' },
+                                monitoring: { color: 'emerald', badge: 'Start watching the market', text: 'You are 1 to 2 years from the end of your contract. Start tracking future prices so you can pick a good moment to commit.' },
                             } as const;
                             const uc = urgencyConfig[urgency];
-                            const UIcon = uc.icon;
+                            const countTone = urgency === 'expired' || urgency === 'urgent' ? 'text-rose-700' : urgency === 'approaching' ? 'text-amber-700' : 'text-zinc-950';
 
                             return (
-                                <CardShell>
-                                    <div className="p-6 md:p-8">
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                <Reveal>
+                                    <Panel className="p-6 sm:p-8">
+                                        <div className="grid gap-10 lg:grid-cols-2 lg:gap-14">
 
-                                            {/* LEFT: Renewal countdown */}
+                                            {/* LEFT: countdown */}
                                             <div>
-                                                <div className="flex items-center gap-2 mb-5">
-                                                    <Zap className="w-4 h-4 text-zinc-300" />
-                                                    <div>
-                                                        <SectionLabel>Contract Renewal</SectionLabel>
-                                                        <p className="text-zinc-600 text-[9px]">When to act on your next energy agreement</p>
-                                                    </div>
-                                                </div>
-
-                                                {/* Expiry countdown */}
-                                                <div className="flex items-end gap-2 mb-2">
-                                                    <span className={`font-mono text-6xl font-bold ${urgency === 'expired' || urgency === 'urgent' ? 'text-rose-400'
-                                                        : urgency === 'approaching' ? 'text-amber-400'
-                                                            : 'text-white'
-                                                        }`}>
+                                                <PanelHeading title="Contract renewal" sub="When to act on your next energy agreement." />
+                                                <p className="mt-8 flex flex-wrap items-baseline gap-x-3">
+                                                    <span className={`np-display text-7xl [font-variant-numeric:lining-nums_tabular-nums] ${countTone}`}>
                                                         {expiryDays < 0 ? 'Expired' : expiryDays}
                                                     </span>
-                                                    {expiryDays >= 0 && <span className="font-mono text-lg text-zinc-500 mb-2">days left on contract</span>}
-                                                </div>
-
+                                                    {expiryDays >= 0 && <span className="text-base text-zinc-500">days left on your contract</span>}
+                                                </p>
                                                 {activeDeal?.closeDate && (
-                                                    <p className="font-mono text-[9px] text-zinc-600 mb-4">
-                                                        Expires {format(parseISO(activeDeal.closeDate), 'MMMM d, yyyy')}
+                                                    <p className="mt-2 text-sm text-zinc-500">
+                                                        Ends {format(parseISO(activeDeal.closeDate), 'MMMM d, yyyy')}
                                                     </p>
                                                 )}
-
-                                                {/* Urgency callout */}
-                                                <div className={`flex items-start gap-3 p-4 rounded-xl ${uc.color === 'rose' ? 'bg-rose-500/5 border border-rose-500/15'
-                                                    : uc.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/15'
-                                                        : 'bg-emerald-500/5 border border-emerald-500/10'
-                                                    }`}>
-                                                    <UIcon className={`w-4 h-4 shrink-0 mt-0.5 ${uc.color === 'rose' ? 'text-rose-400'
-                                                        : uc.color === 'amber' ? 'text-amber-400'
-                                                            : 'text-emerald-400'
-                                                        }`} />
-                                                    <div>
-                                                        <p className={`font-mono text-[9px] uppercase tracking-widest mb-1 font-semibold ${uc.color === 'rose' ? 'text-rose-400'
-                                                            : uc.color === 'amber' ? 'text-amber-400'
-                                                                : 'text-emerald-400'
-                                                            }`}>{uc.badge}</p>
-                                                        <p className="text-zinc-400 text-sm leading-relaxed">{uc.text}</p>
-                                                    </div>
+                                                <div className="mt-6">
+                                                    <Callout tone={uc.color} title={uc.badge}>{uc.text}</Callout>
                                                 </div>
                                             </div>
 
-                                            {/* RIGHT: Market timing + forward curve */}
+                                            {/* RIGHT: market timing */}
                                             <div>
-                                                <div className="flex items-center justify-between mb-4">
-                                                    <div>
-                                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Market Timing</p>
-                                                        <p className="text-zinc-600 text-[9px]">ERCOT South LZ forward prices · next 12 months</p>
-                                                    </div>
-                                                    <span className={`font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${marketWindow.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400'
-                                                        : marketWindow.color === 'blue' ? 'bg-[#002FA7]/10 text-[#002FA7]'
-                                                            : marketWindow.color === 'rose' ? 'bg-rose-500/10 text-rose-400'
-                                                                : 'bg-zinc-800 text-zinc-500'
-                                                        }`}>{marketWindow.label}</span>
-                                                </div>
+                                                <PanelHeading
+                                                    title="Market timing"
+                                                    sub="Future wholesale prices by month, South Texas."
+                                                    aside={<StatusTag tone={marketWindow.color}>{marketWindow.label}</StatusTag>}
+                                                />
 
-                                                {/* SVG price curve */}
-                                                <div className="mb-4">
-                                                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 90 }}>
-                                                        {/* Zone fills */}
+                                                <div className="mt-6">
+                                                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Chart of future wholesale electricity prices by month">
+                                                        {/* Month bands */}
                                                         {pts.map((p, i) => {
                                                             const isBest = BEST_MONTHS.includes(p.month);
                                                             const isGood = GOOD_MONTHS.includes(p.month);
                                                             const isAvoid = AVOID_MONTHS.includes(p.month);
-                                                            const isCurrent = p.month === currentMonth;
-                                                            if (!isBest && !isGood && !isAvoid && !isCurrent) return null;
+                                                            if (!isBest && !isGood && !isAvoid) return null;
                                                             const bw = (W - padX * 2) / (FORWARD_PRICES.length - 1);
                                                             return (
                                                                 <rect
@@ -627,430 +646,281 @@ export function ClientDashboard() {
                                                                     width={bw * 0.9}
                                                                     height={drawH}
                                                                     rx={3}
-                                                                    fill={
-                                                                        isCurrent && isBest ? 'rgba(16,185,129,0.12)'
-                                                                            : isBest ? 'rgba(16,185,129,0.08)'
-                                                                                : isGood ? 'rgba(0,47,167,0.08)'
-                                                                                    : isAvoid ? 'rgba(239,68,68,0.06)'
-                                                                                        : 'none'
-                                                                    }
+                                                                    fill={isBest ? 'rgba(16,185,129,0.14)' : isGood ? 'rgba(0,47,167,0.10)' : 'rgba(225,29,72,0.09)'}
                                                                 />
                                                             );
                                                         })}
-                                                        {/* Price line */}
-                                                        <path d={pathD} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                                        {/* Dots */}
+                                                        <path d={pathD} fill="none" stroke="#a1a1aa" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                                         {pts.map((p, i) => {
                                                             const isBest = BEST_MONTHS.includes(p.month);
                                                             const isGood = GOOD_MONTHS.includes(p.month);
                                                             const isAvoid = AVOID_MONTHS.includes(p.month);
                                                             const isCurrent = p.month === currentMonth;
-                                                            const r = isCurrent ? 4 : 2.5;
-                                                            const fill = isBest ? '#10b981'
-                                                                : isGood ? '#002FA7'
-                                                                    : isAvoid ? '#ef4444'
-                                                                        : 'rgba(255,255,255,0.25)';
-                                                            return <circle key={i} cx={p.x} cy={p.y} r={r} fill={fill} />;
+                                                            const fill = isBest ? '#059669' : isGood ? '#002FA7' : isAvoid ? '#e11d48' : '#a1a1aa';
+                                                            return <circle key={i} cx={p.x} cy={p.y} r={isCurrent ? 4.5 : 2.5} fill={fill} stroke={isCurrent ? '#ffffff' : 'none'} strokeWidth={isCurrent ? 1.5 : 0} />;
                                                         })}
-                                                        {/* Price label for peak month */}
                                                         {pts.filter(p => AVOID_MONTHS.includes(p.month) || BEST_MONTHS.includes(p.month)).map((p, i) => (
-                                                            <text key={i} x={p.x} y={p.y - 6} textAnchor="middle"
-                                                                fontSize="7" fill={BEST_MONTHS.includes(p.month) ? '#10b981' : '#ef4444'}
-                                                                fontFamily="monospace">
+                                                            <text key={i} x={p.x} y={p.y - 6} textAnchor="middle" fontSize="7.5" fontWeight="600" fill={BEST_MONTHS.includes(p.month) ? '#047857' : '#be123c'}>
                                                                 ${p.price}
                                                             </text>
                                                         ))}
-                                                        {/* Month labels */}
                                                         {pts.filter((_, i) => i % 3 === 0 || i === pts.length - 1).map((p, i) => (
-                                                            <text key={i} x={p.x} y={H - 1} textAnchor="middle"
-                                                                fontSize="7" fill="rgba(255,255,255,0.25)"
-                                                                fontFamily="monospace">
+                                                            <text key={i} x={p.x} y={H - 1} textAnchor="middle" fontSize="7.5" fill="#71717a">
                                                                 {p.label.split("'")[0].trim()}
                                                             </text>
                                                         ))}
                                                     </svg>
-                                                    {/* Legend */}
-                                                    <div className="flex items-center gap-4 mt-1">
-                                                        <div className="flex items-center gap-1">
-                                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                                            <span className="font-mono text-[8px] text-zinc-500">Best window</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <div className="w-2 h-2 rounded-full bg-[#002FA7]" />
-                                                            <span className="font-mono text-[8px] text-zinc-500">Good window</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <div className="w-2 h-2 rounded-full bg-rose-500" />
-                                                            <span className="font-mono text-[8px] text-zinc-500">Avoid</span>
-                                                        </div>
-                                                    </div>
+                                                    <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-500">
+                                                        <li className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-600" aria-hidden />Best time to buy</li>
+                                                        <li className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#002FA7]" aria-hidden />Good time to buy</li>
+                                                        <li className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-600" aria-hidden />Avoid</li>
+                                                        <li>Prices in dollars per MWh</li>
+                                                    </ul>
                                                 </div>
 
-                                                {/* Market window insight */}
-                                                <div className={`p-3 rounded-xl ${marketWindow.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10'
-                                                    : marketWindow.color === 'blue' ? 'bg-[#002FA7]/5 border border-[#002FA7]/10'
-                                                        : marketWindow.color === 'rose' ? 'bg-rose-500/5 border border-rose-500/10'
-                                                            : 'bg-zinc-800/40 border border-white/5'
-                                                    }`}>
-                                                    <p className={`font-mono text-[9px] font-semibold mb-1 ${marketWindow.color === 'emerald' ? 'text-emerald-400'
-                                                        : marketWindow.color === 'blue' ? 'text-[#002FA7]'
-                                                            : marketWindow.color === 'rose' ? 'text-rose-400'
-                                                                : 'text-zinc-400'
-                                                        }`}>{marketWindow.headline}</p>
-                                                    <p className="text-zinc-500 text-[11px] leading-relaxed">{marketWindow.body}</p>
-                                                    {marketWindow.status !== 'optimal' && (
-                                                        <p className="font-mono text-[8px] text-zinc-600 mt-1">Next: {marketWindow.nextWindow}</p>
-                                                    )}
+                                                <div className="mt-5">
+                                                    <Callout tone={marketWindow.color} title={marketWindow.headline}>
+                                                        {marketWindow.body}
+                                                        {marketWindow.status !== 'optimal' && (
+                                                            <span className="mt-2 block text-zinc-500">Next: {marketWindow.nextWindow}</span>
+                                                        )}
+                                                    </Callout>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </CardShell>
+                                    </Panel>
+                                </Reveal>
                             );
                         })()}
 
-                        {/* ── 12-MONTH USAGE PROFILE ── */}
-                        <div className="h-[400px]">
-                            <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} meters={meters} />
-                        </div>
-
-                        {/* ── 3-COL ROW: Savings | Grid Status | Your Contract ── */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-
-                            {/* Savings to Date */}
-                            <CardShell>
-                                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Shield className="w-4 h-4 text-zinc-300" />
-                                    <div>
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Savings to Date</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Estimated vs. paying market rate</p>
-                                    </div>
-                                    {signedDate && (
-                                        <span className="ml-auto font-mono text-[9px] text-zinc-600">Since {format(signedDate, 'MMM yyyy')}</span>
-                                    )}
+                        {/* ── 12-MONTH USAGE (shared chart component, dark by design) ── */}
+                        <Reveal>
+                            <section>
+                                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Your usage, month by month</h2>
+                                <p className="mt-1 text-sm leading-6 text-zinc-500">Energy used and peak demand over the last year, for each site.</p>
+                                <div className="mt-4 h-[400px] overflow-hidden rounded-2xl">
+                                    <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} meters={meters} />
                                 </div>
-                                <div className="p-5">
-                                    <div className="mb-4">
-                                        <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest mb-1">Total accumulated</p>
-                                        <p className={`font-mono text-4xl font-bold ${totalSavings > 0 ? 'text-emerald-400' : 'text-zinc-400'}`}>
-                                            {totalSavings > 0 ? fmtDollars(totalSavings) : '—'}
-                                        </p>
-                                    </div>
-                                    <div className="space-y-3 pt-3 border-t border-white/5">
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Per month (avg)</p>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">{monthlySavings > 0 ? fmtDollars(monthlySavings) : '—'}</p>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Annual run rate</p>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">{annualSavings > 0 ? fmtDollars(annualSavings) : '—'}</p>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Months active</p>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">{monthsActive} months</p>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Annual usage</p>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">{fmtUsage(usage)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </CardShell>
+                            </section>
+                        </Reveal>
 
-                            {/* Live Grid Status (ERCOT) — simplified for client audience */}
-                            <CardShell>
-                                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Wifi className="w-4 h-4 text-zinc-300" />
-                                    <div>
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Live Grid Status</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Texas ERCOT conditions right now</p>
-                                    </div>
-                                    {ercotGrid && (
-                                        <span className={`ml-auto font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${stress.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400'
-                                            : stress.color === 'amber' ? 'bg-amber-500/10 text-amber-400'
-                                                : stress.color === 'rose' ? 'bg-rose-500/10 text-rose-400'
-                                                    : 'bg-zinc-800 text-zinc-500'
-                                            }`}>{stress.label}</span>
-                                    )}
-                                </div>
-                                <div className="p-5 space-y-4">
-                                    {/* Status pill */}
-                                    <div className={`flex items-center gap-3 p-4 rounded-xl ${stress.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10'
-                                        : stress.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/10'
-                                            : 'bg-zinc-800/50 border border-white/5'
-                                        }`}>
-                                        <div className={`w-2 h-2 rounded-full shrink-0 ${stress.color === 'emerald' ? 'bg-emerald-400'
-                                            : stress.color === 'amber' ? 'bg-amber-400 animate-pulse'
-                                                : 'bg-rose-400 animate-pulse'
-                                            }`} />
-                                        <p className={`text-sm ${stress.color === 'emerald' ? 'text-emerald-300'
-                                            : stress.color === 'amber' ? 'text-amber-300'
-                                                : 'text-rose-300'
-                                            }`}>{stress.sub}</p>
-                                    </div>
-                                    {/* Spot price — sole data point worth showing clients */}
-                                    {wholesalePrice !== undefined && (
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">{wholesaleLabel}</p>
-                                                <p className="text-zinc-600 text-[9px]">{wholesaleDescription}</p>
+                        {/* ── 3-COL ROW: Savings | Grid | Contract ── */}
+                        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+
+                            {/* Savings to date */}
+                            <Reveal className="h-full">
+                                <Panel className="h-full p-6">
+                                    <PanelHeading
+                                        title="Savings so far"
+                                        sub={signedDate ? `Estimated against the Texas average, since ${format(signedDate, 'MMM yyyy')}.` : 'Estimated against the Texas average.'}
+                                    />
+                                    <p className={`np-display mt-6 text-6xl [font-variant-numeric:lining-nums_tabular-nums] ${totalSavings > 0 ? 'text-emerald-700' : 'text-zinc-400'}`}>
+                                        {totalSavings > 0 ? fmtDollars(totalSavings) : '—'}
+                                    </p>
+                                    <dl className="mt-6 border-t border-zinc-100">
+                                        <Row label="Average per month">{monthlySavings > 0 ? fmtDollars(monthlySavings) : '—'}</Row>
+                                        <Row label="At this pace, per year">{annualSavings > 0 ? fmtDollars(annualSavings) : '—'}</Row>
+                                        <Row label="Months on this contract">{monthsActive}</Row>
+                                        <Row label="Annual usage">{fmtUsage(usage)}</Row>
+                                    </dl>
+                                </Panel>
+                            </Reveal>
+
+                            {/* Live grid status */}
+                            <Reveal delay={0.07} className="h-full">
+                                <Panel className="h-full p-6">
+                                    <PanelHeading
+                                        title="Texas grid right now"
+                                        sub="Live conditions from ERCOT, the grid operator."
+                                        aside={ercotGrid ? <StatusTag tone={stress.color}>{stress.label}</StatusTag> : undefined}
+                                    />
+                                    <div className="mt-6 space-y-5">
+                                        <Callout tone={stress.color}>{stress.sub}</Callout>
+                                        {wholesalePrice !== undefined && (
+                                            <div className="flex items-baseline justify-between gap-6">
+                                                <div>
+                                                    <p className="text-sm font-medium text-zinc-950">{wholesaleLabel}</p>
+                                                    <p className="mt-0.5 text-xs leading-5 text-zinc-500">{wholesaleDescription}</p>
+                                                </div>
+                                                <p className="shrink-0 text-base font-semibold tabular-nums text-zinc-950">${wholesalePrice.toFixed(2)} <span className="text-sm font-normal text-zinc-500">per MWh</span></p>
                                             </div>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">${wholesalePrice.toFixed(2)}/MWh</p>
-                                        </div>
-                                    )}
-                                    {/* Contract protection context */}
-                                    {contractedRate && spotPriceKwh && (
-                                        <div className="pt-3 border-t border-white/5">
-                                            {parseFloat(spotPriceKwh) < contractedRate ? (
-                                                <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
-                                                    Grid is calm today. Your fixed rate shields you when wholesale spikes — on peak summer days it can exceed 50¢/kWh wholesale. Your rate holds regardless.
-                                                </p>
-                                            ) : (
-                                                <p className="font-mono text-[9px] text-emerald-600 leading-relaxed">
-                                                    Wholesale is elevated. Your fixed contract at {contractedRate.toFixed(2)}¢/kWh is locked — you don't pay a cent more regardless of grid conditions.
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {!ercotPrices && !ercotGrid && (
-                                        <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest text-center py-4">Market data refreshing...</p>
-                                    )}
-                                </div>
-                            </CardShell>
-
-                            {/* Your Contract */}
-                            <CardShell>
-                                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-zinc-300" />
-                                    <div>
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Your Contract</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Active energy agreement</p>
+                                        )}
+                                        {contractedRate && spotPriceKwh && (
+                                            <p className="border-t border-zinc-100 pt-4 text-sm leading-6 text-zinc-600">
+                                                {parseFloat(spotPriceKwh) < contractedRate
+                                                    ? 'The grid is calm today. Your fixed rate protects you when wholesale prices spike; on peak summer days wholesale can exceed 50¢ per kWh. Your rate holds regardless.'
+                                                    : `Wholesale prices are high right now. Your fixed contract at ${contractedRate.toFixed(2)}¢ per kWh is locked, so you do not pay more whatever the grid does.`}
+                                            </p>
+                                        )}
+                                        {!ercotPrices && !ercotGrid && (
+                                            <p className="text-sm text-zinc-500">Market data is not available right now. It will show here when it is back.</p>
+                                        )}
                                     </div>
-                                </div>
-                                <div className="p-5">
+                                </Panel>
+                            </Reveal>
+
+                            {/* Your contract */}
+                            <Reveal delay={0.14} className="h-full md:col-span-2 xl:col-span-1">
+                                <Panel className="h-full p-6">
+                                    <PanelHeading title="Your contract" sub="Your active energy agreement." />
                                     {activeDeal ? (
-                                        <div className="space-y-4">
-                                            {/* Contract name */}
-                                            <div className="p-3 rounded-xl bg-zinc-800/50 border border-white/5">
-                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider mb-1">Agreement</p>
-                                                <p className="font-mono text-xs text-zinc-100 font-semibold leading-relaxed">{activeDeal.title}</p>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center">
-                                                    <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Supplier</p>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">{account.electricity_supplier || '—'}</p>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Term length</p>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">{activeDeal.contractLength ? `${activeDeal.contractLength} months` : '—'}</p>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Annual value</p>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">{activeDeal.amount ? `$${activeDeal.amount.toLocaleString()}` : '—'}</p>
-                                                </div>
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Expiry date</p>
-                                                    </div>
-                                                    <p className={`font-mono text-xs font-semibold flex items-center gap-1 ${expiryDays !== null && expiryDays <= 60 ? 'text-amber-400' : 'text-zinc-200'
-                                                        }`}>
-                                                        {expiryDays !== null && expiryDays <= 60 && <AlertTriangle className="w-3 h-3" />}
+                                        <>
+                                            <p className="mt-6 text-base font-medium leading-6 text-zinc-950">{activeDeal.title}</p>
+                                            <dl className="mt-4 border-t border-zinc-100">
+                                                <Row label="Supplier">{account.electricity_supplier || '—'}</Row>
+                                                <Row label="Length">{activeDeal.contractLength ? `${activeDeal.contractLength} months` : '—'}</Row>
+                                                <Row label="Value per year">{activeDeal.amount ? `$${activeDeal.amount.toLocaleString()}` : '—'}</Row>
+                                                <Row label="End date">
+                                                    <span className={expiryDays !== null && expiryDays <= 60 ? 'inline-flex items-center gap-1.5 text-amber-700' : ''}>
+                                                        {expiryDays !== null && expiryDays <= 60 && <AlertTriangle className="h-3.5 w-3.5" aria-hidden />}
                                                         {activeDeal.closeDate ? format(parseISO(activeDeal.closeDate), 'MMM d, yyyy') : '—'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {/* Expiry progress bar */}
+                                                    </span>
+                                                </Row>
+                                            </dl>
                                             {activeDeal.closeDate && activeDeal.createdAt && (() => {
                                                 const total = differenceInDays(parseISO(activeDeal.closeDate), parseISO(activeDeal.createdAt));
                                                 const elapsed = differenceInDays(new Date(), parseISO(activeDeal.createdAt));
                                                 const pct = Math.min(100, Math.max(0, (elapsed / total) * 100));
                                                 return (
-                                                    <div className="pt-3 border-t border-white/5">
-                                                        <div className="flex justify-between mb-1.5">
-                                                            <p className="font-mono text-[9px] text-zinc-600">Contract progress</p>
-                                                            <p className="font-mono text-[9px] text-zinc-500">{Math.round(pct)}% elapsed</p>
+                                                    <div className="mt-5">
+                                                        <div className="flex justify-between text-xs text-zinc-500">
+                                                            <span>How far through the contract</span>
+                                                            <span className="tabular-nums">{Math.round(pct)}%</span>
                                                         </div>
-                                                        <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                                            <div
-                                                                className={`h-full rounded-full transition-all ${pct > 80 ? 'bg-amber-500' : 'bg-[#002FA7]'}`}
-                                                                style={{ width: `${pct}%` }}
-                                                            />
+                                                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                                                            <div className={`h-full rounded-full transition-[width] duration-700 ease-out ${pct > 80 ? 'bg-amber-500' : 'bg-[#002FA7]'}`} style={{ width: `${pct}%` }} />
                                                         </div>
                                                     </div>
                                                 );
                                             })()}
-                                        </div>
+                                        </>
                                     ) : (
-                                        <div className="py-8 text-center">
-                                            <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">No active contracts</p>
-                                        </div>
+                                        <p className="mt-6 text-sm leading-6 text-zinc-500">No active contract on file yet. It will show here once your agreement is signed.</p>
                                     )}
-                                </div>
-                            </CardShell>
+                                </Panel>
+                            </Reveal>
                         </div>
 
-                        {/* ── BOTTOM ROW: 4CP + Documents ── */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {/* ── BOTTOM ROW: Peak season + Documents ── */}
+                        <div className="grid gap-6 lg:grid-cols-2">
 
-                            {/* Peak Season Watch (4CP) */}
-                            <CardShell>
-                                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Flame className={`w-4 h-4 ${is4CPSeason ? 'text-amber-400' : 'text-zinc-300'}`} />
-                                    <div>
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Peak Season Watch</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Summer demand tracking · June 1 – Sep 30</p>
-                                    </div>
-                                    <span className={`ml-auto font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${is4CPSeason ? 'bg-amber-500/10 text-amber-400 animate-pulse' : 'bg-zinc-800 text-zinc-500'
-                                        }`}>{is4CPSeason ? 'Active' : 'Off Season'}</span>
-                                </div>
-                                <div className="p-5 space-y-5">
-                                    {/* Visual countdown / status */}
-                                    {is4CPSeason ? (
-                                        <div className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/15 flex items-start gap-3">
-                                            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                            {/* Peak season watch (4CP) */}
+                            <Reveal className="h-full">
+                                <Panel className="h-full p-6">
+                                    <PanelHeading
+                                        title="Summer peak season"
+                                        sub="June 1 to September 30."
+                                        aside={<StatusTag tone={is4CPSeason ? 'amber' : 'zinc'}>{is4CPSeason ? 'Active now' : 'Off season'}</StatusTag>}
+                                    />
+                                    <div className="mt-6 space-y-5">
+                                        {is4CPSeason ? (
+                                            <Callout tone="amber" title="Peak season is active right now">
+                                                We are watching for the four highest-demand hours. Where you can, avoid running heavy equipment on weekday afternoons (2 to 7pm).
+                                            </Callout>
+                                        ) : (
                                             <div>
-                                                <p className="font-mono text-xs text-amber-300 font-semibold mb-1">Peak season is active right now</p>
-                                                <p className="font-mono text-[9px] text-amber-400/70 leading-relaxed">
-                                                    We are monitoring the 4 highest demand windows. Avoid unnecessary high-draw operations during weekday afternoons (2–7pm).
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <div className="flex items-baseline justify-between mb-2">
-                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Next peak season</p>
-                                                <p className="font-mono text-2xl font-bold text-white">
-                                                    {daysTo4CP !== null ? `${daysTo4CP}d` : '—'}
-                                                    <span className="font-mono text-sm text-zinc-500 ml-1">away</span>
-                                                </p>
-                                            </div>
-                                            {/* Progress bar toward season */}
-                                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-1.5">
-                                                <div
-                                                    className="h-full rounded-full bg-[#002FA7]/60 transition-all"
-                                                    style={{ width: `${seasonProgress}%` }}
-                                                />
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <p className="font-mono text-[9px] text-zinc-600">Today</p>
-                                                <p className="font-mono text-[9px] text-zinc-600">Jun 1, {seasonStart.getFullYear()}</p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Explanation */}
-                                    <div className="p-4 rounded-xl bg-zinc-800/40 border border-white/5 space-y-2">
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest font-semibold">What is this?</p>
-                                        <p className="text-zinc-400 text-sm leading-relaxed">
-                                            Each summer, ERCOT records the 4 highest demand hours across Texas. Your share of those peaks determines your transmission charges — called <span className="text-zinc-200 font-medium">capacity costs</span> — for the entire following year.
-                                        </p>
-                                        <p className="text-zinc-500 text-sm leading-relaxed">
-                                            Nodal Point monitors the grid in real time and alerts you before high-risk windows occur.
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardShell>
-
-                            {/* Document Vault */}
-                            <CardShell className="flex flex-col">
-                                <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Lock className="w-4 h-4 text-zinc-300" />
-                                    <div>
-                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Your Documents</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Executed agreements · PDF download</p>
-                                    </div>
-                                    {signedDocs.length > 0 && (
-                                        <span className="ml-auto font-mono text-[9px] text-zinc-600 uppercase tracking-widest">{signedDocs.length} executed</span>
-                                    )}
-                                </div>
-
-                                {signedDocs.length > 0 ? (
-                                    <div className="flex-1 p-5 space-y-3 overflow-y-auto max-h-72">
-                                        {signedDocs.map((doc) => (
-                                            <div key={doc.id} className="flex items-center justify-between gap-4 px-4 py-3 rounded-xl bg-zinc-800/50 border border-white/5">
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="w-8 h-8 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/20 flex items-center justify-center shrink-0">
-                                                        <FileText className="w-3.5 h-3.5 text-[#002FA7]" />
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="font-mono text-[10px] text-zinc-200 truncate font-semibold">{doc.name}</p>
-                                                        <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">
-                                                            Executed {format(parseISO(doc.signedAt), 'dd MMM yyyy')}
-                                                        </p>
-                                                    </div>
+                                                <div className="flex items-baseline justify-between gap-6">
+                                                    <p className="text-sm font-medium text-zinc-950">Next peak season starts in</p>
+                                                    <p className="np-display text-4xl text-zinc-950 [font-variant-numeric:lining-nums_tabular-nums]">
+                                                        {daysTo4CP !== null ? daysTo4CP : '—'}
+                                                        <span className="ml-2 font-sans text-sm font-normal tracking-normal text-zinc-500">days</span>
+                                                    </p>
                                                 </div>
-                                                {doc.downloadUrl ? (
-                                                    <a
-                                                        href={doc.downloadUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 text-zinc-400 hover:text-zinc-200 hover:border-white/20 font-mono text-[9px] uppercase tracking-wider transition-all shrink-0"
-                                                    >
-                                                        <Download className="w-3 h-3" />
-                                                        PDF
-                                                    </a>
-                                                ) : (
-                                                    <span className="font-mono text-[9px] text-zinc-700 shrink-0">Processing</span>
-                                                )}
+                                                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-zinc-100">
+                                                    <div className="h-full rounded-full bg-[#002FA7] transition-[width] duration-700 ease-out" style={{ width: `${seasonProgress}%` }} />
+                                                </div>
+                                                <div className="mt-2 flex justify-between text-xs text-zinc-500">
+                                                    <span>Today</span>
+                                                    <span>Jun 1, {seasonStart.getFullYear()}</span>
+                                                </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center py-14 px-6 text-center">
-                                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mb-4">
-                                            <Lock className="w-5 h-5 text-zinc-600" />
+                                        )}
+                                        <div className="border-t border-zinc-100 pt-5">
+                                            <p className="text-sm font-semibold text-zinc-950">Why this matters</p>
+                                            <p className="mt-2 text-sm leading-6 text-zinc-600">
+                                                Each summer, ERCOT records the four highest-demand hours across Texas. Your share of those peaks sets your transmission charges, sometimes called capacity costs, for the whole of the following year.
+                                            </p>
+                                            <p className="mt-2 text-sm leading-6 text-zinc-600">
+                                                Nodal Point monitors the grid in real time and alerts you before high-risk hours.
+                                            </p>
                                         </div>
-                                        <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-2">No executed documents yet</p>
-                                        <p className="text-zinc-600 text-sm leading-relaxed max-w-[260px]">
-                                            Signed contracts will appear here automatically after execution.
-                                        </p>
                                     </div>
-                                )}
+                                </Panel>
+                            </Reveal>
 
-                                <div className="px-5 py-3 border-t border-white/5">
-                                    <p className="font-mono text-[9px] text-zinc-700">Customer copies only · Links expire in 1 hour · Audit trail retained internally</p>
-                                </div>
-                            </CardShell>
+                            {/* Documents */}
+                            <Reveal delay={0.07} className="h-full">
+                                <Panel className="flex h-full flex-col p-6">
+                                    <PanelHeading
+                                        title="Your documents"
+                                        sub="Signed agreements, ready to download as PDF."
+                                        aside={signedDocs.length > 0 ? <span className="text-sm tabular-nums text-zinc-500">{signedDocs.length} signed</span> : undefined}
+                                    />
+
+                                    {signedDocs.length > 0 ? (
+                                        <ul className="mt-6 max-h-72 flex-1 overflow-y-auto border-t border-zinc-100">
+                                            {signedDocs.map((doc) => (
+                                                <li key={doc.id} className="flex items-center justify-between gap-4 border-b border-zinc-100 py-4">
+                                                    <div className="flex min-w-0 items-center gap-3">
+                                                        <FileText className="h-5 w-5 shrink-0 text-[#002FA7]" aria-hidden />
+                                                        <div className="min-w-0">
+                                                            <p className="truncate text-sm font-medium text-zinc-950">{doc.name}</p>
+                                                            <p className="text-xs text-zinc-500">Signed {format(parseISO(doc.signedAt), 'MMM d, yyyy')}</p>
+                                                        </div>
+                                                    </div>
+                                                    {doc.downloadUrl ? (
+                                                        <a
+                                                            href={doc.downloadUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-950 transition-[border-color,transform] duration-200 hover:border-zinc-950 active:scale-[0.97] ${focusOnLight}`}
+                                                        >
+                                                            <Download className="h-3.5 w-3.5" aria-hidden />
+                                                            Download
+                                                        </a>
+                                                    ) : (
+                                                        <span className="shrink-0 text-sm text-zinc-500">Processing</span>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="mt-6 flex-1">
+                                            <p className="text-sm font-medium text-zinc-950">No signed documents yet</p>
+                                            <p className="mt-1 max-w-sm text-sm leading-6 text-zinc-500">
+                                                Signed contracts appear here automatically once they are complete.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <p className="mt-5 border-t border-zinc-100 pt-4 text-xs leading-5 text-zinc-500">
+                                        These are your customer copies. Download links expire after 1 hour; reload the page for a fresh one.
+                                    </p>
+                                </Panel>
+                            </Reveal>
                         </div>
 
-                        {/* ── ADVISOR CTAs ── */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Link
-                                href={`/book${userEmail ? `?email=${encodeURIComponent(userEmail)}&from=/client` : ''}`}
-                                className="flex items-center justify-between px-6 py-5 rounded-2xl bg-[#002FA7]/10 border border-[#002FA7]/30 hover:bg-[#002FA7]/15 hover:border-[#002FA7]/50 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-[#002FA7]/15 border border-[#002FA7]/20 flex items-center justify-center shrink-0">
-                                        <CalendarDays className="w-5 h-5 text-[#002FA7]" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-white">Book a Strategy Session</p>
-                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Speak with your advisor · No commitment</p>
-                                    </div>
+                        {/* ── NEXT STEPS ── */}
+                        <Reveal>
+                            <section className="relative isolate overflow-hidden rounded-2xl bg-zinc-950 p-8 text-white sm:p-10">
+                                <div aria-hidden className="pointer-events-none absolute -bottom-56 right-0 -z-10 h-[26rem] w-[36rem] rounded-full bg-[#002FA7]/40 blur-[130px]" />
+                                <h2 className="np-display max-w-xl text-3xl md:text-4xl">Questions about your contract?</h2>
+                                <p className="mt-4 max-w-xl text-base leading-7 text-zinc-300">
+                                    Talk to your advisor, or send us a new bill and we will read it for you.
+                                </p>
+                                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                                    <PrimaryLink href={`/book${userEmail ? `?email=${encodeURIComponent(userEmail)}&from=/client` : ''}`} surface="dark">
+                                        Book a call
+                                    </PrimaryLink>
+                                    <OutlineLink href="/bill-debugger" surface="dark">
+                                        Review a bill
+                                    </OutlineLink>
                                 </div>
-                                <ArrowRight className="w-4 h-4 text-[#002FA7] group-hover:translate-x-1 transition-transform" />
-                            </Link>
-
-                            <Link
-                                href="/bill-debugger"
-                                className="flex items-center justify-between px-6 py-5 rounded-2xl bg-zinc-900 border border-white/5 hover:bg-zinc-800/60 hover:border-white/10 transition-all group"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center shrink-0">
-                                        <Activity className="w-5 h-5 text-zinc-400" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-white">Run a Bill Analysis</p>
-                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Upload a bill · 60-second forensic read</p>
-                                    </div>
-                                </div>
-                                <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-1 transition-all" />
-                            </Link>
-                        </div>
+                            </section>
+                        </Reveal>
 
                     </div>
                 )}
-                </PageReveal>
             </main>
         </div>
     );

@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "crm-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:turbo"],
+      "port": 3000
+    },
+    {
+      "name": "public-site-preview",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:NEXT_PUBLIC_SUPABASE_URL='http://127.0.0.1:54321'; $env:NEXT_PUBLIC_SUPABASE_ANON_KEY='preview-placeholder'; npm.cmd run dev:turbo"
+      ],
+      "port": 3000
+    }
+  ]
+}

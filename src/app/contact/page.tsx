@@ -1,51 +1,26 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { Activity, ArrowRight, Mail, Menu, Phone, Send, X, MapPin, CalendarDays } from 'lucide-react'
-import { LandingFooter } from '@/components/landing/LandingFooter'
+import { useId, useState } from 'react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { Check } from 'lucide-react'
+import { ClosingCta } from '@/components/landing/ClosingCta'
+import { PageHero } from '@/components/landing/PageHero'
+import { PublicShell } from '@/components/landing/PublicShell'
+import { Reveal } from '@/components/landing/Reveal'
+import { TextLink, buttonPrimary, focusOnLight } from '@/components/landing/ui'
 
-const MENU_ITEMS = [
-  { label: 'Forensic Review', href: '/forensic-review' },
-  { label: 'Who We Serve', href: '/who-we-serve' },
-  { label: 'Market Intelligence', href: '/market-data' },
-  { label: 'Contact', href: '/contact' },
-] as const
+const EASE = [0.23, 1, 0.32, 1] as const
+
+const labelClass = 'block text-sm font-medium text-zinc-950'
+const inputClass =
+  'mt-2 block w-full rounded-[10px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-950 placeholder:text-zinc-400 transition-[border-color,box-shadow] duration-200 focus:border-[#002FA7] focus:outline-none focus:ring-4 focus:ring-[#002FA7]/15'
+const contactLinkClass = `np-link rounded-sm text-xl font-semibold tracking-[-0.02em] text-zinc-950 tabular-nums hover:text-[#002FA7] ${focusOnLight}`
 
 export default function Contact() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isMenuRendered, setIsMenuRendered] = useState(false)
-  const [isScrolled, setIsScrolled] = useState(false)
   const [formState, setFormState] = useState({ name: '', company: '', email: '', message: '' })
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    }
-  }, [])
-
-  const openMenu = () => {
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    setIsMenuRendered(true)
-    requestAnimationFrame(() => setIsMenuOpen(true))
-  }
-
-  const closeMenu = () => {
-    setIsMenuOpen(false)
-    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
-    closeTimerRef.current = setTimeout(() => {
-      setIsMenuRendered(false)
-    }, 650)
-  }
+  const reduceMotion = useReducedMotion()
+  const fieldId = useId()
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,272 +40,179 @@ export default function Contact() {
     }
   }
 
+  const swap = reduceMotion
+    ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, y: 12 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -8 },
+        transition: { duration: 0.35, ease: EASE },
+      }
+
   return (
-    <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-[#002FA7] selection:text-white">
-      <header
-        id="main-header"
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-          isScrolled ? 'bg-zinc-950/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-24'
-        }`}
+    <PublicShell>
+      <PageHero
+        title="Contact us"
+        lead="Reach out if you want the bill reviewed, need help understanding a contract, or just want a straight answer."
       >
-        <div className="w-full px-8 h-full flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 cursor-pointer">
-            <div className="bg-white p-1.5 rounded-xl">
-              <img src="/images/nodalpoint.png" alt="Nodal Point Logo" className="h-8 w-auto" />
-            </div>
-            <span className="font-bold text-xl tracking-tighter text-white">
-              Nodal <span className="text-[#002FA7]">Point</span>
-            </span>
-          </Link>
+        <p className="text-sm text-zinc-400">We respond within 24 hours, Monday to Friday.</p>
+      </PageHero>
 
-          <div className="flex items-center gap-3 md:gap-6">
-            <Link href="/portal" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors">
-              Sign In
-            </Link>
-            <Link
-              href="/book"
-              className="hidden md:flex items-center gap-2 border border-white/15 text-zinc-200 px-5 py-2.5 rounded-full text-sm font-medium hover:border-white/30 hover:bg-white/5 transition-all"
-            >
-              <CalendarDays className="w-4 h-4" />
-              <span>Book a Strategy Call</span>
-            </Link>
-            <a
-              href="/bill-debugger"
-              className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 transition-all"
-            >
-              <Activity className="w-4 h-4" />
-              <span>Review My Bill</span>
-            </a>
-            <button onClick={openMenu} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Open menu">
-              <Menu className="w-6 h-6 text-white" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <section id="contact-form" className="scroll-mt-16 bg-white px-6 py-16 lg:px-10 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-20">
+          <Reveal>
+            <h2 className="np-display text-4xl text-zinc-950 md:text-[3.25rem]">Send a message</h2>
+            <p className="mt-5 max-w-xl text-lg leading-8 text-zinc-600">
+              Tell us what you need help with and we&apos;ll reply by email.
+            </p>
 
-      {isMenuRendered ? (
-        <div
-          className={`fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${
-            isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-          aria-hidden={!isMenuOpen}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeMenu()
-          }}
-        >
-          <button
-            type="button"
-            onClick={closeMenu}
-            className={`absolute top-8 right-8 p-2 hover:bg-white/10 rounded-full ${
-              isMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
-            }`}
-            aria-label="Close menu"
-            tabIndex={isMenuOpen ? 0 : -1}
-          >
-            <X className="w-8 h-8 text-white" />
-          </button>
-          <div className={`flex flex-col gap-8 text-center ${isMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
-            {MENU_ITEMS.map((item, i) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                onClick={closeMenu}
-                tabIndex={isMenuOpen ? 0 : -1}
-                className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${
-                  isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-                }`}
-                style={{ transitionDelay: `${(i + 1) * 100}ms` }}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <div className={`mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-              <Link
-                href="/book"
-                onClick={closeMenu}
-                tabIndex={isMenuOpen ? 0 : -1}
-                className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
-              >
-                <CalendarDays className="w-4 h-4" />
-                Book a Strategy Call
-              </Link>
-              <a
-                href="/bill-debugger"
-                onClick={closeMenu}
-                tabIndex={isMenuOpen ? 0 : -1}
-                className="inline-flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 transition-all"
-              >
-                <Activity className="w-4 h-4" />
-                Review My Bill
-              </a>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            <div className="mt-10 max-w-xl">
+              <AnimatePresence mode="wait" initial={false}>
+                {formStatus === 'sent' ? (
+                  <motion.div
+                    key="sent"
+                    {...swap}
+                    role="status"
+                    className="rounded-2xl border border-zinc-200 bg-zinc-50 p-8"
+                  >
+                    <motion.span
+                      aria-hidden
+                      initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.1, ease: EASE }}
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-[#002FA7] text-white"
+                    >
+                      <Check className="h-5 w-5" strokeWidth={2.5} />
+                    </motion.span>
+                    <h3 className="mt-5 text-xl font-semibold tracking-[-0.02em] text-zinc-950">Message received</h3>
+                    <p className="mt-2 text-base leading-7 text-zinc-600">
+                      We&apos;ll reply within 24 hours, Monday to Friday.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <motion.form key="form" {...swap} onSubmit={handleFormSubmit} className="space-y-6">
+                    <div className="grid gap-6 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor={`${fieldId}-name`} className={labelClass}>
+                          Your name
+                        </label>
+                        <input
+                          id={`${fieldId}-name`}
+                          type="text"
+                          autoComplete="name"
+                          required
+                          value={formState.name}
+                          onChange={(e) => setFormState((s) => ({ ...s, name: e.target.value }))}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={`${fieldId}-company`} className={labelClass}>
+                          Company <span className="font-normal text-zinc-500">(optional)</span>
+                        </label>
+                        <input
+                          id={`${fieldId}-company`}
+                          type="text"
+                          autoComplete="organization"
+                          value={formState.company}
+                          onChange={(e) => setFormState((s) => ({ ...s, company: e.target.value }))}
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label htmlFor={`${fieldId}-email`} className={labelClass}>
+                        Work email
+                      </label>
+                      <input
+                        id={`${fieldId}-email`}
+                        type="email"
+                        autoComplete="email"
+                        placeholder="you@company.com"
+                        required
+                        value={formState.email}
+                        onChange={(e) => setFormState((s) => ({ ...s, email: e.target.value }))}
+                        className={inputClass}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`${fieldId}-message`} className={labelClass}>
+                        What do you need help with?
+                      </label>
+                      <textarea
+                        id={`${fieldId}-message`}
+                        required
+                        rows={5}
+                        value={formState.message}
+                        onChange={(e) => setFormState((s) => ({ ...s, message: e.target.value }))}
+                        className={`${inputClass} resize-none`}
+                      />
+                    </div>
 
-      <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
-
-      <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden pt-32 pb-20 md:pt-40 md:pb-32">
-        <div className="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-20 relative z-10">
-          <div className="flex flex-col justify-center">
-            <motion.h1
-              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8 }}
-              className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-6"
-            >
-              Contact.
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-xl text-zinc-400 leading-relaxed max-w-md"
-            >
-              Reach out if you want the bill reviewed, need help understanding a contract, or just want a straight answer.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.25 }}
-              className="flex items-center gap-2 mt-5"
-            >
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">We respond within 24 hours · Mon – Fri</span>
-            </motion.div>
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            transition={{ duration: 0.8, delay: 0.2 }}
-            className="bg-zinc-900/50 backdrop-blur-xl border border-white/10 p-10 rounded-3xl relative group hover:border-[#002FA7]/50 transition-colors duration-500"
-          >
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#002FA7] to-purple-600 rounded-3xl opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-500" />
-
-            <div className="space-y-12 relative z-10">
-              <div>
-                <div className="flex items-center gap-3 mb-2 text-zinc-500 uppercase tracking-widest text-xs font-mono">
-                  <Phone className="w-4 h-4" />
-                  <span>Direct line</span>
-                </div>
-                <a href="tel:+18178093367" className="block text-2xl md:text-4xl text-white font-bold tracking-tight hover:text-[#002FA7] transition-colors">
-                  +1 (817) 809-3367
-                </a>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-3 mb-2 text-zinc-500 uppercase tracking-widest text-xs font-mono">
-                  <Mail className="w-4 h-4" />
-                  <span>Email</span>
-                </div>
-                <a href="mailto:signal@nodalpoint.io" className="block text-xl md:text-3xl text-white font-medium tracking-tight hover:text-[#002FA7] transition-colors">
-                  signal@nodalpoint.io
-                </a>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-3 mb-2 text-zinc-500 uppercase tracking-widest text-xs font-mono">
-                  <MapPin className="w-4 h-4" />
-                  <span>Location</span>
-                </div>
-                <p className="text-xl text-zinc-300">
-                  North Texas
-                  <br />
-                  <span className="text-zinc-500 text-sm">ERCOT region</span>
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-12 pt-8 border-t border-white/5 relative z-10 space-y-4">
-              <div>
-                <p className="text-zinc-500 text-sm mb-2">Want to move faster?</p>
-                <a href="/bill-debugger" className="flex items-center gap-2 text-white font-bold hover:gap-4 hover:text-[#002FA7] transition-all">
-                  Review My Bill <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
-              <div>
-                <a href="/book" className="flex items-center gap-2 text-zinc-500 text-sm hover:text-zinc-300 transition-colors">
-                  Or book a briefing <ArrowRight className="w-3 h-3 rotate-90" />
-                </a>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      <section id="contact-form" className="px-6 pb-20 relative z-10">
-        <div className="max-w-2xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-3">SEND_A_MESSAGE</p>
-            <h2 className="text-2xl font-bold text-white tracking-tight mb-8">Send a message.</h2>
-
-            {formStatus === 'sent' ? (
-              <div className="bg-zinc-900/50 border border-emerald-500/20 rounded-2xl p-8 text-center">
-                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                </div>
-                <p className="font-mono text-sm text-emerald-400 uppercase tracking-widest mb-2">MESSAGE_RECEIVED</p>
-                <p className="text-zinc-400 text-sm">We&apos;ll reply within 24 hours, Mon–Fri.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleFormSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="Your name"
-                    required
-                    value={formState.name}
-                    onChange={e => setFormState(s => ({ ...s, name: e.target.value }))}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Company (optional)"
-                    value={formState.company}
-                    onChange={e => setFormState(s => ({ ...s, company: e.target.value }))}
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
-                  />
-                </div>
-                <input
-                  type="email"
-                  placeholder="Work email"
-                  required
-                  value={formState.email}
-                  onChange={e => setFormState(s => ({ ...s, email: e.target.value }))}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
-                />
-                <textarea
-                  placeholder="Tell us what you need help with"
-                  required
-                  rows={4}
-                  value={formState.message}
-                  onChange={e => setFormState(s => ({ ...s, message: e.target.value }))}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors resize-none"
-                />
-                {formStatus === 'error' && (
-                  <p className="text-rose-400 text-xs font-mono">MESSAGE_FAILED — if the form keeps failing, email us directly.</p>
+                    <div>
+                      <button
+                        type="submit"
+                        disabled={formStatus === 'sending'}
+                        className={`${buttonPrimary} ${focusOnLight} w-full sm:w-auto`}
+                      >
+                        {formStatus === 'sending' ? 'Sending...' : 'Send message'}
+                      </button>
+                      {formStatus === 'error' ? (
+                        <p role="alert" className="mt-3 text-sm text-red-600">
+                          Your message did not send. Try again, or email us at{' '}
+                          <a href="mailto:signal@nodalpoint.io" className="font-medium underline underline-offset-2">
+                            signal@nodalpoint.io
+                          </a>
+                          .
+                        </p>
+                      ) : null}
+                    </div>
+                  </motion.form>
                 )}
-                <button
-                  type="submit"
-                  disabled={formStatus === 'sending'}
-                  className="flex items-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                  {formStatus === 'sending' ? 'Sending...' : 'Send message'}
-                </button>
-              </form>
-            )}
-          </motion.div>
+              </AnimatePresence>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.07}>
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+              <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Reach us directly</h3>
+              <dl className="mt-6 space-y-6">
+                <div>
+                  <dt className="text-sm text-zinc-500">Phone</dt>
+                  <dd className="mt-1">
+                    <a href="tel:+18178093367" className={contactLinkClass}>
+                      +1 (817) 809-3367
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-zinc-500">Email</dt>
+                  <dd className="mt-1">
+                    <a href="mailto:signal@nodalpoint.io" className={`${contactLinkClass} break-all`}>
+                      signal@nodalpoint.io
+                    </a>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-sm text-zinc-500">Location</dt>
+                  <dd className="mt-1 text-xl font-semibold tracking-[-0.02em] text-zinc-950">North Texas</dd>
+                  <dd className="mt-1 text-sm text-zinc-500">ERCOT region</dd>
+                </div>
+              </dl>
+
+              <div className="mt-8 border-t border-zinc-200 pt-6">
+                <p className="text-base leading-7 text-zinc-600">Want to move faster?</p>
+                <div className="mt-3 flex flex-col items-start gap-3">
+                  <TextLink href="/bill-debugger">Review my bill</TextLink>
+                  <TextLink href="/book">Book a call</TextLink>
+                </div>
+              </div>
+            </div>
+          </Reveal>
         </div>
       </section>
 
-      <LandingFooter />
-    </div>
+      <ClosingCta />
+    </PublicShell>
   )
 }

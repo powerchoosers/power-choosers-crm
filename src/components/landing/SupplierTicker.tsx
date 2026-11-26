@@ -42,7 +42,7 @@ export function SupplierTicker({ label, logos, className = '' }: SupplierTickerP
       <div className="pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-24 bg-gradient-to-r from-white to-transparent" />
       <div className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-24 bg-gradient-to-l from-white to-transparent" />
 
-      <p className="mb-5 text-center font-mono text-[9px] uppercase tracking-[0.3em] text-zinc-400">
+      <p className="mb-5 text-center text-sm text-zinc-500">
         {label}
       </p>
 

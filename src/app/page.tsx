@@ -1,21 +1,21 @@
 import type { Metadata } from 'next'
-import { LandingHeader } from '@/components/landing/LandingHeader'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { LandingSections } from '@/components/landing/LandingSections'
+import { PublicShell } from '@/components/landing/PublicShell'
 
 export const metadata: Metadata = {
+  title: 'Nodal Point | Energy Broker for Texas Businesses',
+  description:
+    'Nodal Point is an energy broker for Texas businesses. We read your electricity bill, show you where you are overpaying, and negotiate a better plan with suppliers.',
   alternates: { canonical: 'https://nodalpoint.io' },
 }
 
-/**
- * Landing page: server-rendered hero for fast LCP; header and sections are client for interactivity.
- */
+/** Public home page. Dark server-rendered hero (fast LCP), light body, dark close. */
 export default function LandingPage() {
   return (
-    <div className="bg-zinc-50 text-zinc-600 min-h-screen font-sans antialiased selection:bg-[#002FA7] selection:text-white overflow-x-hidden">
-      <LandingHeader />
+    <PublicShell>
       <HeroSection />
       <LandingSections />
-    </div>
+    </PublicShell>
   )
 }

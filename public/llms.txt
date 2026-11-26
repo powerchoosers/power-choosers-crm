@@ -13,10 +13,11 @@ Nodal Point is an advanced energy intelligence platform and procurement partner.
 
 # Key Pages
 - Home: https://nodalpoint.io/
-- Philosophy: https://nodalpoint.io/philosophy
-- Bill Debugger: https://nodalpoint.io/bill-debugger
-- Technical Docs: https://nodalpoint.io/technical-docs
+- How It Works: https://nodalpoint.io/how-it-works
+- Who We Serve: https://nodalpoint.io/who-we-serve
+- Review My Bill: https://nodalpoint.io/bill-debugger
 - Market Data: https://nodalpoint.io/market-data
+- Contact: https://nodalpoint.io/contact
 
 # Geographic Focus
 We serve commercial and industrial businesses in all major deregulated US energy markets:

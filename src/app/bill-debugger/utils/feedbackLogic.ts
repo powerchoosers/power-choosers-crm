@@ -147,7 +147,7 @@ export function generateFeedback(
 
         title = isFacilityLarge
             ? "Delivery and demand are pushing this bill up"
-            : (isFixed ? "Competitive pricing opportunity" : "Likely expired or post-term");
+            : (isFixed ? "Your rate looks high for the market" : "Your contract has likely expired");
 
         description = isFacilityLarge
             ? [
@@ -217,16 +217,16 @@ export function generateFeedback(
 
             // Strategic Warnings
             if (status === "green" && diffYears > 0 && diffYears <= 2) {
-                title = "Potential Budget Cliff Detected";
+                title = "Low rate now, higher renewal risk ahead";
                 description = `You are currently locked in at ${rateCent}¢/kWh, which is significantly below today's market rates. However, your contract expires in ${monthsRemaining} months. Given current volatility, you face a high risk of a 40-60% budget increase upon renewal.`;
-                actionItems.unshift(`STRATEGY: Quote ${monthsRemaining > 12 ? 'forward' : 'immediate'} renewals now to hedge against further spikes.`);
+                actionItems.unshift(`Get quotes for ${monthsRemaining > 12 ? 'a future-start' : 'an immediate'} renewal now to protect against further price increases.`);
             } else if (status === "red" && diffDays > 0 && diffDays < 180) {
-                actionItems.unshift("CRITICAL: Current contract expires in < 6 months. Lock new rate immediately to avoid month-to-month penalties.");
+                actionItems.unshift("Your contract ends in less than 6 months. Lock in a new rate now to avoid month-to-month penalty rates.");
             }
         }
     } else {
         // Contract end date NOT found
-        actionItems.push("NOTICE: Contract end date not detected on bill. Verify expiration manually to avoid MTM penalty rates.");
+        actionItems.push("The contract end date is not on this bill. Check it in your contract so you do not roll onto month-to-month penalty rates.");
     }
 
     // 8. Action Items Finalization

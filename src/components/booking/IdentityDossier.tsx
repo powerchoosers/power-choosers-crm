@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { User, MapPin, ShieldCheck, Loader2, Linkedin, Phone } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { resolveIdentity, updateContactManualData } from '@/actions/enrich-contact';
-import { motion, AnimatePresence } from 'framer-motion';
-import { CompanyIcon } from '@/components/ui/CompanyIcon';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
+import { buttonPrimary, focusOnLight } from '@/components/landing/ui';
 
-interface IdentityData {
+const EASE = [0.23, 1, 0.32, 1] as const;
+
+export interface IdentityData {
     name: string;
     firstName?: string;
     lastName?: string;
@@ -26,14 +28,26 @@ interface IdentityDossierProps {
     onConfirm?: () => void;
     isValid?: boolean;
     isBooking?: boolean;
+    /** The chosen day and time in plain words, shown above the booking button. */
+    selectionLabel?: string | null;
+    /** Shown under the booking button when the last attempt failed. */
+    errorMessage?: string | null;
 }
+
+const labelClass = 'block text-sm font-medium text-zinc-950';
+const optionalClass = 'font-normal text-zinc-500';
+const inputClass =
+    'mt-2 block w-full rounded-[10px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-950 placeholder:text-zinc-400 transition-[border-color,box-shadow] duration-200 focus:border-[#002FA7] focus:outline-none focus:ring-4 focus:ring-[#002FA7]/15';
+const skeletonClass = 'block h-5 animate-pulse rounded bg-zinc-200 motion-reduce:animate-none';
 
 export default function IdentityDossier({
     email,
     onIdentityResolved,
     onConfirm,
     isValid = false,
-    isBooking = false
+    isBooking = false,
+    selectionLabel = null,
+    errorMessage = null
 }: IdentityDossierProps) {
     const [loading, setLoading] = useState(true);
     const [data, setData] = useState<IdentityData | null>(null);
@@ -41,6 +55,8 @@ export default function IdentityDossier({
     const [manualFields, setManualFields] = useState({ name: '', company: '', title: '', phone: '' });
     const [isSavingManual, setIsSavingManual] = useState(false);
     const { user, loading: authLoading } = useAuth();
+    const reduceMotion = useReducedMotion();
+    const fieldId = useId();
 
     useEffect(() => {
         async function fetchIdentity() {
@@ -105,243 +121,199 @@ export default function IdentityDossier({
         }
     };
 
-    const inputClass = "w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 font-mono text-sm focus:outline-none focus:border-zinc-600 transition-all";
+    const view: 'loading' | 'manual' | 'found' = loading ? 'loading' : isManualEntry ? 'manual' : 'found';
+    const manualIncomplete = !manualFields.name || !manualFields.company;
+
+    const swap = reduceMotion
+        ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+        : {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              exit: { opacity: 0 },
+              transition: { duration: 0.25, ease: EASE },
+          };
+
+    const rowClass = 'flex flex-col gap-1 border-b border-zinc-200 py-3.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6';
+    const termClass = 'shrink-0 text-sm text-zinc-500';
+    const valueClass = 'min-w-0 break-words text-base font-medium text-zinc-950 sm:text-right';
 
     return (
-        <div className="flex flex-col">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                    <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-500 animate-pulse' : isManualEntry ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                    <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                        {loading ? 'LOOKING_UP_CONTACT...' : isManualEntry ? 'ENTER_CONTACT_DETAILS' : 'CONTACT_FOUND'}
-                    </span>
-                </div>
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+            <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Your details</h3>
 
-                <div className="min-h-[52px]">
-                    <AnimatePresence mode="wait">
-                        {loading ? (
-                            <motion.div
-                                key="loading-header"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="space-y-2"
-                            >
-                                <div className="h-6 w-48 bg-white/5 rounded animate-pulse" />
-                                <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
-                            </motion.div>
-                        ) : isManualEntry ? (
-                            <motion.div
-                                key="manual-header"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                            >
-                                <p className="text-zinc-500 text-sm font-mono lowercase">{email}</p>
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="data-header"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                            >
-                                <h3 className="text-2xl text-white font-medium mb-1 tracking-tight">
-                                    {data?.name}
-                                </h3>
-                                <p className="text-zinc-500 text-sm font-mono lowercase">
-                                    {data?.email || email}
-                                </p>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </div>
-
-            {/* Contact details or manual entry form */}
-            <div className="space-y-3">
-                {isManualEntry ? (
-                    <motion.div
-                        key="manual-entry"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-3"
-                    >
-                        <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Full Name *</label>
-                            <input
-                                type="text"
-                                value={manualFields.name}
-                                onChange={e => setManualFields(p => ({ ...p, name: e.target.value }))}
-                                placeholder="Jane Smith"
-                                className={inputClass}
-                                autoFocus
-                            />
+            <AnimatePresence mode="wait" initial={false}>
+                {view === 'loading' ? (
+                    <motion.div key="loading" {...swap} role="status" className="mt-2">
+                        <p className="text-sm text-zinc-500">Looking up your details...</p>
+                        <div aria-hidden className="mt-6 space-y-5">
+                            <span className={`${skeletonClass} w-48`} />
+                            <span className={`${skeletonClass} w-36`} />
+                            <span className={`${skeletonClass} w-28`} />
                         </div>
-                        <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Company *</label>
-                            <input
-                                type="text"
-                                value={manualFields.company}
-                                onChange={e => setManualFields(p => ({ ...p, company: e.target.value }))}
-                                placeholder="Acme Corp"
-                                className={inputClass}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Job title</label>
-                            <input
-                                type="text"
-                                value={manualFields.title}
-                                onChange={e => setManualFields(p => ({ ...p, title: e.target.value }))}
-                                placeholder="Facilities Manager"
-                                className={inputClass}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Phone number</label>
-                            <input
-                                type="tel"
-                                value={manualFields.phone}
-                                onChange={e => setManualFields(p => ({ ...p, phone: e.target.value }))}
-                                placeholder="+1 (817) 000-0000"
-                                className={inputClass}
-                            />
+                    </motion.div>
+                ) : view === 'manual' ? (
+                    <motion.div key="manual" {...swap} className="mt-2">
+                        <p className="text-sm text-zinc-500">
+                            Tell us who we&apos;ll be speaking with. Booking for{' '}
+                            <span className="break-all text-zinc-950">{email}</span>.
+                        </p>
+                        <div className="mt-6 space-y-5">
+                            <div>
+                                <label htmlFor={`${fieldId}-name`} className={labelClass}>Full name</label>
+                                <input
+                                    id={`${fieldId}-name`}
+                                    type="text"
+                                    autoComplete="name"
+                                    required
+                                    value={manualFields.name}
+                                    onChange={e => setManualFields(p => ({ ...p, name: e.target.value }))}
+                                    placeholder="Jane Smith"
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor={`${fieldId}-company`} className={labelClass}>Company</label>
+                                <input
+                                    id={`${fieldId}-company`}
+                                    type="text"
+                                    autoComplete="organization"
+                                    required
+                                    value={manualFields.company}
+                                    onChange={e => setManualFields(p => ({ ...p, company: e.target.value }))}
+                                    placeholder="Acme Corp"
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor={`${fieldId}-title`} className={labelClass}>
+                                    Job title <span className={optionalClass}>(optional)</span>
+                                </label>
+                                <input
+                                    id={`${fieldId}-title`}
+                                    type="text"
+                                    autoComplete="organization-title"
+                                    value={manualFields.title}
+                                    onChange={e => setManualFields(p => ({ ...p, title: e.target.value }))}
+                                    placeholder="Facilities Manager"
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor={`${fieldId}-phone`} className={labelClass}>
+                                    Phone number <span className={optionalClass}>(optional)</span>
+                                </label>
+                                <input
+                                    id={`${fieldId}-phone`}
+                                    type="tel"
+                                    autoComplete="tel"
+                                    value={manualFields.phone}
+                                    onChange={e => setManualFields(p => ({ ...p, phone: e.target.value }))}
+                                    placeholder="+1 (817) 000-0000"
+                                    className={`${inputClass} tabular-nums`}
+                                />
+                            </div>
                         </div>
                     </motion.div>
                 ) : (
-                    <>
-                        {/* Company Node */}
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-[#002FA7]/30">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-[#002FA7]" />
-                            <div className="flex items-start gap-4">
-                                <div className="p-1.5 rounded-lg bg-white/5 w-10 h-10 flex items-center justify-center overflow-hidden">
-                                    <CompanyIcon
-                                        logoUrl={data?.logoUrl}
-                                        domain={data?.email?.split('@')[1]}
-                                        name={data?.company || 'Company'}
-                                        className="w-6 h-6 object-contain"
-                                    />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Company</p>
-                                    {loading ? (
-                                        <div className="h-4 w-28 bg-white/5 rounded animate-pulse mt-0.5" />
-                                    ) : (
-                                        <p className="text-white text-base font-medium">{data?.company || 'Unknown company'}</p>
-                                    )}
-                                </div>
-                            </div>
+                    <motion.dl key="found" {...swap} className="mt-4 border-t border-zinc-200">
+                        <div className={rowClass}>
+                            <dt className={termClass}>Name</dt>
+                            <dd className={valueClass}>{data?.name}</dd>
                         </div>
-
-                        {/* Role Node */}
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-zinc-800" />
-                            <div className="flex items-start gap-4">
-                                <div className="p-2 rounded-lg bg-white/5">
-                                    <User className="w-4 h-4 text-zinc-400" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Job title</p>
-                                    {loading ? (
-                                        <div className="h-4 w-32 bg-white/5 rounded animate-pulse mt-0.5" />
-                                    ) : (
-                                        <p className="text-zinc-200 text-sm font-medium">{data?.title || 'Professional'}</p>
-                                    )}
-                                </div>
-                            </div>
+                        <div className={rowClass}>
+                            <dt className={termClass}>Email</dt>
+                            <dd className={`${valueClass} break-all`}>{data?.email || email}</dd>
                         </div>
-
-                        {/* Location Node */}
-                        <div className="p-3 rounded-2xl bg-black/40 border border-white/5 relative overflow-hidden group transition-all hover:border-zinc-700">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-zinc-800" />
-                            <div className="flex items-start gap-4">
-                                <div className="p-2 rounded-lg bg-white/5">
-                                    <MapPin className="w-4 h-4 text-zinc-400" />
-                                </div>
-                                <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Location</p>
-                                    {loading ? (
-                                        <div className="h-4 w-20 bg-white/5 rounded animate-pulse mt-0.5" />
-                                    ) : (
-                                        <p className="text-zinc-200 text-sm font-medium">{data?.location || 'Not provided'}</p>
-                                    )}
-                                </div>
-                            </div>
+                        <div className={rowClass}>
+                            <dt className={termClass}>Company</dt>
+                            <dd className={valueClass}>{data?.company || 'Unknown company'}</dd>
                         </div>
-
-                        {/* Social/Phone Node */}
-                        {!loading && (data?.linkedinUrl || data?.phone) && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="flex gap-2"
-                            >
-                                {data?.linkedinUrl && (
+                        <div className={rowClass}>
+                            <dt className={termClass}>Job title</dt>
+                            <dd className={valueClass}>{data?.title || 'Professional'}</dd>
+                        </div>
+                        <div className={rowClass}>
+                            <dt className={termClass}>Location</dt>
+                            <dd className={valueClass}>{data?.location || 'Not provided'}</dd>
+                        </div>
+                        {data?.phone ? (
+                            <div className={rowClass}>
+                                <dt className={termClass}>Phone</dt>
+                                <dd className={`${valueClass} tabular-nums`}>{data.phone}</dd>
+                            </div>
+                        ) : null}
+                        {data?.linkedinUrl ? (
+                            <div className={rowClass}>
+                                <dt className={termClass}>LinkedIn</dt>
+                                <dd className={valueClass}>
                                     <a
                                         href={data.linkedinUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-mono text-[10px] uppercase tracking-tighter"
+                                        className={`np-link rounded-sm text-[#002FA7] ${focusOnLight}`}
                                     >
-                                        <Linkedin className="w-3 h-3" />
-                                        LinkedIn profile
+                                        View profile
                                     </a>
-                                )}
-                                {data?.phone && (
-                                    <div className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/5 text-zinc-400 font-mono text-[10px] uppercase tracking-tighter">
-                                        <Phone className="w-3 h-3" />
-                                        {data.phone}
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </>
+                                </dd>
+                            </div>
+                        ) : null}
+                    </motion.dl>
                 )}
-            </div>
+            </AnimatePresence>
 
-            {/* Action Button */}
-            <div className="mt-6 pt-5 border-t border-white/5">
+            {/* Action */}
+            <div className="mt-6">
                 {isManualEntry ? (
-                    <button
-                        className="w-full group relative overflow-hidden rounded-xl bg-white text-black py-4 font-bold text-lg hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_20px_40px_-10px_rgba(255,255,255,0.1)] active:scale-95"
-                        disabled={!manualFields.name || !manualFields.company || isSavingManual}
-                        onClick={handleManualSubmit}
-                    >
-                        <span className="relative z-10 flex items-center justify-center gap-2 uppercase tracking-wide">
+                    <>
+                        <button
+                            type="button"
+                            className={`${buttonPrimary} ${focusOnLight} w-full`}
+                            disabled={manualIncomplete || isSavingManual}
+                            onClick={handleManualSubmit}
+                        >
                             {isSavingManual ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                    <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
                                     Saving...
                                 </>
                             ) : (
-                                <>
-                                    <ShieldCheck className="w-5 h-5" />
-                                    Continue
-                                </>
+                                'Continue'
                             )}
-                        </span>
-                    </button>
+                        </button>
+                        {manualIncomplete ? (
+                            <p className="mt-3 text-sm text-zinc-500">Add your full name and company to continue.</p>
+                        ) : null}
+                    </>
                 ) : (
-                    <button
-                        className="w-full group relative overflow-hidden rounded-xl bg-white text-black py-4 font-bold text-lg hover:bg-zinc-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_20px_40px_-10px_rgba(255,255,255,0.1)] active:scale-95"
-                        disabled={loading || !isValid || isBooking}
-                        onClick={onConfirm}
-                    >
-                        <span className="relative z-10 flex items-center justify-center gap-2 uppercase tracking-wide">
-                            {isBooking ? (
+                    <>
+                        <p aria-live="polite" className="mb-4 text-base leading-7 text-zinc-600">
+                            {selectionLabel ? (
                                 <>
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    Scheduling...
+                                    Your call: <span className="font-medium tabular-nums text-zinc-950">{selectionLabel}</span>
                                 </>
                             ) : (
-                                <>
-                                    <ShieldCheck className="w-5 h-5" />
-                                    {isValid ? 'Confirm booking' : 'Select date and time'}
-                                </>
+                                'Select a date and time to finish booking.'
                             )}
-                        </span>
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
-                    </button>
+                        </p>
+                        <button
+                            type="button"
+                            className={`${buttonPrimary} ${focusOnLight} w-full`}
+                            disabled={loading || !isValid || isBooking}
+                            onClick={onConfirm}
+                        >
+                            {isBooking ? (
+                                <>
+                                    <Loader2 aria-hidden className="h-5 w-5 animate-spin" />
+                                    Booking...
+                                </>
+                            ) : (
+                                'Book this time'
+                            )}
+                        </button>
+                        {errorMessage ? (
+                            <p role="alert" className="mt-3 text-sm text-red-600">{errorMessage}</p>
+                        ) : null}
+                    </>
                 )}
             </div>
         </div>

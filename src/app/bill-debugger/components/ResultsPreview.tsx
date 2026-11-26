@@ -1,7 +1,8 @@
-import { motion } from 'framer-motion'
-import { Calendar, Zap, Activity, ReceiptText, ArrowRight, ShieldCheck } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { buttonPrimary, focusOnLight, NudgeArrow } from '@/components/landing/ui'
 import { BillReviewLens } from './BillReviewLens'
 import { FeedbackBadge } from './FeedbackBadge'
+import { EASE, StepBand } from './StepBand'
 
 interface ExtractedData {
     customer_name?: string
@@ -68,12 +69,13 @@ function formatCents(value: number) {
 }
 
 export function ResultsPreview({ data, redactedMode = false, onUnlock }: ResultsPreviewProps) {
+    const reduceMotion = useReducedMotion()
     const feedback = data.analysis?.feedback
     const billTotal = parseCurrency(data.total_amount_due)
     const usageKwh = parseNumber(data.total_usage_kwh)
     const allInRate = billTotal > 0 && usageKwh > 0 ? billTotal / usageKwh : 0
     const printedSupplyRate = parseNumber(data.energy_rate_per_kwh)
-    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'N/A'
+    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'an unknown rate'
     const supplyCost = parseCurrency(data.energy_charges ?? data.analysis?.billSplit?.supply)
     const deliveryCost = parseCurrency(data.delivery_charges ?? data.analysis?.billSplit?.delivery)
     const taxesCost = parseCurrency(data.taxes_and_fees ?? data.analysis?.billSplit?.taxes)
@@ -92,39 +94,28 @@ export function ResultsPreview({ data, redactedMode = false, onUnlock }: Results
 
     const snapshotFields = [
         {
-            id: 'charges',
-            label: 'CURRENT CHARGES',
-            value: billTotal ? formatMoney(billTotal) : 'Not found',
-            icon: ReceiptText,
-            context: 'This invoice',
-            isText: false
-        },
-        {
             id: 'demand',
-            label: 'DEMAND PROFILE',
+            label: 'Demand',
+            hint: 'Your highest rate of use in the month. Part of the bill is based on it.',
             value: actualDemand > 0
-                ? `${actualDemand.toLocaleString()} kW actual / ${billedDemand.toLocaleString()} kW billed`
-                : 'Demand data found',
-            icon: Activity,
+                ? `${actualDemand.toLocaleString()} kW actual, ${billedDemand.toLocaleString()} kW billed`
+                : 'No demand figure found',
             context: powerFactor > 0 ? `Power factor ${powerFactor.toFixed(1)}%` : 'Power factor not shown',
-            isText: true
         },
         {
             id: 'usage',
-            label: 'TOTAL USAGE',
+            label: 'Total usage',
+            hint: 'Electricity used during the billing period.',
             value: `${data.total_usage_kwh} kWh`,
-            icon: Zap,
-            context: 'Usage during the billing period',
-            isText: false
+            context: '',
         },
         {
             id: 'period',
-            label: 'BILLING PERIOD',
+            label: 'Billing period',
+            hint: 'Service dates on the bill.',
             value: data.billing_period,
-            icon: Calendar,
-            context: 'Service dates on the bill',
-            isText: true
-        }
+            context: '',
+        },
     ]
 
     const summaryCopy = printedSupplyRate > 0
@@ -133,98 +124,91 @@ export function ResultsPreview({ data, redactedMode = false, onUnlock }: Results
             ? 'The bill is split into supply, delivery, and demand so the main cost driver is easy to see.'
             : (feedback?.description || 'We split the bill into supply, delivery, and demand so the main cost driver is easy to see.'))
     const badgeTitle = feedback?.title || 'Review complete'
-    const siteLabel = redactedMode ? 'Redacted facility review' : 'Logistics warehouse review'
+
+    const item = (index: number) =>
+        reduceMotion
+            ? {}
+            : {
+                initial: { opacity: 0, y: 10, filter: 'blur(4px)' },
+                animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+                transition: { duration: 0.4, delay: 0.1 + index * 0.07, ease: EASE },
+            }
 
     return (
-        <div className="w-full max-w-5xl mx-auto text-center px-4">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                transition={{ duration: 0.6 }}
-                className="mb-12 flex flex-col items-center"
-            >
-                {feedback && (
-                    <div className="mb-6">
-                        <FeedbackBadge
-                            status={feedback.status}
-                            title={badgeTitle}
-                            isLarge={feedback.facilitySize === 'large'}
-                        />
+        <>
+            <StepBand title="Here is what we found" lead={summaryCopy} />
+
+            <section className="bg-white px-6 py-12 lg:px-10 lg:py-16">
+                <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:gap-16">
+                    <div>
+                        {feedback && (
+                            <motion.div {...item(0)} className="mb-6">
+                                <FeedbackBadge
+                                    status={feedback.status}
+                                    title={badgeTitle}
+                                    isLarge={feedback.facilitySize === 'large'}
+                                />
+                            </motion.div>
+                        )}
+
+                        <motion.div {...item(1)}>
+                            <p className="text-sm font-medium text-zinc-950">Current charges on this bill</p>
+                            <p className="np-display mt-2 text-5xl text-zinc-950 [font-variant-numeric:lining-nums_tabular-nums] sm:text-6xl">
+                                {billTotal ? formatMoney(billTotal) : 'Not found'}
+                            </p>
+                        </motion.div>
+
+                        <dl className="mt-8 border-t border-zinc-200">
+                            {snapshotFields.map((field, i) => (
+                                <motion.div
+                                    key={field.id}
+                                    {...item(i + 2)}
+                                    className="border-b border-zinc-200 py-4"
+                                >
+                                    <dt className="text-sm font-medium text-zinc-950">{field.label}</dt>
+                                    <dd className="mt-1">
+                                        <span className="block text-lg font-semibold tracking-[-0.01em] text-zinc-950 tabular-nums">
+                                            {field.value}
+                                        </span>
+                                        {field.context ? (
+                                            <span className="mt-0.5 block text-sm font-medium text-zinc-600 tabular-nums">{field.context}</span>
+                                        ) : null}
+                                        <span className="mt-0.5 block text-sm text-zinc-500">{field.hint}</span>
+                                    </dd>
+                                </motion.div>
+                            ))}
+                        </dl>
+
+                        {redactedMode ? (
+                            <p className="mt-5 text-sm text-zinc-500">
+                                This is an example bill. Names, addresses and account numbers are hidden.
+                            </p>
+                        ) : null}
+
+                        <motion.div {...item(5)} className="mt-8">
+                            <button type="button" onClick={onUnlock} className={`${buttonPrimary} ${focusOnLight} w-full sm:w-auto`}>
+                                Get the full report
+                                <NudgeArrow />
+                            </button>
+                            <p className="mt-4 max-w-md text-sm leading-6 text-zinc-500">
+                                The full report keeps the bill split and next steps in one place. We ask
+                                for your work email so we can send it to you.
+                            </p>
+                        </motion.div>
                     </div>
-                )}
 
-                <div className="text-[10px] md:text-xs font-mono uppercase tracking-[0.3em] text-zinc-500 mb-3">
-                    {siteLabel}
-                </div>
-                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-2 tracking-tight">
-                    Review complete
-                </h1>
-                <p className="text-zinc-500 max-w-2xl mx-auto text-lg leading-relaxed">
-                    {summaryCopy}
-                </p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 text-left">
-                {snapshotFields.map((field, i) => (
-                    <motion.div
-                        key={field.id}
-                        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                        transition={{ duration: 0.5, delay: i * 0.08 }}
-                        className="glass-card p-8 relative overflow-hidden group"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#002FA7]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-
-                        <div className="flex items-start justify-between mb-4">
-                            <span className="text-xs font-mono uppercase tracking-widest text-zinc-400">
-                                {field.label}
-                            </span>
-                            <field.icon className="w-5 h-5 text-[#002FA7] opacity-80" />
-                        </div>
-
-                        <div className={`font-semibold text-zinc-900 mb-3 ${field.isText ? 'text-lg leading-snug' : 'text-3xl tracking-tight font-mono text-[#002FA7]'}`}>
-                            {field.value}
-                        </div>
-
-                        <div className="text-xs text-zinc-500 font-medium">
-                            {field.context}
-                        </div>
+                    <motion.div {...item(2)}>
+                        <BillReviewLens
+                            usageKwh={usageKwh}
+                            totalBill={billTotal}
+                            printedSupplyRate={printedSupplyRate}
+                            supplyAmount={supplyCost}
+                            deliveryAmount={deliveryCost}
+                            taxesAmount={taxesCost}
+                        />
                     </motion.div>
-                ))}
-            </div>
-
-            <div className="mb-12 text-left">
-                <BillReviewLens
-                    usageKwh={usageKwh}
-                    totalBill={billTotal}
-                    printedSupplyRate={printedSupplyRate}
-                    supplyAmount={supplyCost}
-                    deliveryAmount={deliveryCost}
-                    taxesAmount={taxesCost}
-                />
-            </div>
-
-            <motion.div
-                initial={{ opacity: 0, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, filter: 'blur(0px)' }}
-                transition={{ delay: 0.45 }}
-                className="flex flex-col items-center gap-4 py-10 glass-card bg-white/50 border-zinc-200"
-            >
-                <div className="mb-2 flex items-center gap-2 text-[#002FA7] text-xs font-mono uppercase tracking-widest font-bold">
-                    <ShieldCheck className="w-5 h-5" />
-                    Full report ready
                 </div>
-                <button
-                    onClick={onUnlock}
-                    className="w-full md:w-auto px-12 py-5 bg-black text-white rounded-full font-bold text-lg hover:scale-105 transition-all shadow-2xl flex items-center gap-2 group"
-                >
-                    Open full report
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-                <p className="text-sm text-zinc-500 font-medium">
-                    Protected delivery. The full report keeps the bill split and next steps in one place.
-                </p>
-            </motion.div>
-        </div>
+            </section>
+        </>
     )
 }

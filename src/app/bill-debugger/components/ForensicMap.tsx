@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapPin, Satellite, Loader2, ShieldCheck, Copy, CheckCircle2 } from 'lucide-react';
+import { MapPin, Satellite, Loader2, Copy, CheckCircle2 } from 'lucide-react';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -74,16 +74,16 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
 
     if (!mapboxToken) {
         return (
-            <div className="w-full h-full flex items-center justify-center bg-zinc-900/10 rounded-2xl border border-dashed border-zinc-200 p-6 text-center">
-                <div className="text-red-500 font-mono text-[10px] uppercase tracking-widest">
-                    ERROR: MAPBOX_TOKEN_MISSING
-                </div>
+            <div className="w-full h-full flex items-center justify-center bg-zinc-50 rounded-2xl border border-zinc-200 p-6 text-center">
+                <p className="text-sm text-zinc-500">
+                    The map is not available right now.
+                </p>
             </div>
         );
     }
 
     return (
-        <div className="relative w-full h-full min-h-[300px] rounded-2xl overflow-hidden bg-zinc-100 group border border-zinc-200/50 shadow-inner">
+        <div className="relative w-full h-full min-h-[300px] rounded-2xl overflow-hidden bg-zinc-100 group border border-zinc-200">
             <AnimatePresence>
                 {isLoading && (
                     <motion.div
@@ -92,8 +92,8 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         exit={{ opacity: 0 }}
                         className="absolute inset-0 z-20 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center p-4"
                     >
-                        <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin mb-2" />
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Loading map...</span>
+                        <Loader2 className="w-6 h-6 text-[#002FA7] motion-safe:animate-spin mb-2" />
+                        <span className="text-sm text-zinc-500">Loading the map</span>
                     </motion.div>
                 )}
 
@@ -104,8 +104,8 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         className="absolute inset-0 z-20 bg-zinc-50 flex flex-col items-center justify-center p-4 text-center"
                     >
                         <Satellite className="w-6 h-6 text-zinc-300 mb-2" />
-                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest">{error}</span>
-                        <div className="mt-1 text-[9px] text-zinc-300 font-mono">{address}</div>
+                        <span className="text-sm font-medium text-zinc-600">{error}</span>
+                        <div className="mt-1 text-sm text-zinc-500">{address}</div>
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -139,10 +139,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             transition={{ type: 'spring', damping: 12, stiffness: 200, delay: 0.5 }}
                         >
                             <div className="relative">
-                                <MapPin className="text-red-500 w-8 h-8 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" fill="currentColor" />
-                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full flex items-center justify-center shadow-sm">
-                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-                                </div>
+                                <MapPin className="text-[#002FA7] w-8 h-8" fill="currentColor" stroke="white" />
                             </div>
                         </motion.div>
                     </Marker>
@@ -160,10 +157,11 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                                     e.stopPropagation();
                                     setSelectedPOI(poi);
                                 }}
-                                className="group relative cursor-pointer outline-none focus:outline-none"
+                                aria-label={`Nearby business: ${poi.name}`}
+                                className="group/poi relative cursor-pointer rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                             >
-                                <div className="w-6 h-6 rounded-full bg-white/90 border-2 border-[#002FA7] group-hover:scale-125 group-hover:bg-[#002FA7] group-hover:border-white transition-all flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] group-hover:bg-white animate-pulse" />
+                                <div className="w-6 h-6 rounded-full bg-white border-2 border-[#002FA7] group-hover/poi:scale-110 group-hover/poi:bg-[#002FA7] group-hover/poi:border-white transition-[transform,background-color,border-color] duration-200 flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] group-hover/poi:bg-white" />
                                 </div>
                             </button>
                         </Marker>
@@ -179,24 +177,25 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             closeButton={false}
                             className="z-50"
                         >
-                            <div className="bg-white/95 backdrop-blur-md p-3 min-w-[200px] rounded-xl shadow-2xl border border-zinc-200">
-                                <div className="flex justify-between items-start mb-2">
+                            <div className="bg-white p-3 min-w-[200px] rounded-xl border border-zinc-200">
+                                <div className="flex justify-between items-start gap-2 mb-2">
                                     <div>
-                                <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest leading-none">Nearby business</div>
-                                <div className="text-xs font-mono font-bold text-zinc-900 mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                                <div className="text-xs text-zinc-500 leading-none">Nearby business</div>
+                                <div className="text-sm font-semibold text-zinc-950 mt-1 leading-tight line-clamp-2">{selectedPOI.name}</div>
                                     </div>
                                     <button
+                                        aria-label="Copy name"
                                         onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                                        className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-[#002FA7] hover:bg-white transition-all"
+                                        className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-[#002FA7] hover:bg-white transition-colors duration-200"
                                     >
                                         {copiedId === selectedPOI.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                                     </button>
                                 </div>
-                                <div className="text-[9px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2 italic">{selectedPOI.address}</div>
+                                <div className="text-xs text-zinc-500 leading-tight mb-3 line-clamp-2">{selectedPOI.address}</div>
 
                                 <button
                                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-blue-600 hover:brightness-110 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest shadow-md shadow-blue-500/20"
+                                    className="w-full h-9 rounded-[10px] bg-[#002FA7] text-white hover:bg-[#0a3fd1] transition-colors duration-200 flex items-center justify-center gap-2 text-sm font-medium"
                                 >
                                     {copiedId === selectedPOI.id ? 'Copied' : 'Copy name'}
                                 </button>
@@ -204,30 +203,16 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         </Popup>
                     )}
                 </Map>
-            ) : (
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none" />
-            )}
+            ) : null}
 
-            {/* Overlays */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
-                <div className="px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-lg border border-zinc-200 shadow-sm flex items-center gap-2">
-                    <Satellite className="w-3.5 h-3.5 text-[#002FA7]" />
-                    <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Map active</span>
-                </div>
-                {zoneLabel && (
-                    <div className="px-3 py-1.5 bg-zinc-900/90 backdrop-blur-md rounded-lg border border-white/10 shadow-sm flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-widest">{zoneLabel}</span>
+            {/* Zone label */}
+            {zoneLabel && (
+                <div className="absolute top-4 left-4 z-10">
+                    <div className="px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-lg border border-zinc-200">
+                        <span className="text-sm font-medium text-zinc-950">{zoneLabel}</span>
                     </div>
-                )}
-            </div>
-
-            <div className="absolute bottom-4 right-4 z-10">
-                <div className="px-3 py-1.5 bg-white/80 backdrop-blur-md rounded-lg border border-zinc-200/50 shadow-sm flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-tight">Location check: active</span>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
