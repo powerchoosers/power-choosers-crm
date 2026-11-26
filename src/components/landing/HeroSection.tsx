@@ -1,82 +1,51 @@
-import Link from 'next/link'
-import { Activity, CalendarDays } from 'lucide-react'
-
-const SIGNAL_POINTS = [
-  { label: 'BILL REVIEW', sub: 'START' },
-  { label: 'SUPPLIER PARTNERSHIPS', sub: 'COMPARE' },
-  { label: 'RATE NEGOTIATION', sub: 'HANDLE' },
-  { label: 'PAPERWORK', sub: 'DONE' },
-  { label: 'PLAN FIT', sub: 'MATCHED' },
-] as const
+import { LoadSurface } from '@/components/landing/LoadSurface'
+import { OutlineLink, PrimaryLink } from '@/components/landing/ui'
 
 /**
- * Server-rendered hero section so the LCP element (H1) is in the initial HTML
- * and does not wait for React hydration or motion. Improves LCP significantly.
+ * Home page hero. Server-rendered so the headline is in the first HTML; the 3D visual
+ * loads afterwards. Below lg the visual sits under the text and fills the rest of the
+ * screen; at lg and up it runs behind the right side of the hero.
  */
 export function HeroSection() {
   return (
     <section
-      className="min-h-[100svh] flex flex-col items-center justify-start px-6 relative overflow-hidden pt-28 pb-16 sm:pt-32 sm:pb-20 md:min-h-screen md:justify-center md:py-0 md:pt-32"
-      aria-label="Hero"
+      data-header-tone="dark"
+      className="relative isolate flex min-h-[100svh] flex-col overflow-hidden bg-zinc-950 text-white"
+      aria-label="Introduction"
     >
-      <div className="max-w-7xl mx-auto text-center z-10 w-full">
-        <h1 className="mx-auto max-w-7xl text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] font-bold tracking-[-0.07em] leading-[1.02] mb-6 text-zinc-900 break-words">
-          <span className="word-reveal" style={{ animationDelay: '0ms' }}>Commercial</span>
-          {' '}
-          <span className="word-reveal" style={{ animationDelay: '40ms' }}>energy</span>
-          {' '}
-          <span className="word-reveal" style={{ animationDelay: '80ms' }}>procurement</span>
-          <br />
-          <span className="word-reveal" style={{ animationDelay: '120ms' }}>that</span>
-          {' '}
-          <span className="text-[#002FA7]">
-            <span className="word-reveal" style={{ animationDelay: '160ms' }}>fits</span>
-            {' '}
-            <span className="word-reveal" style={{ animationDelay: '200ms' }}>the</span>
-            {' '}
-            <span className="word-reveal" style={{ animationDelay: '240ms' }}>business.</span>
-          </span>
-        </h1>
-        <p className="text-lg md:text-xl text-zinc-600 font-normal tracking-tight leading-8 mb-10 max-w-2xl mx-auto">
-          We help Texas businesses review their bill, compare supplier offers through our supplier partnerships, negotiate competitive rates, handle the paperwork, and recommend the plan that fits the business.
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 sm:mb-0">
-          <Link
-            href="/bill-debugger"
-            className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
-          >
-            <Activity className="w-5 h-5" />
-            <span>Review My Bill</span>
-          </Link>
-          <Link
-            href="/book"
-            className="inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300 whitespace-nowrap"
-          >
-            <CalendarDays className="w-5 h-5" />
-            <span>Book a Strategy Call</span>
-          </Link>
-        </div>
-        <div className="mt-8 hidden flex-wrap items-center justify-center gap-2.5 sm:flex">
-          {SIGNAL_POINTS.map((item) => (
-            <span
-              key={item.label}
-              className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3.5 py-2 text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-600 shadow-sm"
-            >
-              <span className="text-[#002FA7]">{item.label}</span>
-              <span className="text-zinc-400">{item.sub}</span>
-            </span>
-          ))}
+      {/* Keeps the headline readable where the visual runs behind it (lg and up) */}
+      <div className="pointer-events-none absolute inset-0 -z-10 hidden bg-gradient-to-r from-zinc-950 via-zinc-950/60 to-transparent lg:block" aria-hidden />
+
+      <div className="mx-auto flex w-full max-w-7xl flex-col px-6 pt-28 lg:flex-1 lg:justify-center lg:px-10 lg:pb-24 lg:pt-24">
+        <div className="max-w-3xl">
+          <h1 className="np-display np-enter text-[2.9rem] sm:text-6xl lg:text-[5.25rem]">
+            Find the gaps in your electricity plan.
+          </h1>
+          <p className="np-enter mt-6 max-w-xl text-lg leading-8 text-zinc-300" style={{ animationDelay: '80ms' }}>
+            Nodal Point is an energy broker for Texas businesses. We read your bill, show you where
+            you&apos;re overpaying, and negotiate a better plan with suppliers.
+          </p>
+          <div className="np-enter mt-9 flex flex-col gap-3 sm:flex-row" style={{ animationDelay: '160ms' }}>
+            <PrimaryLink href="/bill-debugger" surface="dark">
+              Review my bill
+            </PrimaryLink>
+            <OutlineLink href="/book" surface="dark" className="backdrop-blur-sm">
+              Book a call
+            </OutlineLink>
+          </div>
         </div>
       </div>
-      {/* BREATHING ORB: Ambient signal presence */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" aria-hidden>
-        <div
-          className="hero-breathe-orb w-[700px] h-[700px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(0,47,167,0.20) 0%, transparent 65%)' }}
-        />
+
+      <div className="relative -z-10 min-h-64 flex-1 lg:absolute lg:inset-y-0 lg:left-[30%] lg:right-0 lg:min-h-0 lg:[mask-image:linear-gradient(to_right,transparent,black_30%)]">
+        <LoadSurface />
       </div>
-      {/* BACKGROUND TEXTURE: The "Digital Grain" */}
-      <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" aria-hidden />
+
+      <p className="mx-auto w-full max-w-7xl px-6 pb-8 text-sm leading-6 text-zinc-400 lg:px-10 lg:text-right">
+        <span className="lg:ml-auto lg:block lg:max-w-xs">
+          One building&apos;s electricity use across a year. The bright spikes are the few hours
+          that push the bill up.
+        </span>
+      </p>
     </section>
   )
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { PublicShell } from '@/components/landing/PublicShell'
 
 export const metadata: Metadata = {
   title: 'Nodal Point | Review My Bill',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 }
 
 export default function BillDebuggerLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return <PublicShell>{children}</PublicShell>
 }

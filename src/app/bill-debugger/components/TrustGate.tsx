@@ -1,93 +1,62 @@
 import React from 'react'
-import { motion } from 'framer-motion'
-import { Lock, FileX, ShieldCheck, ArrowRight } from 'lucide-react'
+import { buttonPrimary, focusOnLight, NudgeArrow } from '@/components/landing/ui'
+import { StepBand } from './StepBand'
 
 interface TrustGateProps {
     onNext: () => void
 }
 
+const HANDLING = [
+    {
+        title: 'We only read it',
+        body: 'We only look at the bill you upload. We do not contact your supplier or change your account.',
+    },
+    {
+        title: 'It stays private',
+        body: 'Your file is used for the review and for follow-up with you. It is handled with the same care as the report itself.',
+    },
+    {
+        title: 'It is stored securely',
+        body: 'The file is protected while it is uploaded and while it is stored, so the review stays private.',
+    },
+]
+
 export function TrustGate({ onNext }: TrustGateProps) {
     return (
-        <div className="w-full max-w-4xl mx-auto px-6 flex flex-col items-center text-center">
+        <>
+            <StepBand
+                title="How we handle your bill"
+                lead="We review the file you send, separate the charges, and show you the parts that matter. No supplier calls. No changes to your account during the review."
+            />
 
-            {/* Header Section */}
-            <motion.div
-                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="mb-16"
-            >
-                <h1 className="text-4xl md:text-6xl font-thin tracking-tight mb-6 text-zinc-900">
-                    Before you upload, here's <span className="font-normal text-[#002FA7]">how we handle your bill</span>.<br />
-                    Keep it simple.
-                </h1>
-                <p className="text-xl text-zinc-600 font-light max-w-2xl mx-auto leading-relaxed">
-                    We review the file you send, separate the charges, and show you the parts that matter.
-                    No supplier calls. No changes to your account during the review.
-                </p>
-            </motion.div>
+            <section className="bg-white px-6 py-12 lg:px-10 lg:py-16">
+                <div className="mx-auto max-w-7xl">
+                    <div className="max-w-3xl">
+                        <dl className="border-t border-zinc-200">
+                            {HANDLING.map((item) => (
+                                <div
+                                    key={item.title}
+                                    className="grid gap-1 border-b border-zinc-200 py-5 sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:gap-8"
+                                >
+                                    <dt className="text-lg font-semibold tracking-[-0.01em] text-zinc-950">{item.title}</dt>
+                                    <dd className="text-base leading-7 text-zinc-600">{item.body}</dd>
+                                </div>
+                            ))}
+                        </dl>
 
-            {/* Trust Items Grid */}
-            <motion.div
-                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 w-full max-w-3xl"
-            >
-                <div className="glass-card flex flex-col items-center space-y-4 p-8">
-                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
-                        <Lock className="w-6 h-6" />
+                        <p className="mt-8 text-base leading-7 text-zinc-600">
+                            Upload your bill. We pull out demand charges (charges based on your highest
+                            usage), delivery costs and contract dates, then show you the main issue.
+                        </p>
+
+                        <button type="button" onClick={onNext} className={`${buttonPrimary} ${focusOnLight} mt-8`}>
+                            Continue to upload
+                            <NudgeArrow />
+                        </button>
+                        <p className="mt-4 text-sm text-zinc-500">Usually under 60 seconds. No commitment required.</p>
                     </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Read-only review</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        We only analyze the bill you upload. We do not contact your supplier or change your account.
-                    </p>
                 </div>
-
-                <div className="glass-card flex flex-col items-center space-y-4 p-8">
-                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
-                        <FileX className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Private handling</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Your file is used for the review and follow-up, then handled through the same secure process as the rest of the report.
-                    </p>
-                </div>
-
-                <div className="glass-card flex flex-col items-center space-y-4 p-8">
-                    <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
-                        <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Secure storage</h3>
-                    <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        The file is protected in transit and at rest, so the review stays private.
-                    </p>
-                </div>
-            </motion.div>
-
-            {/* CTA Section */}
-            <motion.div
-                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-col items-center space-y-6"
-            >
-                <button
-                    onClick={onNext}
-                    className="group relative px-8 py-4 bg-[#002FA7] text-white rounded-full font-medium text-lg hover:bg-[#002FA7]/90 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-[#002FA7]/20 flex items-center gap-2"
-                >
-                    Continue to Upload
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </button>
-
-                <p className="text-sm text-zinc-400">
-                    Usually under 60 seconds • No commitment required
-                </p>
-                <p className="text-xs text-zinc-500 max-w-sm text-center leading-relaxed">
-                    Upload your bill. We pull out demand charges, delivery costs, and contract dates, then show you the main issue.
-                </p>
-            </motion.div>
-
-        </div>
+            </section>
+        </>
     )
 }

@@ -1,25 +1,41 @@
 'use client';
 
-import { useState } from 'react';
-import TacticalCalendar from './TacticalCalendar';
-import IdentityDossier from './IdentityDossier';
+import { useId, useState } from 'react';
+import TacticalCalendar, { formatSlotLabel } from './TacticalCalendar';
+import IdentityDossier, { type IdentityData } from './IdentityDossier';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { ShieldCheck } from 'lucide-react';
+import { Check } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { buttonPrimary, focusOnLight } from '@/components/landing/ui';
+
+const EASE = [0.23, 1, 0.32, 1] as const;
+
+const GATE_POINTS = [
+    'No sales script. We keep it practical.',
+    'Bring a bill, supplier offer, or both.',
+    'You can cancel up to 2 hours before.',
+];
+
+const h2Class = 'np-display text-4xl text-zinc-950 md:text-[3.25rem]';
 
 export default function BookingInterface({ email }: { email: string }) {
     const [localEmail, setLocalEmail] = useState(email);
     const [emailInput, setEmailInput] = useState('');
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
-    const [identityData, setIdentityData] = useState<any>(null);
+    const [identityData, setIdentityData] = useState<IdentityData | null>(null);
     const [isBooking, setIsBooking] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [bookingFailed, setBookingFailed] = useState(false);
+    const reduceMotion = useReducedMotion();
+    const emailId = useId();
 
     const handleConfirm = async () => {
         if (!selectedDate || !selectedTime || !localEmail) return;
 
         setIsBooking(true);
+        setBookingFailed(false);
         try {
             const response = await fetch('/api/create-booking', {
                 method: 'POST',
@@ -43,107 +59,125 @@ export default function BookingInterface({ email }: { email: string }) {
             toast.success('Booking confirmed.');
         } catch (error) {
             console.error(error);
+            setBookingFailed(true);
             toast.error('We could not schedule that time.');
         } finally {
             setIsBooking(false);
         }
     };
 
-    if (isSuccess) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md p-10 animate-in fade-in zoom-in duration-500">
-                <div className="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6 animate-pulse">
-                    <ShieldCheck className="w-12 h-12 text-emerald-500" />
-                </div>
-                <h2 className="text-3xl font-mono font-bold text-white mb-2 tracking-tight">MEETING_SCHEDULED</h2>
-                <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-8">
-                    Your meeting has been scheduled.
-                </p>
-                <div className="p-4 bg-white/5 border border-white/10 rounded-xl max-w-md w-full">
-                    <div className="flex justify-between text-sm py-2 border-b border-white/5">
-                        <span className="text-zinc-500">COMPANY</span>
-                        <span className="text-white font-mono">{identityData?.company || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between text-sm py-2 border-b border-white/5">
-                        <span className="text-zinc-500">DATE</span>
-                        <span className="text-white font-mono">{selectedDate ? format(selectedDate, 'MMM dd') : ''} @ {selectedTime}</span>
-                    </div>
-                    <div className="flex justify-between text-sm py-2 pt-4">
-                        <span className="text-emerald-500 animate-pulse">● SCHEDULED</span>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const step: 'success' | 'email' | 'schedule' = isSuccess ? 'success' : !localEmail ? 'email' : 'schedule';
 
-    // Email gate — shown when accessed directly without an email param
-    if (!localEmail) {
-        return (
-            <div className="flex-1 flex flex-col items-center justify-center p-6">
-                <div className="max-w-md w-full">
-                    <div className="flex items-center gap-2 mb-6">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                            SCHEDULE_A_STRATEGY_CALL // ACCESS
-                        </span>
+    const selectionLabel =
+        selectedDate && selectedTime
+            ? `${format(selectedDate, 'EEEE, MMMM d')} at ${formatSlotLabel(selectedTime)} CT`
+            : null;
+
+    const stepMotion = reduceMotion
+        ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+        : {
+              initial: { opacity: 0, y: 14 },
+              animate: { opacity: 1, y: 0 },
+              exit: { opacity: 0, y: -8 },
+              transition: { duration: 0.35, ease: EASE },
+          };
+
+    return (
+        <AnimatePresence mode="wait" initial={false}>
+            {step === 'success' ? (
+                <motion.div key="success" {...stepMotion} role="status" className="max-w-2xl">
+                    <motion.span
+                        aria-hidden
+                        initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.4, delay: 0.15, ease: EASE }}
+                        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#002FA7] text-white"
+                    >
+                        <Check className="h-6 w-6" strokeWidth={2.5} />
+                    </motion.span>
+                    <h2 className={`${h2Class} mt-6`}>Your call is booked</h2>
+                    <p className="mt-5 text-lg leading-8 text-zinc-600">Your meeting has been scheduled.</p>
+                    <dl className="mt-8 rounded-2xl border border-zinc-200 bg-zinc-50 px-6">
+                        <div className="flex flex-col gap-1 border-b border-zinc-200 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+                            <dt className="text-sm text-zinc-500">Company</dt>
+                            <dd className="text-base font-medium text-zinc-950">{identityData?.company || 'Not provided'}</dd>
+                        </div>
+                        <div className="flex flex-col gap-1 py-4 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
+                            <dt className="text-sm text-zinc-500">When</dt>
+                            <dd className="text-base font-medium tabular-nums text-zinc-950">{selectionLabel}</dd>
+                        </div>
+                    </dl>
+                </motion.div>
+            ) : step === 'email' ? (
+                // Email gate: shown when the page is opened without an email param
+                <motion.div
+                    key="email"
+                    {...stepMotion}
+                    className="grid gap-12 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:gap-20"
+                >
+                    <div>
+                        <h2 className={h2Class}>Start with your work email</h2>
+                        <ul className="mt-8 max-w-lg border-t border-zinc-200">
+                            {GATE_POINTS.map(line => (
+                                <li key={line} className="border-b border-zinc-200 py-4 text-base leading-7 text-zinc-600">
+                                    {line}
+                                </li>
+                            ))}
+                        </ul>
                     </div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Schedule a strategy call</h2>
-                    <p className="text-zinc-500 text-sm mb-4 leading-relaxed">
-                        A 30-minute call with the Nodal Point team. Bring a bill, a supplier offer, or both. We&apos;ll review the numbers live, compare the options, and point out the biggest cost drivers before you commit to anything.
-                    </p>
-                    <div className="flex flex-col gap-1.5 mb-8">
-                        {['No sales script. We keep it practical.', 'Bring a bill, supplier offer, or both.', 'You can cancel up to 2 hours before.'].map(line => (
-                            <div key={line} className="flex items-center gap-2 text-xs text-zinc-500">
-                                <div className="w-1 h-1 rounded-full bg-[#002FA7] shrink-0" />
-                                <span>{line}</span>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="space-y-3">
+                    <div className="self-start rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+                        <label htmlFor={emailId} className="block text-sm font-medium text-zinc-950">
+                            Work email
+                        </label>
                         <input
+                            id={emailId}
                             type="email"
+                            autoComplete="email"
                             value={emailInput}
                             onChange={e => setEmailInput(e.target.value)}
                             onKeyDown={e => { if (e.key === 'Enter' && emailInput) setLocalEmail(emailInput); }}
                             placeholder="you@company.com"
-                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 font-mono text-sm focus:outline-none focus:border-[#002FA7]/60 focus:bg-white/[0.07] transition-all"
-                            autoFocus
+                            className="mt-2 block w-full rounded-[10px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-950 placeholder:text-zinc-400 transition-[border-color,box-shadow] duration-200 focus:border-[#002FA7] focus:outline-none focus:ring-4 focus:ring-[#002FA7]/15"
                         />
+                        <p className="mt-2 text-sm text-zinc-500">We use it to look up your details.</p>
                         <button
+                            type="button"
                             onClick={() => { if (emailInput) setLocalEmail(emailInput); }}
                             disabled={!emailInput}
-                            className="w-full bg-white text-black rounded-xl py-3.5 font-bold uppercase tracking-wide hover:bg-zinc-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            className={`${buttonPrimary} ${focusOnLight} mt-6 w-full`}
                         >
                             Continue
                         </button>
                     </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
-            {/* LEFT PANEL: Tactical Calendar */}
-            <div className="flex-[7] p-4 md:p-8 lg:p-10 border-b lg:border-b-0 lg:border-r border-white/5 lg:overflow-y-auto np-scroll">
-                <TacticalCalendar
-                    selectedDate={selectedDate}
-                    onDateSelect={setSelectedDate}
-                    selectedTime={selectedTime}
-                    onTimeSelect={setSelectedTime}
-                />
-            </div>
-
-            {/* RIGHT PANEL: Live Recon / Context */}
-            <div className="flex-[5] bg-black/20 p-4 md:p-8 lg:p-10 lg:overflow-y-auto np-scroll relative">
-                <IdentityDossier
-                    email={localEmail}
-                    onIdentityResolved={setIdentityData}
-                    onConfirm={handleConfirm}
-                    isValid={!!selectedDate && !!selectedTime}
-                    isBooking={isBooking}
-                />
-            </div>
-        </div>
+                </motion.div>
+            ) : (
+                <motion.div key="schedule" {...stepMotion}>
+                    <h2 className={h2Class}>Pick a time</h2>
+                    <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-16">
+                        <TacticalCalendar
+                            selectedDate={selectedDate}
+                            onDateSelect={setSelectedDate}
+                            selectedTime={selectedTime}
+                            onTimeSelect={setSelectedTime}
+                        />
+                        <div className="lg:sticky lg:top-24 lg:self-start">
+                            <IdentityDossier
+                                email={localEmail}
+                                onIdentityResolved={setIdentityData}
+                                onConfirm={handleConfirm}
+                                isValid={!!selectedDate && !!selectedTime}
+                                isBooking={isBooking}
+                                selectionLabel={selectionLabel}
+                                errorMessage={
+                                    bookingFailed
+                                        ? 'We could not book that time. Try again or pick another time.'
+                                        : null
+                                }
+                            />
+                        </div>
+                    </div>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 }

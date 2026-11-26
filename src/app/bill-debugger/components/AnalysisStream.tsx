@@ -1,80 +1,111 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
+import { Check, Loader2 } from 'lucide-react'
+import { EASE, StepBand } from './StepBand'
 
 interface AnalysisStreamProps {
     onComplete: () => void
 }
 
-const MESSAGES = [
-    "Starting review...",
-    "Reading bill details...",
-    "Checking utility charges...",
-    "Looking for demand spikes...",
-    "Summarizing the findings...",
-    "Review complete."
+const STEPS = [
+    'Opening the file',
+    'Reading the bill details',
+    'Checking the utility charges',
+    'Looking for peaks in your usage',
+    'Writing up what we found',
 ]
 
+/** How long each step shows as active before the next one starts. */
+const STEP_MS = 1200
+
 export function AnalysisStream({ onComplete }: AnalysisStreamProps) {
+    const reduceMotion = useReducedMotion()
+    const [currentStep, setCurrentStep] = useState(0)
+    const [finished, setFinished] = useState(false)
 
-    const [lines, setLines] = useState<string[]>([])
-    const [currentLineIndex, setCurrentLineIndex] = useState(0)
-
+    // Walk through the steps. The last one stays active until the page moves on.
     useEffect(() => {
-        if (currentLineIndex >= MESSAGES.length) {
-            const timeout = setTimeout(onComplete, 800)
-            return () => clearTimeout(timeout)
-        }
-
-        const currentMessage = MESSAGES[currentLineIndex]
-        let charIndex = 0
-        let currentText = ''
-
-        // Add empty line first
-        setLines(prev => [...prev, ''])
-
-        const typeInterval = setInterval(() => {
-            if (charIndex < currentMessage.length) {
-                currentText += currentMessage.charAt(charIndex)
-                setLines(prev => {
-                    const newLines = [...prev]
-                    newLines[newLines.length - 1] = currentText
-                    return newLines
-                })
-                charIndex++
+        const timeout = setTimeout(() => {
+            if (currentStep < STEPS.length - 1) {
+                setCurrentStep((prev) => prev + 1)
             } else {
-                clearInterval(typeInterval)
-                setTimeout(() => {
-                    setCurrentLineIndex(prev => prev + 1)
-                }, 400)
+                setFinished(true)
             }
-        }, 30)
+        }, STEP_MS)
+        return () => clearTimeout(timeout)
+    }, [currentStep])
 
-        return () => clearInterval(typeInterval)
-    }, [currentLineIndex, onComplete])
+    // Once the steps have played, ask the page to move on. The page passes a new
+    // onComplete whenever its data changes, so this fires again when the result arrives.
+    useEffect(() => {
+        if (!finished) return
+        const timeout = setTimeout(onComplete, 800)
+        return () => clearTimeout(timeout)
+    }, [finished, onComplete])
+
+    const progress = finished ? 0.94 : (currentStep + 0.5) / STEPS.length
 
     return (
-        <motion.div
-            initial={{ opacity: 0, translateY: 10, filter: 'blur(10px)' }}
-            animate={{ opacity: 1, translateY: 0, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, filter: 'blur(10px)', transition: { duration: 0.3 } }}
-            className="w-full max-w-2xl mx-auto"
-        >
-            <div className="font-mono text-left w-full">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-3 h-3 bg-[#002FA7] rounded-full animate-pulse"></div>
-                    <span className="text-sm tracking-widest uppercase text-zinc-400">Review active</span>
-                </div>
+        <>
+            <StepBand
+                title="Reading your bill"
+                lead="This usually takes under a minute. Keep this page open."
+            />
 
-                <div className="space-y-4 text-lg md:text-xl border-l-2 border-zinc-200 pl-6 h-64 overflow-hidden flex flex-col justify-end">
-                    {lines.map((line, i) => (
-                        <p key={i} className={`font-mono transition-colors duration-300 ${i === lines.length - 1 ? 'text-[#002FA7]' : 'text-zinc-400'}`}>
-                            <span className="mr-2">&gt;</span>
-                            {line}
-                            {i === lines.length - 1 && <span className="inline-block w-2 h-5 bg-[#002FA7] ml-1 animate-pulse align-middle"></span>}
+            <section className="min-h-[50vh] bg-white px-6 py-12 lg:px-10 lg:py-16">
+                <div className="mx-auto max-w-7xl">
+                    <div className="max-w-3xl rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+                        <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-zinc-200">
+                            <motion.div
+                                className="h-full origin-left rounded-full bg-[#002FA7]"
+                                initial={false}
+                                animate={{ scaleX: progress }}
+                                transition={{ duration: reduceMotion ? 0 : 0.45, ease: EASE }}
+                            />
+                        </div>
+
+                        <ol className="mt-7 space-y-4">
+                            {STEPS.map((step, index) => {
+                                const done = index < currentStep
+                                const active = index === currentStep
+                                return (
+                                    <li key={step} className="flex items-center gap-3">
+                                        <span
+                                            aria-hidden
+                                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color] duration-300 ease-out ${
+                                                done
+                                                    ? 'border-[#002FA7] bg-[#002FA7] text-white'
+                                                    : active
+                                                        ? 'border-[#002FA7]/30 bg-white text-[#002FA7]'
+                                                        : 'border-zinc-300 bg-white text-transparent'
+                                            }`}
+                                        >
+                                            {done ? (
+                                                <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                                            ) : active ? (
+                                                <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" />
+                                            ) : null}
+                                        </span>
+                                        <span
+                                            className={`text-base transition-colors duration-300 ${
+                                                active ? 'font-medium text-zinc-950' : done ? 'text-zinc-600' : 'text-zinc-400'
+                                            }`}
+                                        >
+                                            {step}
+                                        </span>
+                                    </li>
+                                )
+                            })}
+                        </ol>
+
+                        <p role="status" aria-live="polite" className="mt-7 border-t border-zinc-200 pt-5 text-sm text-zinc-500">
+                            {finished
+                                ? 'Still working. Longer bills take a little more time.'
+                                : `Step ${currentStep + 1} of ${STEPS.length}: ${STEPS[currentStep].toLowerCase()}.`}
                         </p>
-                    ))}
+                    </div>
                 </div>
-            </div>
-        </motion.div>
+            </section>
+        </>
     )
 }

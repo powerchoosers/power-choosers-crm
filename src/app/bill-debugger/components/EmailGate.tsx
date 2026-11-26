@@ -1,112 +1,122 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
-import { Mail, ArrowRight, Loader2, CheckCircle, ShieldCheck } from 'lucide-react'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { CheckCircle, Loader2 } from 'lucide-react'
+import { buttonPrimary, focusOnLight, NudgeArrow } from '@/components/landing/ui'
+import { EASE, StepBand } from './StepBand'
 
 interface EmailGateProps {
     onUnlock: (email: string) => void
 }
 
 export function EmailGate({ onUnlock }: EmailGateProps) {
+    const reduceMotion = useReducedMotion()
     const [email, setEmail] = useState('')
     const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle')
+    const [showError, setShowError] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!email || !email.includes('@')) return
+        if (!email || !email.includes('@')) {
+            setShowError(true)
+            return
+        }
 
+        setShowError(false)
         setStatus('loading')
 
-        // Simulate secure tunnel initialization
+        // Short pause before the report opens
         await new Promise(resolve => setTimeout(resolve, 1500))
 
         setStatus('success')
-        // Wait for success animation
+        // Wait for the confirmation to show
         setTimeout(() => {
             onUnlock(email)
         }, 1000)
     }
 
+    const fade = {
+        initial: reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, filter: 'blur(4px)' },
+        animate: reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: 'blur(0px)' },
+        exit: reduceMotion ? { opacity: 0 } : { opacity: 0, filter: 'blur(4px)' },
+        transition: { duration: 0.25, ease: EASE },
+    }
+
     return (
-        <div className="w-full max-w-lg mx-auto text-center px-6">
-            <motion.div
-                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-                className="glass-card p-10 md:p-14 relative overflow-hidden"
-            >
-                {/* Success Overlay */}
-                {status === 'success' && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="absolute inset-0 bg-[#002FA7] z-20 flex flex-col items-center justify-center text-white"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.5 }}
-                            animate={{ scale: 1 }}
-                            transition={{ type: "spring", stiffness: 200, damping: 10 }}
-                        >
-                            <CheckCircle className="w-20 h-20 mb-6" />
-                        </motion.div>
-                        <p className="text-2xl font-bold tracking-tight">Report ready</p>
-                        <p className="text-blue-200 mt-2 font-mono text-xs uppercase tracking-widest">Sending your full report...</p>
-                    </motion.div>
-                )}
+        <>
+            <StepBand
+                title="Where should we send your report?"
+                lead="Enter your work email. We will email you the full report and open it on this page."
+            />
 
-                <div className="mb-10">
-                    <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-[#002FA7] shadow-inner">
-                        <ShieldCheck className="w-8 h-8" />
+            <section className="min-h-[50vh] bg-white px-6 py-12 lg:px-10 lg:py-16">
+                <div className="mx-auto max-w-7xl">
+                    <div className="max-w-xl rounded-2xl border border-zinc-200 bg-zinc-50 p-6 sm:p-8">
+                        <AnimatePresence mode="wait" initial={false}>
+                            {status === 'success' ? (
+                                <motion.div key="success" role="status" className="flex items-start gap-3 py-2" {...fade}>
+                                    <CheckCircle aria-hidden className="mt-0.5 h-6 w-6 shrink-0 text-emerald-600" />
+                                    <div>
+                                        <p className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Your report is ready</p>
+                                        <p className="mt-1 text-base leading-7 text-zinc-600">Opening the full report now.</p>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.form key="form" onSubmit={handleSubmit} {...fade}>
+                                    <label htmlFor="bill-review-email" className="block text-sm font-medium text-zinc-950">
+                                        Work email
+                                    </label>
+                                    <input
+                                        id="bill-review-email"
+                                        name="email"
+                                        type="email"
+                                        required
+                                        autoComplete="email"
+                                        value={email}
+                                        onChange={(e) => {
+                                            setEmail(e.target.value)
+                                            if (showError) setShowError(false)
+                                        }}
+                                        placeholder="name@company.com"
+                                        aria-invalid={showError}
+                                        aria-describedby={showError ? 'bill-review-email-error' : undefined}
+                                        className={`mt-2 w-full rounded-[10px] border bg-white px-4 py-3 text-base text-zinc-950 placeholder:text-zinc-400 transition-[border-color,box-shadow] duration-200 focus:outline-none focus:ring-4 disabled:opacity-60 ${
+                                            showError
+                                                ? 'border-red-500 focus:border-red-600 focus:ring-red-500/15'
+                                                : 'border-zinc-300 focus:border-[#002FA7] focus:ring-[#002FA7]/15'
+                                        }`}
+                                        disabled={status === 'loading'}
+                                    />
+                                    {showError ? (
+                                        <p id="bill-review-email-error" role="alert" className="mt-2 text-sm text-red-700">
+                                            That email does not look right. Enter it like name@company.com.
+                                        </p>
+                                    ) : null}
+
+                                    <button
+                                        type="submit"
+                                        disabled={status === 'loading'}
+                                        className={`${buttonPrimary} ${focusOnLight} mt-6 w-full sm:w-auto`}
+                                    >
+                                        {status === 'loading' ? (
+                                            <>
+                                                <Loader2 aria-hidden className="h-4 w-4 motion-safe:animate-spin" />
+                                                Getting your report ready
+                                            </>
+                                        ) : (
+                                            <>
+                                                Email me the report
+                                                <NudgeArrow />
+                                            </>
+                                        )}
+                                    </button>
+
+                                    <p className="mt-5 text-sm text-zinc-500">Your review stays private. No spam.</p>
+                                </motion.form>
+                            )}
+                        </AnimatePresence>
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 mb-4 tracking-tighter">
-                        Send the full report
-                    </h2>
-                    <p className="text-zinc-500 text-lg leading-relaxed font-medium">
-                        Enter your work email and we&apos;ll send the full report to your inbox.
-                    </p>
                 </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="text-left">
-                        <label className="text-xs font-mono font-bold uppercase text-[#002FA7] ml-2 mb-2 block tracking-widest">
-                            Work email
-                        </label>
-                        <input
-                            type="email"
-                            required
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="name@company.com"
-                            className="w-full px-6 py-4 rounded-2xl border border-zinc-200 bg-white focus:bg-white focus:ring-4 focus:ring-[#002FA7]/10 focus:border-[#002FA7] outline-none transition-all placeholder:text-zinc-300 text-lg font-medium"
-                            disabled={status === 'loading'}
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={status === 'loading'}
-                        className="w-full bg-black text-white font-bold py-5 rounded-2xl hover:bg-zinc-900 transition-all flex items-center justify-center gap-3 disabled:opacity-50 shadow-2xl active:scale-[0.98] group"
-                    >
-                        {status === 'loading' ? (
-                            <Loader2 className="w-6 h-6 animate-spin" />
-                        ) : (
-                            <>
-                                Send the report
-                                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            </>
-                        )}
-                    </button>
-                </form>
-
-                <div className="mt-10 flex items-center justify-center gap-4 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-400">
-                    <span className="flex items-center gap-1">
-                        <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
-                        Private review
-                    </span>
-                    <span>•</span>
-                    <span>No spam</span>
-                </div>
-
-            </motion.div>
-        </div>
+            </section>
+        </>
     )
 }

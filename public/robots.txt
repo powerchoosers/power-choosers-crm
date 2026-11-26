@@ -4,9 +4,9 @@
 # Default rules for all search engines
 User-agent: *
 Allow: /
-Allow: /philosophy
+Allow: /how-it-works
+Allow: /who-we-serve
 Allow: /bill-debugger
-Allow: /technical-docs
 Allow: /market-data
 
 # Block platform/private areas and API endpoints

@@ -3,99 +3,26 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Lock, Activity, Mail, CheckCircle2, CalendarDays, Eye, EyeOff } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { useScrollEffect } from '@/hooks/useScrollEffect';
-import { PageReveal } from '@/components/motion/PageReveal';
+import { displayFontClass } from '@/components/landing/fonts';
+import { buttonPrimary, focusOnDark, focusOnLight, NudgeArrow, TextLink } from '@/components/landing/ui';
 
-// Blurred dashboard preview cards
-function ForensicPreview() {
-    return (
-        <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-            <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CLIENT_DASHBOARD</p>
-                <div className="space-y-3">
-                    {[
-                        { label: 'DEMAND_EXPOSURE', value: '$4,820 / mo' },
-                        { label: 'RATE_CLASS', value: 'LZ_SOUTH_7B' },
-                        { label: 'CONTRACT_END', value: 'Aug 2026' },
-                        { label: 'SCARCITY_ADDER', value: '+$0.031 /kWh' },
-                        { label: 'PEAK_LOAD', value: '847 kW' },
-                        { label: 'ALL_IN_RATE', value: '14.2 ¢/kWh' },
-                    ].map(row => (
-                        <div key={row.label} className="flex justify-between items-center border-b border-white/5 pb-2">
-                            <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">{row.label}</span>
-                            <span className="font-mono text-[11px] text-zinc-200 font-semibold">{row.value}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
-                <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
-            </div>
-        </div>
-    );
-}
+const EASE = [0.23, 1, 0.32, 1] as const;
 
-function MarketPreview() {
-    return (
-        <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-            <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">LIVE_MARKET_SNAPSHOT</p>
-                <div className="space-y-3">
-                    {[
-                        { label: 'LZ_SOUTH', value: '$22.35', sub: '↑ 4.2%' },
-                        { label: 'LZ_HOUSTON', value: '$21.80', sub: '↑ 3.8%' },
-                        { label: 'SYSTEM_LOAD', value: '48.1 GW', sub: 'Live' },
-                        { label: 'RESERVES', value: '19.0 GW', sub: 'Adequate' },
-                        { label: 'SCARCITY_PROB', value: '0.0%', sub: 'Trend' },
-                    ].map(row => (
-                        <div key={row.label} className="flex justify-between items-center border-b border-white/5 pb-2">
-                            <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">{row.label}</span>
-                            <div className="text-right">
-                                <span className="font-mono text-[11px] text-zinc-200 font-semibold">{row.value}</span>
-                                <span className="font-mono text-[9px] text-zinc-600 ml-2">{row.sub}</span>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
-                <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
-            </div>
-        </div>
-    );
-}
+/** What a client actually finds in the dashboard. Keep in step with ClientDashboard. */
+const INSIDE = [
+    { title: 'Your rate next to the Texas average', body: 'See at a glance whether your contract is protecting you.' },
+    { title: 'When to renew', body: 'Days left on your contract and how the market looks for locking a new one.' },
+    { title: 'Your usage, month by month', body: 'The last year of usage and peak demand for each of your sites.' },
+    { title: 'Signed agreements', body: 'Download your executed contracts whenever you need them.' },
+] as const;
 
-function ContractPreview() {
-    return (
-        <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
-            <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CONTRACT_SUMMARY</p>
-                <div className="space-y-3">
-                    {[
-                        { label: 'ACTIVE CONTRACT', value: 'Constellation Energy', alert: false },
-                        { label: 'RATE TYPE', value: 'Fixed 12-Month', alert: false },
-                        { label: 'EXPIRY ALERT', value: '87 days', alert: true },
-                        { label: 'SAVINGS_LOCKED', value: '$14,220 /yr', alert: false },
-                        { label: 'RENEWAL_WINDOW', value: 'Opens Nov 2026', alert: false },
-                    ].map(row => (
-                        <div key={row.label} className="flex justify-between items-center border-b border-white/5 pb-2">
-                            <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">{row.label}</span>
-                            <span className={`font-mono text-[11px] font-semibold ${row.alert ? 'text-amber-400' : 'text-zinc-200'}`}>{row.value}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-            <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
-                <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
-            </div>
-        </div>
-    );
-}
+const labelClass = 'block text-sm font-medium text-zinc-950';
+const inputClass =
+    'mt-2 w-full rounded-[10px] border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-950 placeholder:text-zinc-400 transition-[border-color,box-shadow] duration-200 focus:border-[#002FA7] focus:outline-none focus:ring-4 focus:ring-[#002FA7]/15';
+const quietButton = `np-link rounded-sm text-sm font-medium text-[#002FA7] ${focusOnLight}`;
 
 export default function PortalContent() {
     const [email, setEmail] = useState('');
@@ -104,7 +31,7 @@ export default function PortalContent() {
     const [mode, setMode] = useState<'password' | 'magic'>('password');
     const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
-    const isScrolled = useScrollEffect((y) => y > 30, false);
+    const reduceMotion = useReducedMotion();
 
     const handlePasswordLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -120,9 +47,9 @@ export default function PortalContent() {
 
             if (error) {
                 if (error.message.toLowerCase().includes('invalid login credentials')) {
-                    setErrorMsg('Incorrect email or password. If you haven\'t set a password yet, use the magic link option below.');
+                    setErrorMsg('That email or password is not right. If you have not set a password yet, use "Email me a sign-in link" below.');
                 } else if (error.message.toLowerCase().includes('email not confirmed')) {
-                    setErrorMsg('Please check your email for an invitation link to activate your account first.');
+                    setErrorMsg('Your account is not active yet. Check your email for the invitation link, then come back and sign in.');
                 } else {
                     setErrorMsg(error.message);
                 }
@@ -131,7 +58,7 @@ export default function PortalContent() {
                 window.location.href = '/client';
             }
         } catch {
-            setErrorMsg('Something went wrong. Please try again.');
+            setErrorMsg('We could not sign you in. Check your connection and try again.');
             setStatus('error');
         }
     };
@@ -153,7 +80,7 @@ export default function PortalContent() {
 
             if (error) {
                 if (error.message.toLowerCase().includes('signups not allowed') || error.status === 422) {
-                    setErrorMsg('This email isn\'t registered as a Nodal Point client. To get access, book a briefing or review your bill below.');
+                    setErrorMsg('This email is not registered as a Nodal Point client. To get started, review a bill or book a call below.');
                 } else {
                     setErrorMsg(error.message);
                 }
@@ -162,242 +89,206 @@ export default function PortalContent() {
                 setStatus('sent');
             }
         } catch {
-            setErrorMsg('Something went wrong. Please try again.');
+            setErrorMsg('We could not send the link. Check your connection and try again.');
             setStatus('error');
         }
     };
 
+    const switchMode = (next: 'password' | 'magic') => {
+        setMode(next);
+        setStatus('idle');
+        setErrorMsg('');
+    };
+
+    const view = status === 'sent' ? 'sent' : mode;
+    const swap = reduceMotion
+        ? { initial: false as const, animate: {}, exit: {} }
+        : {
+              initial: { opacity: 0, y: 10, filter: 'blur(6px)' },
+              animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+              exit: { opacity: 0, y: -6, filter: 'blur(4px)' },
+          };
+
+    const errorBox = (
+        <AnimatePresence initial={false}>
+            {status === 'error' ? (
+                <motion.p
+                    role="alert"
+                    className="overflow-hidden rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700"
+                    initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: EASE }}
+                >
+                    {errorMsg}
+                </motion.p>
+            ) : null}
+        </AnimatePresence>
+    );
+
     return (
-        <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+        <div className={`${displayFontClass} grid min-h-screen bg-white font-sans text-zinc-600 antialiased selection:bg-[#002FA7] selection:text-white lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]`}>
 
-            {/* Header — fixed + blur on scroll */}
-            <header
-                className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${isScrolled
-                        ? 'h-16 bg-zinc-950/85 backdrop-blur-xl border-b border-white/5'
-                        : 'h-20 bg-transparent'
-                    }`}
-            >
-                <Link href="/" className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
-                        <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-full w-auto object-contain" />
-                    </div>
-                    <span className="font-bold text-lg tracking-tighter text-white">
-                        Nodal <span className="text-[#002FA7]">Point</span>
-                    </span>
-                </Link>
-                <Link href="/" className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest hover:text-zinc-300 transition-colors">
-                    ← Back to site
-                </Link>
-            </header>
+            {/* LEFT: brand and what is inside. Dark, sits above the form on small screens. */}
+            <aside className="relative isolate flex flex-col overflow-hidden bg-zinc-950 px-6 pb-10 pt-6 text-white lg:px-12 lg:pb-12 lg:pt-8">
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute -left-40 -top-48 -z-10 h-[34rem] w-[34rem] rounded-full bg-[#002FA7]/45 blur-[150px]"
+                />
+                <div className="flex items-center justify-between">
+                    <Link href="/" className={`flex items-center gap-2.5 rounded-md ${focusOnDark}`}>
+                        <Image src="/images/nodalpoint.png" alt="" width={32} height={32} className="h-8 w-8 rounded-lg bg-white p-0.5" priority />
+                        <span className="text-lg font-semibold tracking-[-0.02em]">Nodal Point</span>
+                    </Link>
+                    <Link href="/" className={`np-link rounded-sm text-sm font-medium text-zinc-300 transition-colors duration-200 hover:text-white ${focusOnDark}`}>
+                        Back to site
+                    </Link>
+                </div>
 
-            {/* Main — padded for fixed header */}
-            <main className="flex-1 flex items-center justify-center px-6 pt-28 pb-12">
-                <PageReveal className="w-full max-w-5xl" delay={0.05}>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div className="mt-12 lg:my-auto lg:py-12">
+                    <h1 className="np-display np-enter max-w-md text-4xl sm:text-5xl lg:text-6xl">Your client dashboard.</h1>
+                    <p className="np-enter mt-5 max-w-md text-lg leading-8 text-zinc-300" style={{ animationDelay: '80ms' }}>
+                        Everything about your electricity contract in one place, in plain English.
+                    </p>
+                    <ul className="np-enter mt-10 hidden max-w-md border-t border-white/10 lg:block" style={{ animationDelay: '160ms' }}>
+                        {INSIDE.map((item) => (
+                            <li key={item.title} className="border-b border-white/10 py-4">
+                                <p className="text-base font-semibold tracking-[-0.01em] text-white">{item.title}</p>
+                                <p className="mt-1 text-sm leading-6 text-zinc-400">{item.body}</p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
 
-                    {/* LEFT: Login */}
-                    <div className="w-full max-w-sm mx-auto lg:mx-0">
-                        <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CLIENT_PORTAL</p>
-                        <h1 className="text-4xl font-bold tracking-tighter text-white mb-3 leading-tight">
-                            Your client dashboard.
-                        </h1>
-                        <p className="text-zinc-400 text-sm leading-relaxed mb-10">
-                            Sign in with your credentials. Access is by invitation only.
-                        </p>
+                <p className="hidden text-sm text-zinc-500 lg:block">Access is by invitation, for existing clients.</p>
+            </aside>
 
-                        {status === 'sent' ? (
-                            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center">
-                                <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-4" />
-                                <p className="font-semibold text-white mb-2">Check your inbox</p>
-                                <p className="text-zinc-400 text-sm leading-relaxed">
-                                    We sent a secure access link to <span className="text-zinc-200 font-mono">{email}</span>. The link expires in 10 minutes.
+            {/* RIGHT: sign in */}
+            <main className="flex items-center justify-center px-6 py-12 lg:px-12">
+                <div className="w-full max-w-md">
+                    <AnimatePresence mode="wait" initial={false}>
+                        {view === 'sent' ? (
+                            <motion.div key="sent" {...swap} transition={{ duration: 0.3, ease: EASE }} role="status">
+                                <CheckCircle2 className="h-9 w-9 text-emerald-600" aria-hidden />
+                                <h2 className="np-display mt-5 text-4xl text-zinc-950">Check your inbox</h2>
+                                <p className="mt-4 text-base leading-7 text-zinc-600">
+                                    We sent a sign-in link to <span className="font-medium text-zinc-950">{email}</span>. The link expires in 10 minutes.
                                 </p>
-                                <button
-                                    onClick={() => setStatus('idle')}
-                                    className="mt-4 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
-                                >
-                                    ← Back to sign in
+                                <button type="button" onClick={() => setStatus('idle')} className={`mt-8 ${quietButton}`}>
+                                    Back to sign in
                                 </button>
-                            </div>
-                        ) : mode === 'password' ? (
-                            <form onSubmit={handlePasswordLogin} className="space-y-4">
-                                {/* Email */}
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={e => setEmail(e.target.value)}
-                                        placeholder="your@company.com"
-                                        required
-                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-11 pr-4 py-3.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] transition-colors"
-                                    />
-                                </div>
+                            </motion.div>
+                        ) : view === 'password' ? (
+                            <motion.div key="password" {...swap} transition={{ duration: 0.3, ease: EASE }}>
+                                <h2 className="np-display text-4xl text-zinc-950">Sign in</h2>
+                                <p className="mt-3 text-base leading-7 text-zinc-600">Use the email your invitation was sent to.</p>
 
-                                {/* Password */}
-                                <div className="relative">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                    <input
-                                        type={showPassword ? 'text' : 'password'}
-                                        value={password}
-                                        onChange={e => setPassword(e.target.value)}
-                                        placeholder="••••••••"
-                                        required
-                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-11 pr-11 py-3.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] transition-colors"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(v => !v)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                                        tabIndex={-1}
-                                    >
-                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-
-                                {status === 'error' && (
-                                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3">
-                                        <p className="text-zinc-400 text-xs leading-relaxed">{errorMsg}</p>
+                                <form onSubmit={handlePasswordLogin} className="mt-8 space-y-5">
+                                    <div>
+                                        <label htmlFor="portal-email" className={labelClass}>Work email</label>
+                                        <input
+                                            id="portal-email"
+                                            type="email"
+                                            autoComplete="email"
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            placeholder="you@company.com"
+                                            required
+                                            className={inputClass}
+                                        />
                                     </div>
-                                )}
 
-                                <button
-                                    type="submit"
-                                    disabled={status === 'loading' || !email.trim() || !password.trim()}
-                                    className="w-full flex items-center justify-center gap-2 bg-[#002FA7] hover:bg-[#002FA7]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-                                >
-                                    {status === 'loading' ? (
-                                        <span className="font-mono text-sm">Authenticating...</span>
-                                    ) : (
-                                        <>
-                                            <span className="font-mono text-sm uppercase tracking-wider">Sign In</span>
-                                            <ArrowRight className="w-4 h-4" />
-                                        </>
-                                    )}
-                                </button>
+                                    <div>
+                                        <label htmlFor="portal-password" className={labelClass}>Password</label>
+                                        <div className="relative">
+                                            <input
+                                                id="portal-password"
+                                                type={showPassword ? 'text' : 'password'}
+                                                autoComplete="current-password"
+                                                value={password}
+                                                onChange={e => setPassword(e.target.value)}
+                                                required
+                                                className={`${inputClass} pr-12`}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(v => !v)}
+                                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                                aria-pressed={showPassword}
+                                                className={`absolute right-2 top-1/2 mt-1 -translate-y-1/2 rounded-md p-2 text-zinc-500 transition-colors duration-200 hover:text-zinc-950 ${focusOnLight}`}
+                                            >
+                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                            </button>
+                                        </div>
+                                    </div>
 
-                                <div className="text-center pt-1 space-y-1">
-                                    <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">
-                                        Access by invitation only · Existing clients
-                                    </p>
+                                    {errorBox}
+
                                     <button
-                                        type="button"
-                                        onClick={() => { setMode('magic'); setStatus('idle'); setErrorMsg(''); }}
-                                        className="font-mono text-[9px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
+                                        type="submit"
+                                        disabled={status === 'loading' || !email.trim() || !password.trim()}
+                                        className={`${buttonPrimary} ${focusOnLight} w-full`}
                                     >
-                                        Send me a login link instead →
+                                        {status === 'loading' ? 'Signing in…' : <>Sign in<NudgeArrow /></>}
                                     </button>
-                                </div>
-                            </form>
+                                </form>
+
+                                <button type="button" onClick={() => switchMode('magic')} className={`mt-6 ${quietButton}`}>
+                                    Email me a sign-in link instead
+                                </button>
+                            </motion.div>
                         ) : (
-                            <form onSubmit={handleMagicLink} className="space-y-4">
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={e => setEmail(e.target.value)}
-                                        placeholder="your@company.com"
-                                        required
-                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-11 pr-4 py-3.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] transition-colors"
-                                    />
-                                </div>
+                            <motion.div key="magic" {...swap} transition={{ duration: 0.3, ease: EASE }}>
+                                <h2 className="np-display text-4xl text-zinc-950">Get a sign-in link</h2>
+                                <p className="mt-3 text-base leading-7 text-zinc-600">
+                                    We&apos;ll email you a link that signs you in. No password needed.
+                                </p>
 
-                                {status === 'error' && (
-                                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3">
-                                        <p className="text-zinc-400 text-xs leading-relaxed">{errorMsg}</p>
+                                <form onSubmit={handleMagicLink} className="mt-8 space-y-5">
+                                    <div>
+                                        <label htmlFor="portal-magic-email" className={labelClass}>Work email</label>
+                                        <input
+                                            id="portal-magic-email"
+                                            type="email"
+                                            autoComplete="email"
+                                            value={email}
+                                            onChange={e => setEmail(e.target.value)}
+                                            placeholder="you@company.com"
+                                            required
+                                            className={inputClass}
+                                        />
                                     </div>
-                                )}
 
-                                <button
-                                    type="submit"
-                                    disabled={status === 'loading' || !email.trim()}
-                                    className="w-full flex items-center justify-center gap-2 bg-[#002FA7] hover:bg-[#002FA7]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
-                                >
-                                    {status === 'loading' ? (
-                                        <span className="font-mono text-sm">Sending link...</span>
-                                    ) : (
-                                        <>
-                                            <span className="font-mono text-sm uppercase tracking-wider">Send Access Link</span>
-                                            <ArrowRight className="w-4 h-4" />
-                                        </>
-                                    )}
-                                </button>
+                                    {errorBox}
 
-                                <div className="text-center pt-1">
                                     <button
-                                        type="button"
-                                        onClick={() => { setMode('password'); setStatus('idle'); setErrorMsg(''); }}
-                                        className="font-mono text-[9px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
+                                        type="submit"
+                                        disabled={status === 'loading' || !email.trim()}
+                                        className={`${buttonPrimary} ${focusOnLight} w-full`}
                                     >
-                                        ← Sign in with password instead
+                                        {status === 'loading' ? 'Sending link…' : <>Email me the link<NudgeArrow /></>}
                                     </button>
-                                </div>
-                            </form>
+                                </form>
+
+                                <button type="button" onClick={() => switchMode('password')} className={`mt-6 ${quietButton}`}>
+                                    Sign in with a password instead
+                                </button>
+                            </motion.div>
                         )}
+                    </AnimatePresence>
 
-                        {/* Divider */}
-                        <div className="flex items-center gap-4 my-10">
-                            <div className="flex-1 h-px bg-zinc-800" />
-                            <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest shrink-0">Not a client?</p>
-                            <div className="flex-1 h-px bg-zinc-800" />
-                        </div>
-
-                        {/* Non-client CTAs */}
-                        <div className="space-y-3">
-                            <Link
-                                href="/bill-debugger"
-                                className="w-full flex items-center justify-between gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3.5 px-5 rounded-xl transition-all duration-200 group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Activity className="w-4 h-4 text-white" />
-                                    <div>
-                                        <p className="text-sm font-semibold">Review My Bill</p>
-                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Upload your bill · 60 seconds</p>
-                                    </div>
-                                </div>
-                                <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
-                            </Link>
-                            <Link
-                                href={`/book${email.trim() ? `?email=${encodeURIComponent(email)}&from=/portal` : ''}`}
-                                className="w-full flex items-center justify-between gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3.5 px-5 rounded-xl transition-all duration-200 group"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <CalendarDays className="w-4 h-4 text-white shrink-0" />
-                                    <div>
-                                        <p className="text-sm font-semibold">Book a Strategy Call</p>
-                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Strategy session · No commitment</p>
-                                    </div>
-                                </div>
-                                <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
-                            </Link>
+                    <div className="mt-12 border-t border-zinc-200 pt-8">
+                        <p className="text-sm font-medium text-zinc-950">Not a client yet?</p>
+                        <p className="mt-1 text-sm leading-6 text-zinc-500">Start with a bill review or a call. Both are free of commitment.</p>
+                        <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3">
+                            <TextLink href="/bill-debugger">Review my bill</TextLink>
+                            <TextLink href={`/book${email.trim() ? `?email=${encodeURIComponent(email)}&from=/portal` : ''}`}>
+                                Book a call
+                            </TextLink>
                         </div>
                     </div>
-
-                    {/* RIGHT: Blurred FOMO previews */}
-                    <div className="hidden lg:flex flex-col gap-4">
-                        <div className="flex items-center gap-2 mb-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                            <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">What you see inside</p>
-                        </div>
-                        <ForensicPreview />
-                        <div className="grid grid-cols-2 gap-4">
-                            <MarketPreview />
-                            <ContractPreview />
-                        </div>
-                    </div>
-
-                    </div>
-                </PageReveal>
+                </div>
             </main>
-
-            {/* Footer */}
-            <footer className="px-8 py-6 shrink-0">
-                <p className="font-mono text-[9px] text-zinc-700 uppercase tracking-widest text-center">
-                    Nodal Point · Client Portal · Secured by Supabase
-                </p>
-            </footer>
-
         </div>
     );
 }

@@ -650,6 +650,9 @@
 }
 
 @theme inline {
+  /* Public-site headline face (font-display). Inline so it resolves where the page wrapper
+     loads Newsreader, and falls back to Inter everywhere else. */
+  --font-display: var(--font-newsreader, var(--font-inter)), Georgia, serif;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -847,3 +850,53 @@
   .nodal-video-monitor .vjs-volume-level {
     background: #002FA7;
   }
+
+/* Public-site headlines. Face, weight and tracking come from the page wrapper
+   (see src/components/landing/fonts.ts) so they can change in one place. */
+.np-display {
+  font-family: var(--font-newsreader, var(--font-inter)), Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+/* Public-site link underline that draws in from the left on hover. */
+.np-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+  transition: background-size 0.3s cubic-bezier(0.23, 1, 0.32, 1), color 0.2s;
+}
+.np-link:hover,
+.np-link:focus-visible,
+.np-link[aria-current='page'] {
+  background-size: 100% 1px;
+}
+
+/* Public-site hero text entrance. Pure CSS so it runs before JavaScript loads.
+   Stagger with an inline animation-delay. */
+@keyframes np-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+.np-enter {
+  animation: np-enter 0.6s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .np-enter {
+    animation: none;
+  }
+  .np-link {
+    transition: none;
+  }
+}

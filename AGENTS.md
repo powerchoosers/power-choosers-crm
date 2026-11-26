@@ -1,12 +1,17 @@
 # AGENTS.md
 
-This file gives Codex a fast, reliable briefing for the `crm-platform` repo. It should reduce wasted exploration, not replace reading the code. If this file conflicts with the codebase, trust the code and update this file.
+A fast briefing for coding agents working in the `crm-platform` repo. It should cut wasted exploration, not replace reading the code. If this file conflicts with the codebase, trust the code and update this file.
 
-## Who This Project Is For
+## What Nodal Point Does
 
-Nodal Point CRM is a modern CRM for commercial energy procurement and forensic tariff intelligence. The core goal is to help brokers and sales users spot hidden cost leakage, understand account risk quickly, and act fast.
+Nodal Point is an energy broker for Texas businesses. We read a company's electricity bill, find the gaps in its plan (peak charges, fees passed through, the wrong kind of plan), and negotiate a better one with suppliers.
 
-When making product decisions, apply the "CFO test":
+This repo holds two products that share one Next.js app:
+
+1. **The public website** (`nodalpoint.io`) - explains what we do and collects bills and booked calls.
+2. **The CRM** (`/network`) - the internal tool brokers use to spot cost leakage, read account risk, and act.
+
+Apply the "CFO test" to both:
 - Could a CFO understand the screen in 3 seconds?
 - Would they trust the data?
 - Would they know what action to take next?
@@ -31,10 +36,13 @@ If the answer is no, simplify.
 - Supabase for primary data
 - Firestore as legacy read-only reference
 - Radix UI, Lucide, Framer Motion for UI
+- Three.js with React Three Fiber (`three`, `@react-three/fiber`) - public website hero only
 
 ## Important Paths
 
 - `src/app/` - App Router UI
+- `src/app/page.tsx` - public home page
+- `src/components/landing/` - public website components
 - `src/app/api/` - App Router route handlers for a few auth/webhook endpoints
 - `src/pages/api/` - legacy API routes
 - `public/images/nodalpoint-webicon.png` - official Nodal Point web icon used in headers, print sheets, and small brand marks
@@ -48,7 +56,78 @@ If the answer is no, simplify.
 - `src/hooks/useContacts.ts` - key example of normalization rules
 - `vercel.json` - deploy config, rewrites, cron setup
 
-## Important Routes
+## Public Website
+
+The public site and the CRM look different on purpose. Do not carry CRM styling (glass panels, dense mono labels) into the public site, or public-site styling into the CRM.
+
+### Pages
+
+The public site is a small set of pages:
+
+- `/` - home
+- `/how-it-works` - the four-step process, what the customer gets back, and how we work
+- `/who-we-serve`
+- `/market-data` - live Texas grid numbers in plain English
+- `/contact`
+- `/bill-debugger` - shown to visitors as "Review my bill"; the primary call to action
+- `/book` - "Book a call"
+- `/portal` - client sign in. Split screen: dark brand panel, light sign-in form. Own layout, no `PublicShell`.
+- `/client` - the signed-in client dashboard. Same fonts, colours, buttons and motion as the public site, on a light `bg-zinc-100` page with white panels and a dark welcome band. Own header (logo, account, sign out). It needs a signed-in Supabase user, so it cannot be opened in the `public-site-preview` setup without a real `.env.local`. The usage chart inside it (`UsageProfilePanel`) is shared with the CRM and stays dark; do not restyle it for the client dashboard without checking the CRM account dossier.
+- `/privacy`, `/terms`
+
+`/forensic-review`, `/philosophy`, and `/technical-docs` were merged into `/how-it-works`, and `/market-outlook` into `/market-data`. The old URLs redirect in `next.config.ts`. The redirects are temporary (307) for now; switch them to `permanent: true` once the new pages are confirmed live. `/forensic-review` was used as an ad landing page, so check running ad campaigns before changing where it points.
+
+When a page is added or removed, also update `src/app/sitemap.xml/route.ts`, `public/robots.txt`, and `public/llms.txt`.
+
+### Shared parts (use these, do not restyle per page)
+
+All in `src/components/landing/`:
+
+- `PublicShell` - wraps every public page: header, footer, headline font, base text styles.
+- `PageHero` - the dark opening band for every page except home (home uses `HeroSection`).
+- `ClosingCta` - the dark closing section. Every marketing page ends with it; the two tool pages (`/bill-debugger`, `/book`) do not.
+- `ui.tsx` - `PrimaryLink`, `OutlineLink`, `TextLink`, and the matching class strings for real `<button>`s.
+- `Reveal` - the scroll-in animation.
+- `LegalPage` - layout for privacy and terms.
+- `content.ts` - copy used on more than one page (the four steps, the industries). Edit facts there so pages cannot drift apart.
+
+### Header
+
+`LandingHeader` restyles itself for whatever is behind it. Any section with `data-header-tone="dark"` gets white header text and dark glass; everything else gets dark text and white glass. `PageHero`, `HeroSection`, `ClosingCta`, and the footer already carry the attribute. Add it to any new dark section, or the header text will be unreadable over it. Below `lg` the nav collapses into an animated full-screen menu.
+
+### Design rules
+
+- **Structure:** dark opening section (`bg-zinc-950`), light body (white and `bg-zinc-100`), dark closing section that runs into the footer.
+- **Alignment:** left-aligned. Do not center headline blocks.
+- **Type:** two families only. Headlines (h1, h2, and the one big figure on the sample bill) are Newsreader, a serif, through the `np-display` class defined at the end of `globals.css` (weight 400, tight tracking). Everything else is Inter: body copy, h3s, buttons, nav, labels, and numbers (`tabular-nums`). No monospace and no uppercase tracked labels on the public site. A page opts in by putting `displayFontClass` from `src/components/landing/fonts.ts` on its wrapper, as `src/app/page.tsx` does; without it `np-display` falls back to Inter.
+- **Type scale:** h1 `lg:text-[5.25rem]`, section h2 `md:text-[3.25rem]`, closing h2 `lg:text-[4.25rem]`, h3 `text-xl font-semibold`, lead paragraph `text-lg leading-8`, body `text-base leading-7`, small `text-sm`.
+- **Color:** Nodal blue `#002FA7` is for the one main action and the thing being pointed at. On dark backgrounds use `#5b7cff` for blue lines and marks, because `#002FA7` is unreadable on black.
+- **Buttons:** `rounded-[10px]`. Primary is solid `#002FA7`. Secondary is an outline. Labels are sentence case and say what happens: "Review my bill", "Book a call".
+- **Copy:** plain English a business owner would use. Say "peak charges", not "4CP exposure". Sentence case. No uppercase tracked-out labels above headings.
+- **Claims:** do not invent numbers, savings figures, or statements about how we are paid. Reuse facts already in the repo or ask Lewis.
+- **Motion:** small, quick, and tied to something the visitor does or sees. Under 0.5s, ease `[0.23, 1, 0.32, 1]`, and always respect reduced motion. The set in use:
+  - hero text blurs in on load with the CSS `np-enter` class (staggered with `animationDelay`);
+  - section blocks blur and rise in once with `Reveal` (a section's main block, or a few siblings with a 0.07s step; not every paragraph, and never above the fold);
+  - links draw an underline with `np-link`; primary buttons nudge their arrow and press in slightly;
+  - the mobile menu fades in with blur and staggers its items;
+  - selected or highlighted rows change colour and lift slightly.
+  The home page 3D hero is the only large animation. Nothing loops except a progress indicator while work is really happening.
+- **Blur:** used for glass (header, mobile menu, sticky bars) and for the soft blue light in dark sections. Not as decoration in light sections.
+
+### Hero 3D visual
+
+- `LoadSurface.tsx` decides what shows. Normally: nothing at first, then the WebGL scene (`LoadSurfaceScene.tsx`) fades in while it rises from flat, so there is one intro and no swap. It runs at every screen size. Users with reduced motion or no WebGL get a static SVG instead.
+- Layout: at `lg` and up the scene runs behind the right side of the hero. Below `lg` it sits under the buttons and fills the rest of the first screen. Test both, plus the in-app browser pane, which is usually narrower than `lg`.
+- Both draw the same data from `loadProfile.ts`: one building's electricity use across a year, with the peak hours highlighted. Change the data there so the two stay matched.
+- The scene is a solid lit surface drawn by one custom shader. A band of light sweeps across it; each peak it passes shoots up and gets a glowing marker. It rises from flat on load, leans slightly toward the cursor, and lifts away on scroll.
+- The scene is loaded with `next/dynamic` and `ssr: false`. Keep it that way so Three.js never lands in the CRM bundle or blocks the headline.
+- Keep 3D to this one visual. Do not add WebGL to the CRM.
+
+### Sample bill on the home page
+
+`BillGaps.tsx` shows an example bill. The total ($3,735.44), usage (20,250 kWh), and "delivery and demand were nearly half" come from a real anonymized warehouse review. The individual line items are illustrative and labeled as such on the page. Keep that label if the numbers change.
+
+## CRM Routes
 
 - `/network` - main dashboard / war room
 - `/network/accounts/[id]` - account dossier
@@ -65,12 +144,12 @@ If the answer is no, simplify.
 When using the in-app browser, use the right URL for the job:
 
 - CRM app work: `http://localhost:3000/network`
-- Regular local app work: `http://localhost:3000`
-- Public customer home page: `https://nodalpoint.io`
+- Public website work (local): `http://localhost:3000`
+- Live public website: `https://nodalpoint.io`
 
-If the user asks to inspect the CRM, start with `/network`. If they ask to inspect the public site or customer-facing home page, use `nodalpoint.io` instead of the CRM route.
+If the user asks to inspect the CRM, start with `/network`. If they ask to inspect the public site or customer-facing home page, use the local home page for work in progress and `nodalpoint.io` for what is live.
 
-Use the in-app browser directly, not shell workarounds. The browser should be driven through the Node REPL `js` tool with the browser runtime, then the `iab` browser:
+Use the in-app browser directly, not shell workarounds. In Codex, drive it through the Node REPL `js` tool with the browser runtime, then the `iab` browser:
 
 - initialize the browser runtime
 - get `agent.browsers.get('iab')`
@@ -95,6 +174,8 @@ Turbo dev is fine here and often preferred. Only use `npm run dev` if you are sp
 
 TypeScript must stay clean before shipping changes. Run `npm run typecheck` after code edits. Only run `npm run build` when Lewis explicitly asks for deploy-level verification or when you are chasing a build-only problem that typecheck cannot catch.
 
+The app will not boot without `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and that includes the public pages, because the root layout loads the Supabase client. To preview only the public site on a machine with no `.env.local`, set placeholder values for those two variables in the dev server's environment (see the `public-site-preview` entry in `.claude/launch.json`). Backend calls will fail, which is expected.
+
 ## Image Renders
 
 - `playwright` is already in `devDependencies` and is the default tool for crisp LinkedIn-style screenshots and HTML renders.
@@ -112,6 +193,13 @@ TypeScript must stay clean before shipping changes. Run `npm run typecheck` afte
   3. nested values inside `metadata`
 - `/network` access is gated by the `np_session=1` cookie. If you touch auth, update `middleware.ts`, the login page, the Zoho callback routes, and `src/app/network/layout.tsx` together.
 - Zoho and Twilio auth/webhook flows assume the canonical production host is `www.nodalpoint.io`. Do not simplify redirect or cookie-domain logic without checking the login and callback paths.
+
+Row-level security, as of the `20261126000100` migration:
+- Admins are the emails hard-coded in the `is_admin()` database function. Admins see and change everything.
+- `deals`: non-admin staff only reach deals they own (`ownerId` equal to their auth uid or email). Portal clients can read, not change, deals on their own account.
+- `meters`: readable when the meter's account is visible to you; only admins and the account owner can change them.
+- Portal clients are matched by sign-in email to `contacts.email`, then to that contact's `accountId`.
+- The browser Supabase client is subject to these rules. Server routes using `supabaseAdmin` are not. If a CRM screen suddenly shows no deals or meters for a non-admin user, check these policies first.
 
 Important relationship:
 - `contacts.accountId` links to `accounts.id`
@@ -167,9 +255,11 @@ AND (id LIKE 'seq_exec_%' OR id LIKE 'zoho_seq_%');
 -- Should return 0
 ```
 
-## UI Rules
+## CRM UI Rules
 
-The product uses a dark forensic interface, not a generic SaaS style.
+These apply to `/network` and other internal surfaces. For the public website, see "Public Website" above.
+
+The CRM uses a dark forensic interface, not a generic SaaS style.
 
 Primary visual rules:
 - Use the Nodal blue `#002FA7` as a signal color, not decoration.
@@ -231,11 +321,11 @@ Common TanStack Query key patterns include:
 - Hosted on Vercel
 - Root directory must be `crm-platform`
 - Main required environment values include Supabase, Gemini, Twilio, and Zoho-related secrets
-- Production deploys come from `main`
+- Production deploys come from `main`, so a push to `main` puts public website changes live
 
 ## Supabase MCP Access
 
-Codex can access the connected Supabase project through the configured MCP tools in this environment. That is the preferred way to inspect schema, run safe queries, check advisors, generate types, and manage migrations.
+Agents can access the connected Supabase project through the configured MCP tools in this environment. That is the preferred way to inspect schema, run safe queries, check advisors, generate types, and manage migrations.
 
 Use MCP Supabase tools for:
 - listing tables, migrations, branches, extensions, and edge functions
@@ -255,7 +345,7 @@ Rules:
 - If a database change is risky, inspect schema and advisors first.
 - After schema changes, rerun the advisors. This project already has warnings around mutable `search_path`, permissive RLS on some tables, and unindexed foreign keys, so do not assume an old warning is harmless.
 
-## Working Rules For Codex
+## Working Rules
 
 - Read the existing code before assuming architecture.
 - Prefer matching local patterns over introducing a "cleaner" but foreign approach.
@@ -263,6 +353,7 @@ Rules:
 - When changing dossier, dashboard, telemetry, or protocol-builder UI, preserve the forensic command-center feel.
 - Favor concise, understandable solutions over clever ones.
 - If something looks inconsistent or wasteful, call it out clearly instead of working around it silently.
+- Install a dependency only when the change in front of you uses it.
 
 ## Desktop Electron App
 

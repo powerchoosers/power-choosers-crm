@@ -1,5 +1,5 @@
-import { motion } from 'framer-motion'
-import { CircleDollarSign } from 'lucide-react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { EASE } from './StepBand'
 
 interface BillReviewLensProps {
     usageKwh: number
@@ -30,6 +30,7 @@ export function BillReviewLens({
     deliveryAmount,
     taxesAmount,
 }: BillReviewLensProps) {
+    const reduceMotion = useReducedMotion()
     const allInRate = usageKwh > 0 && totalBill > 0 ? totalBill / usageKwh : 0
     const sectionTotal = supplyAmount + deliveryAmount + taxesAmount
     const supplyShare = sectionTotal > 0 ? (supplyAmount / sectionTotal) * 100 : 0
@@ -40,122 +41,98 @@ export function BillReviewLens({
     const sectionRows = [
         {
             label: 'Supply',
+            note: 'The electricity itself',
             value: supplyAmount,
             share: supplyShare,
             bar: 'bg-[#002FA7]',
-            text: 'text-[#002FA7]',
         },
         {
             label: 'Delivery',
+            note: 'The utility that brings it to you',
             value: deliveryAmount,
             share: deliveryShare,
-            bar: 'bg-zinc-300',
-            text: 'text-zinc-600',
+            bar: 'bg-zinc-500',
         },
         {
-            label: 'Taxes & fees',
+            label: 'Taxes and fees',
+            note: 'Passed through on the bill',
             value: taxesAmount,
             share: taxesShare,
-            bar: 'bg-zinc-200',
-            text: 'text-zinc-500',
+            bar: 'bg-zinc-300',
         },
     ] as const
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 14, filter: 'blur(8px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-            transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
-            className="rounded-[28px] border border-zinc-200/70 bg-white shadow-sm overflow-hidden"
-        >
-            <div className="flex items-start justify-between gap-4 px-5 pt-5">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-6 sm:p-8">
+            <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">
+                The rate on the bill and the rate you paid
+            </h3>
+
+            <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                 <div>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
-                        Rate lens
+                    <p className="text-sm font-medium text-zinc-950">What you paid per kWh, all in</p>
+                    <p className="np-display mt-2 text-4xl text-[#002FA7] [font-variant-numeric:lining-nums_tabular-nums]">
+                        {allInRate > 0 ? formatCents(allInRate) : 'Not available'}
                     </p>
-                    <h3 className="mt-1 text-lg font-semibold tracking-tight text-zinc-900">
-                        Printed supply rate vs invoice rate
-                    </h3>
-                </div>
-
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#002FA7]/10 bg-[#002FA7]/5 text-[#002FA7]">
-                    <CircleDollarSign className="h-5 w-5" />
-                </div>
-            </div>
-
-            <div className="grid gap-3 px-5 pt-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-400">
-                        All-in invoice rate
-                    </p>
-                    <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-zinc-900">
-                        {allInRate > 0 ? formatCents(allInRate) : 'N/A'}
-                    </p>
-                    <p className="mt-2 text-xs leading-5 text-zinc-500">
-                        Current charges divided by usage. This is the number that reflects the month&apos;s real cost.
+                    <p className="mt-2 text-sm leading-6 text-zinc-500">
+                        The bill total divided by your usage. This is what the month really cost.
                     </p>
                 </div>
 
-                <div className="rounded-2xl border border-[#002FA7]/15 bg-[#002FA7]/5 p-4">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#002FA7]">
-                        Printed supply rate
-                    </p>
-                    <p className="mt-2 font-mono text-3xl font-semibold tracking-tight text-[#002FA7]">
+                <div className="border-zinc-200 sm:border-l sm:pl-6 lg:border-l-0 lg:pl-0 xl:border-l xl:pl-6">
+                    <p className="text-sm font-medium text-zinc-950">Supply rate printed on the bill</p>
+                    <p className="mt-2 text-3xl font-semibold tracking-[-0.02em] text-zinc-950 tabular-nums">
                         {hasPrintedRate ? formatCents(printedSupplyRate) : 'Not found'}
                     </p>
-                    <p className="mt-2 text-xs leading-5 text-zinc-600">
+                    <p className="mt-2 text-sm leading-6 text-zinc-500 tabular-nums">
                         {hasPrintedRate
-                            ? formatDollarRate(printedSupplyRate)
-                            : 'The bill did not surface a clean base-usage rate.'}
+                            ? `Shown on the bill as ${formatDollarRate(printedSupplyRate)}.`
+                            : 'We could not find a supply rate printed on this bill.'}
                     </p>
                 </div>
             </div>
 
-            <div className="px-5 pb-5 pt-5">
-                <div className="flex items-center justify-between gap-3">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-400">
-                        Bill sections
-                    </p>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-400">
-                        Parsed bill blocks
-                    </p>
-                </div>
+            <div className="mt-8 border-t border-zinc-200 pt-6">
+                <p className="text-sm font-medium text-zinc-950">Where the money went</p>
 
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-zinc-100 flex">
-                    {sectionRows.map((section) => (
-                        <div
+                <div aria-hidden className="mt-3 flex h-3 overflow-hidden rounded-full bg-zinc-100">
+                    {sectionRows.map((section, index) => (
+                        <motion.div
                             key={section.label}
                             className={section.bar}
-                            style={{ width: `${Math.max(0, Math.min(100, section.share))}%` }}
+                            initial={reduceMotion ? false : { width: 0 }}
+                            animate={{ width: `${Math.max(0, Math.min(100, section.share))}%` }}
+                            transition={{ duration: 0.5, delay: 0.15 + index * 0.08, ease: EASE }}
                         />
                     ))}
                 </div>
 
-                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <dl className="mt-4">
                     {sectionRows.map((section) => (
-                        <div key={section.label} className="rounded-2xl border border-zinc-200 bg-white/70 p-4">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <span className={`h-2 w-2 rounded-full ${section.bar}`} />
-                                    <p className="text-xs text-zinc-600">{section.label}</p>
-                                </div>
-                                <p className={`font-mono text-[10px] uppercase tracking-[0.24em] ${section.text}`}>
-                                    {section.share.toFixed(1)}%
-                                </p>
-                            </div>
-                            <p className="mt-2 font-mono text-lg font-semibold tracking-tight text-zinc-900">
-                                {formatMoney(section.value)}
-                            </p>
+                        <div
+                            key={section.label}
+                            className="flex items-baseline justify-between gap-4 border-b border-zinc-100 py-3 last:border-b-0 last:pb-0"
+                        >
+                            <dt className="flex min-w-0 items-baseline gap-3">
+                                <span aria-hidden className={`h-2.5 w-2.5 shrink-0 translate-y-[1px] rounded-sm ${section.bar}`} />
+                                <span>
+                                    <span className="block text-base font-medium text-zinc-950">{section.label}</span>
+                                    <span className="block text-sm text-zinc-500">{section.note}</span>
+                                </span>
+                            </dt>
+                            <dd className="shrink-0 text-right tabular-nums">
+                                <span className="block text-base font-semibold text-zinc-950">{formatMoney(section.value)}</span>
+                                <span className="block text-sm text-zinc-500">{section.share.toFixed(1)}%</span>
+                            </dd>
                         </div>
                     ))}
-                </div>
+                </dl>
             </div>
 
-            <div className="border-t border-zinc-100 px-5 py-4">
-                <p className="text-sm leading-6 text-zinc-500">
-                    The printed supply rate is the bill line itself. The invoice rate is the number to use when you want the real month-over-month cost.
-                </p>
-            </div>
-        </motion.div>
+            <p className="mt-6 border-t border-zinc-200 pt-5 text-sm leading-6 text-zinc-500">
+                The printed supply rate only covers the electricity itself. The all-in rate includes
+                delivery, taxes and fees, so use it when you compare one month with another.
+            </p>
+        </div>
     )
 }

@@ -1,6 +1,8 @@
-import React, { useRef, useState } from 'react'
-import { motion } from 'framer-motion'
-import { UploadCloud, Loader2 } from 'lucide-react'
+import React, { useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { FileUp, Loader2 } from 'lucide-react'
+import { buttonPrimary, focusOnLight } from '@/components/landing/ui'
+import { EASE } from './StepBand'
 
 interface UploadZoneProps {
     onUpload: (files: FileList | null) => void
@@ -9,7 +11,7 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onUpload, isAnalyzing, onShowTrust }: UploadZoneProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null)
+    const reduceMotion = useReducedMotion()
     const [isDragging, setIsDragging] = useState(false)
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -29,96 +31,69 @@ export function UploadZone({ onUpload, isAnalyzing, onShowTrust }: UploadZonePro
     }
 
     return (
-        <div className="w-full max-w-2xl mx-auto text-center px-6">
-
-            {/* Header */}
-            {!isAnalyzing && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, filter: 'blur(10px)' }}
-                    className="mb-10"
-                >
-                    <h2 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4">
-                        Upload your bill
-                    </h2>
-                    <p className="text-lg text-zinc-500 font-light">
-                        Upload a recent bill or PDF. <br className="hidden md:block" />
-                        We&apos;ll review it in under 60 seconds.
-                    </p>
-                </motion.div>
-            )}
-
-            {/* Drop Zone Area */}
-            <motion.div
-                layout
-                initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                transition={{ duration: 0.4 }}
-                className={`relative w-full aspect-[2/1] md:aspect-[3/1] rounded-3xl border-2 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden backdrop-blur-xl bg-white/80
-          ${isDragging
-                        ? 'border-[#002FA7] bg-[#002FA7]/5 scale-[1.02] shadow-xl shadow-[#002FA7]/10'
-                        : 'border-dashed border-zinc-300 hover:border-zinc-400 hover:bg-white/90'
-                    }
-          ${isAnalyzing ? 'pointer-events-none border-zinc-200 bg-zinc-50/80 shadow-inner' : ''}
-        `}
+        <div className="rounded-2xl bg-white p-4 text-zinc-600 sm:p-5">
+            {/* The label opens the file picker on click. The input inside it stays focusable,
+                so the drop zone also works from the keyboard. */}
+            <motion.label
+                animate={{ scale: isDragging && !reduceMotion ? 1.01 : 1 }}
+                transition={{ duration: 0.2, ease: EASE }}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => !isAnalyzing && fileInputRef.current?.click()}
+                className={`relative flex min-h-[15rem] flex-col items-center justify-center rounded-xl border-2 border-dashed px-5 py-9 text-center transition-[border-color,background-color] duration-200 ease-out has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[#002FA7] ${
+                    isAnalyzing
+                        ? 'pointer-events-none border-zinc-200 bg-zinc-50'
+                        : isDragging
+                            ? 'cursor-copy border-[#002FA7] bg-[#002FA7]/5'
+                            : 'cursor-pointer border-zinc-300 bg-zinc-50 hover:border-zinc-400 hover:bg-zinc-100'
+                }`}
             >
                 <input
                     type="file"
-                    ref={fileInputRef}
-                    className="hidden"
+                    className="sr-only"
                     accept=".pdf,image/*,.png,.jpg,.jpeg,.heic"
                     onChange={(e) => onUpload(e.target.files)}
                     disabled={isAnalyzing}
+                    aria-describedby="bill-upload-hint"
                 />
 
-                {/* Normal State */}
-                {!isAnalyzing && (
-                    <div className="pointer-events-none z-10 flex flex-col items-center">
-                        <div className={`w-12 h-12 mb-4 transition-colors duration-300 rounded-full flex items-center justify-center ${isDragging ? 'bg-[#002FA7]/10 text-[#002FA7]' : 'bg-zinc-100 text-zinc-400 group-hover:text-zinc-600'}`}>
-                            <UploadCloud className="w-6 h-6" />
-                        </div>
-                        <p className={`text-lg font-medium transition-colors ${isDragging ? 'text-[#002FA7]' : 'text-zinc-700'}`}>
-                            {isDragging ? 'Ready to review...' : 'Drop here or click to browse'}
-                        </p>
-                        <p className="text-xs text-zinc-400 mt-2 uppercase tracking-wide">
-                            PDF, PNG, JPG, HEIC • MAX 10MB
-                        </p>
-                    </div>
+                {isAnalyzing ? (
+                    <span className="flex flex-col items-center">
+                        <Loader2 aria-hidden className="h-7 w-7 text-[#002FA7] motion-safe:animate-spin" />
+                        <span className="mt-4 text-lg font-semibold tracking-[-0.01em] text-zinc-950">Reading your bill</span>
+                        <span id="bill-upload-hint" className="mt-1 text-sm text-zinc-500">
+                            Picking out usage and each line of charges.
+                        </span>
+                    </span>
+                ) : (
+                    <span className="pointer-events-none flex flex-col items-center">
+                        <FileUp
+                            aria-hidden
+                            className={`h-7 w-7 transition-colors duration-200 ${isDragging ? 'text-[#002FA7]' : 'text-zinc-400'}`}
+                        />
+                        <span className="mt-4 text-lg font-semibold tracking-[-0.01em] text-zinc-950">
+                            {isDragging ? 'Drop the file to start' : 'Drag your bill here'}
+                        </span>
+                        <span id="bill-upload-hint" className="mt-1 text-sm text-zinc-500">
+                            PDF, PNG, JPG or HEIC, up to 10 MB.
+                        </span>
+                        <span className={`${buttonPrimary} mt-6`}>Upload bill</span>
+                    </span>
                 )}
-
-                {/* Analyzing State */}
-            {isAnalyzing && (
-                <div className="flex flex-col items-center z-10">
-                    <div className="relative">
-                        <div className="absolute inset-0 bg-[#002FA7]/20 blur-lg rounded-full animate-pulse"></div>
-                        <Loader2 className="w-10 h-10 text-[#002FA7] animate-spin relative z-10" />
-                        </div>
-                        <p className="mt-6 text-lg font-medium text-zinc-800 animate-pulse">
-                            Reviewing your bill...
-                        </p>
-                        <p className="text-sm text-zinc-400 mt-2">
-                            Reading usage data and line items
-                        </p>
-                    </div>
-                )}
-
-            </motion.div>
+            </motion.label>
 
             {!isAnalyzing && onShowTrust && (
-                <button
-                    type="button"
-                    onClick={onShowTrust}
-                    className="mt-6 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-400 hover:text-[#002FA7] transition-colors"
-                >
-                    Read security notes first
-                </button>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 px-1">
+                    <p className="text-sm text-zinc-500">Usually under 60 seconds. No commitment required.</p>
+                    <button
+                        type="button"
+                        onClick={onShowTrust}
+                        className={`rounded-sm text-sm font-medium text-[#002FA7] ${focusOnLight}`}
+                    >
+                        <span className="np-link">How we handle your bill</span>
+                    </button>
+                </div>
             )}
-
         </div>
     )
 }

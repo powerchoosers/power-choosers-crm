@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import {
     format,
     addMonths,
@@ -16,6 +17,16 @@ import {
     isToday
 } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { focusOnLight } from '@/components/landing/ui';
+
+const EASE = [0.23, 1, 0.32, 1] as const;
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Display-only: "09:00 AM" reads as "9:00 AM". The stored value is left untouched. */
+export function formatSlotLabel(time: string) {
+    return time.replace(/^0/, '');
+}
 
 interface TacticalCalendarProps {
     selectedDate: Date | null;
@@ -31,6 +42,7 @@ export default function TacticalCalendar({
     onTimeSelect
 }: TacticalCalendarProps) {
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const reduceMotion = useReducedMotion();
 
     // Calendar logic
     const monthStart = startOfMonth(currentMonth);
@@ -56,52 +68,65 @@ export default function TacticalCalendar({
     const handlePrevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
     const handleNextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
 
+    const monthButtonClass = cn(
+        'flex h-10 w-10 items-center justify-center rounded-[10px] border border-zinc-300 bg-white text-zinc-950 transition-[border-color,transform] duration-200 hover:border-zinc-950 active:scale-[0.98]',
+        focusOnLight
+    );
+
+    const fade = reduceMotion
+        ? { initial: false as const, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0 } }
+        : {
+              initial: { opacity: 0, y: 8 },
+              animate: { opacity: 1, y: 0 },
+              exit: { opacity: 0 },
+              transition: { duration: 0.25, ease: EASE },
+          };
+
     return (
-        <div className="flex flex-col h-full">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8">
+        <div>
+            {/* Month header */}
+            <div className="flex items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-medium text-white tracking-tight">
+                    <h3 aria-live="polite" className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">
                         {format(currentMonth, 'MMMM yyyy')}
-                    </h2>
-                    <p className="text-xs font-mono text-zinc-500 mt-1 uppercase tracking-widest">
-                        // TIMES SHOWN IN CENTRAL TIME (CT)
-                    </p>
+                    </h3>
+                    <p className="mt-1 text-sm text-zinc-500">Times shown in Central Time (CT)</p>
                 </div>
                 <div className="flex gap-2">
-                    <button
-                        onClick={handlePrevMonth}
-                        className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white transition-colors"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
+                    <button type="button" onClick={handlePrevMonth} aria-label="Previous month" className={monthButtonClass}>
+                        <ChevronLeft aria-hidden className="h-5 w-5" />
                     </button>
-                    <button
-                        onClick={handleNextMonth}
-                        className="p-2 hover:bg-white/5 rounded-lg text-zinc-400 hover:text-white transition-colors"
-                    >
-                        <ChevronRight className="w-5 h-5" />
+                    <button type="button" onClick={handleNextMonth} aria-label="Next month" className={monthButtonClass}>
+                        <ChevronRight aria-hidden className="h-5 w-5" />
                     </button>
                 </div>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="mb-8 p-4 bg-black/20 rounded-2xl border border-white/5">
-                <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                        <div key={i} className="text-[10px] font-mono text-zinc-600 uppercase py-2">
-                            {d}
+            {/* Calendar grid */}
+            <div className="mt-6 rounded-2xl border border-zinc-200 bg-white p-3 sm:p-5">
+                <div className="mb-2 grid grid-cols-7 gap-1 text-center">
+                    {WEEKDAYS.map((d) => (
+                        <div key={d} className="py-2 text-xs font-medium text-zinc-500 sm:text-sm">
+                            <span aria-hidden className="sm:hidden">{d.charAt(0)}</span>
+                            <span className="sr-only sm:not-sr-only">{d}</span>
                         </div>
                     ))}
                 </div>
                 <div className="grid grid-cols-7 gap-1">
                     {calendarDays.map((day, idx) => {
                         const isCurrentMonth = isSameMonth(day, monthStart);
-                        const isSelected = selectedDate && isSameDay(day, selectedDate);
+                        const isSelected = !!selectedDate && isSameDay(day, selectedDate);
                         const today = isToday(day);
+                        const isWeekend = day.getDay() === 0 || day.getDay() === 6;
 
                         return (
                             <button
                                 key={idx}
+                                type="button"
+                                disabled={!isCurrentMonth}
+                                aria-label={format(day, 'EEEE, MMMM d')}
+                                aria-pressed={isSelected}
+                                aria-current={today ? 'date' : undefined}
                                 onClick={() => {
                                     if (isCurrentMonth) {
                                         onDateSelect(day);
@@ -109,65 +134,66 @@ export default function TacticalCalendar({
                                     }
                                 }}
                                 className={cn(
-                                    "h-11 w-full rounded-lg text-sm font-mono transition-all duration-200 relative group",
-                                    !isCurrentMonth && "opacity-10 cursor-default",
+                                    'h-11 w-full rounded-[10px] text-sm tabular-nums transition-[background-color,color,transform] duration-200',
+                                    focusOnLight,
+                                    !isCurrentMonth && 'cursor-default text-zinc-300',
+                                    isCurrentMonth && 'active:scale-[0.98]',
                                     isSelected
-                                        ? "bg-[#002FA7] text-white shadow-[0_0_15px_rgba(0,47,167,0.5)] border border-transparent"
-                                        : isCurrentMonth
-                                            ? "text-zinc-400 hover:bg-white/5 hover:text-white border border-transparent hover:border-white/10"
-                                            : "text-zinc-800",
-                                    today && !isSelected && "border-zinc-700"
+                                        ? 'bg-[#002FA7] font-semibold text-white'
+                                        : isCurrentMonth && (isWeekend
+                                            ? 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-950'
+                                            : 'font-medium text-zinc-950 hover:bg-zinc-100'),
+                                    today && !isSelected && 'ring-1 ring-inset ring-zinc-400'
                                 )}
                             >
                                 {format(day, 'd')}
-                                {/* Availability Indicator */}
-                                {isCurrentMonth && day.getDay() !== 0 && day.getDay() !== 6 && !isSelected && (
-                                    <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-0.5 h-0.5 bg-emerald-500/50 rounded-full" />
-                                )}
-                                {today && !isSelected && (
-                                    <span className="absolute top-1 right-1 w-1 h-1 bg-[#002FA7] rounded-full" />
-                                )}
                             </button>
                         );
                     })}
                 </div>
             </div>
 
-            {/* Time Slots Stream */}
-            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar min-h-[300px]">
-                {selectedDate ? (
-                    <>
-                        <div className="text-[10px] font-mono text-zinc-500 uppercase mb-3 flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Available times // {format(selectedDate, 'MMM dd')}
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            {timeSlots.map((time) => (
-                                <button
-                                    key={time}
-                                    onClick={() => onTimeSelect(time)}
-                                    className={cn(
-                                        "flex items-center justify-between px-4 py-4 rounded-xl border transition-all duration-200 group",
-                                        selectedTime === time
-                                            ? "bg-[#002FA7]/10 border-[#002FA7] text-white shadow-[0_0_20px_rgba(0,47,167,0.1)]"
-                                            : "bg-black/40 border-white/5 text-zinc-400 hover:border-white/20 hover:text-white"
-                                    )}
-                                >
-                                    <span className="font-mono text-xs">{time}</span>
-                                    {selectedTime === time ? (
-                                        <div className="w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_8px_#fff]" />
-                                    ) : (
-                                        <Clock className="w-3.5 h-3.5 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-                                    )}
-                                </button>
-                            ))}
-                        </div>
-                    </>
-                ) : (
-                    <div className="h-full min-h-[300px] flex items-center justify-center text-zinc-600 font-mono text-[10px] border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
-                        Select a date to see available times.
-                    </div>
-                )}
+            {/* Time slots */}
+            <div className="mt-8">
+                <AnimatePresence mode="wait" initial={false}>
+                    {selectedDate ? (
+                        <motion.div key={format(selectedDate, 'yyyy-MM-dd')} {...fade}>
+                            <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">
+                                Times on {format(selectedDate, 'EEEE, MMMM d')}
+                            </h3>
+                            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                                {timeSlots.map((time) => {
+                                    const isSelected = selectedTime === time;
+                                    return (
+                                        <button
+                                            key={time}
+                                            type="button"
+                                            aria-pressed={isSelected}
+                                            onClick={() => onTimeSelect(time)}
+                                            className={cn(
+                                                'rounded-[10px] border px-3 py-3 text-base font-medium tabular-nums transition-[background-color,border-color,color,transform] duration-200 active:scale-[0.98]',
+                                                focusOnLight,
+                                                isSelected
+                                                    ? 'border-[#002FA7] bg-[#002FA7] text-white'
+                                                    : 'border-zinc-300 bg-white text-zinc-950 hover:border-zinc-950'
+                                            )}
+                                        >
+                                            {formatSlotLabel(time)}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.p
+                            key="empty"
+                            {...fade}
+                            className="rounded-2xl border border-zinc-200 bg-zinc-50 px-6 py-8 text-base leading-7 text-zinc-600"
+                        >
+                            Select a date to see available times.
+                        </motion.p>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );

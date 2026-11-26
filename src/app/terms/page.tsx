@@ -1,6 +1,4 @@
-import Link from 'next/link'
-import { LandingHeader } from '@/components/landing/LandingHeader'
-import { LandingFooter } from '@/components/landing/LandingFooter'
+import { LegalPage } from '@/components/landing/LegalPage'
 
 export const metadata = {
   title: 'Terms of Service — Nodal Point',
@@ -142,59 +140,20 @@ const SECTIONS = [
 
 export default function TermsOfService() {
   return (
-    <div className="bg-[#F5F5F7] min-h-screen font-sans selection:bg-[#002FA7] selection:text-white">
-      <LandingHeader />
-
-      {/* BACKGROUND TEXTURE */}
-      <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.05] pointer-events-none" />
-
-      <main className="max-w-4xl mx-auto px-6 pt-36 md:pt-44 pb-32 relative z-10">
-
-        {/* Page Header */}
-        <div className="mb-16 border-b border-zinc-200 pb-12">
-          <div className="text-xs font-mono text-[#002FA7] tracking-widest uppercase mb-4">Legal Document</div>
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-black mb-6">
-            Terms of Service
-          </h1>
-          <p className="text-zinc-500 text-lg leading-relaxed max-w-2xl">
-            These terms explain how the platform works, what you can expect from us, and what we expect from you. Plain language where possible.
-          </p>
-          <div className="mt-6 flex flex-wrap gap-6 text-sm font-mono text-zinc-400">
-            <span>Effective: March 2026</span>
-            <span>Jurisdiction: Texas, United States</span>
-            <span>Contact: <a href="mailto:signal@nodalpoint.io" className="text-[#002FA7] hover:underline">signal@nodalpoint.io</a></span>
-          </div>
-        </div>
-
-        {/* Sections */}
-        <div className="space-y-16">
-          {SECTIONS.map((section) => (
-            <div key={section.id} id={section.id} className="scroll-mt-32">
-              <div className="flex items-baseline gap-4 mb-4">
-                <span className="text-xs font-mono text-[#002FA7] tracking-widest">{section.number}</span>
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-black">{section.title}</h2>
-              </div>
-              <div className="prose prose-zinc max-w-none text-zinc-600 leading-relaxed [&_ul]:mt-3 [&_ul]:space-y-2 [&_ul]:list-disc [&_ul]:pl-5 [&_p]:mb-4 [&_a]:text-[#002FA7] [&_a]:underline [&_strong]:text-zinc-900">
-                {section.content}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Footer note */}
-        <div className="mt-20 pt-8 border-t border-zinc-200">
-          <p className="text-sm text-zinc-400 font-mono">
-            Questions about these terms? Contact us at <a href="mailto:signal@nodalpoint.io" className="text-[#002FA7] hover:underline">signal@nodalpoint.io</a> or call +1 (817) 809-3367.
-          </p>
-          <div className="mt-6 flex gap-6 text-sm">
-            <Link href="/privacy" className="text-[#002FA7] hover:underline">Privacy Policy</Link>
-            <Link href="/contact" className="text-[#002FA7] hover:underline">Contact Us</Link>
-          </div>
-        </div>
-
-      </main>
-
-      <LandingFooter />
-    </div>
+    <LegalPage
+      title="Terms of service"
+      lead="These terms explain how the platform works, what you can expect from us, and what we expect from you. Plain language where possible."
+      effective="March 2026"
+      sections={SECTIONS}
+      note={
+        <p>
+          Questions about these terms? Contact us at <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a> or call +1 (817) 809-3367.
+        </p>
+      }
+      related={[
+        { label: 'Privacy policy', href: '/privacy' },
+        { label: 'Contact us', href: '/contact' },
+      ]}
+    />
   )
 }
