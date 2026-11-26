@@ -174,5 +174,15 @@
       ],
       "category": "public.app-category.business"
     }
+  },
+  "allowScripts": {
+    "electron@38.8.6": true,
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.28.0": true,
+    "esbuild@0.25.12": true,
+    "msgpackr-extract@3.0.3": true,
+    "puppeteer@24.42.0": true,
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.11.1": true
   }
 }
