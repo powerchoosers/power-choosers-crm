@@ -398,8 +398,8 @@ Deno.serve(async (req) => {
   try {
     // Verify cron secret
     const cronSecret = req.headers.get('x-cron-secret')
-    const expectedCronSecret = Deno.env.get('CRON_SECRET') || 'REDACTED_CRON_SECRET'
-    if (cronSecret !== expectedCronSecret) {
+    const expectedCronSecret = Deno.env.get('CRON_SECRET') ?? ''
+    if (!expectedCronSecret || cronSecret !== expectedCronSecret) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }

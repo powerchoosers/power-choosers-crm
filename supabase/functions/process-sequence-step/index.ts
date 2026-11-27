@@ -761,14 +761,14 @@ function buildContextualFallbackBody(member: any, replyStage: string, location?:
     return `${opener}${leadSentence || `${companyPhrase} stood out because of ${valueLane}`}. I can send a short note first, and if it matters, we can confirm the hard numbers later.`;
 }
 
-const CRON_SECRET = Deno.env.get('SUPABASE_CRON_SECRET') || 'REDACTED_CRON_SECRET'
+const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
 
 Deno.serve(async (req: Request) => {
     console.log('[DEBUG] Received request:', req.method);
 
     // Authenticate using x-cron-secret header (same pattern as process-scheduled-emails)
     const headerSecret = req.headers.get('x-cron-secret') || ''
-    if (headerSecret !== CRON_SECRET) {
+    if (!CRON_SECRET || headerSecret !== CRON_SECRET) {
         console.error('[DEBUG] Unauthorized: invalid or missing x-cron-secret');
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
             status: 401,

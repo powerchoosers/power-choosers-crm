@@ -9,13 +9,10 @@ import { fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from '../
 
 const REFRESH_WINDOW_DAYS = 14;
 const MAX_DOMAINS_PER_RUN = Number(process.env.APOLLO_NEWS_MAX_PER_RUN || '30');
-const DEFAULT_CRON_SECRET = 'REDACTED_CRON_SECRET';
-
 function getCronSecrets() {
   return [
     process.env.APOLLO_NEWS_CRON_SECRET,
     process.env.CRON_SECRET,
-    DEFAULT_CRON_SECRET,
   ].filter(Boolean);
 }
 

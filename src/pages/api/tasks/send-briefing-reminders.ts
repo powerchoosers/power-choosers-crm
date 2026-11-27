@@ -23,8 +23,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Auth: accept cron secret OR service role
     const secret = req.headers['x-cron-secret'] || req.headers['authorization']?.replace('Bearer ', '');
-    const validSecret = process.env.CRON_SECRET || 'REDACTED_CRON_SECRET';
-    if (secret !== validSecret) {
+    const validSecret = process.env.CRON_SECRET;
+    if (!validSecret || secret !== validSecret) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
     }
