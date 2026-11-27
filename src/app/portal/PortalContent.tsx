@@ -169,8 +169,10 @@ export default function PortalContent() {
                     <AnimatePresence mode="wait" initial={false}>
                         {view === 'sent' ? (
                             <motion.div key="sent" {...swap} transition={{ duration: 0.3, ease: EASE }} role="status">
-                                <CheckCircle2 className="h-9 w-9 text-emerald-600" aria-hidden />
-                                <h2 className="np-display mt-5 text-4xl text-zinc-950">Check your inbox</h2>
+                                <div className="flex items-center gap-4">
+                                    <CheckCircle2 className="h-9 w-9 shrink-0 text-emerald-600" aria-hidden />
+                                    <h2 className="np-display text-4xl text-zinc-950">Check your inbox</h2>
+                                </div>
                                 <p className="mt-4 text-base leading-7 text-zinc-600">
                                     We sent a sign-in link to <span className="font-medium text-zinc-950">{email}</span>. The link expires in 10 minutes.
                                 </p>
