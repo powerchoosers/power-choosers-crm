@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { LogOut, FileText, AlertTriangle, Download, TrendingDown } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { LogOut, AlertTriangle, TrendingDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns';
 import { useScrollEffect } from '@/hooks/useScrollEffect';
 import { mapLocationToZone } from '@/lib/market-mapping';
-import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel';
 import { displayFontClass } from '@/components/landing/fonts';
 import { Reveal } from '@/components/landing/Reveal';
-import { focusOnDark, focusOnLight, OutlineLink, PrimaryLink, TextLink } from '@/components/landing/ui';
+import { buttonOutlineOnDark, buttonPrimary, focusOnDark, focusOnLight, NudgeArrow, PrimaryLink, TextLink } from '@/components/landing/ui';
+import { Callout, EASE, Panel, PanelHeading, Row, StatusTag, billMonth, money, portalFetch, type Tone } from './portal-ui';
+import { UsageChart, type UsageMonth } from './UsageChart';
+import { BillsView, type ClientBill } from './BillsView';
+import { ContractView, type ContractSummary, type SignedDoc } from './ContractView';
 
 // ─────────────────────────────────────────────
 // Types
@@ -59,17 +63,55 @@ interface ErcotGrid {
     scarcity_prob?: string | number;
 }
 
-interface SignedDoc {
-    id: string;
-    name: string;
-    signedAt: string;
-    downloadUrl: string | null;
+interface UsageHistoryRow {
+    month?: string;
+    kwh?: number | string | null;
+    billed_kw?: number | string | null;
+    actual_kw?: number | string | null;
 }
 
-interface MeterData {
-    id: string;
-    esid: string | null;
-    service_address: string | null;
+type View = 'overview' | 'bills' | 'contract';
+const VIEWS: Array<{ id: View; label: string }> = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'bills', label: 'Bills' },
+    { id: 'contract', label: 'Contract and files' },
+];
+
+/** One row per month from the advisor's usage file; several meters in a month are added up. */
+function monthsFromHistory(rows: UsageHistoryRow[] | undefined): UsageMonth[] {
+    if (!Array.isArray(rows)) return [];
+    const order: string[] = [];
+    const byMonth: Record<string, UsageMonth> = {};
+    for (const row of rows) {
+        const label = String(row?.month || '').trim();
+        const kwh = Number(row?.kwh) || 0;
+        if (!label) continue;
+        if (!byMonth[label]) { byMonth[label] = { label, kwh: 0, billedKw: null, actualKw: null }; order.push(label); }
+        const entry = byMonth[label];
+        entry.kwh += kwh;
+        const billed = Number(row?.billed_kw) || 0;
+        const actual = Number(row?.actual_kw) || 0;
+        if (billed > 0) entry.billedKw = (entry.billedKw ?? 0) + billed;
+        if (actual > 0) entry.actualKw = (entry.actualKw ?? 0) + actual;
+    }
+    return order.map((label) => byMonth[label]).filter((m) => m.kwh > 0);
+}
+
+/** The last 12 billing months we have read from bills, oldest first. */
+function monthsFromBills(bills: ClientBill[]): UsageMonth[] {
+    const byMonth = new Map<string, UsageMonth>();
+    for (const bill of bills) {
+        if (bill.status !== 'ready' || !bill.period_end || !bill.usage_kwh) continue;
+        const key = bill.period_end.slice(0, 7);
+        const [y, m] = key.split('-').map(Number);
+        const label = new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'short' });
+        const entry = byMonth.get(key) ?? { label, kwh: 0, billedKw: null, actualKw: null };
+        entry.kwh += Number(bill.usage_kwh);
+        if (bill.billed_demand_kw) entry.billedKw = (entry.billedKw ?? 0) + Number(bill.billed_demand_kw);
+        if (bill.actual_demand_kw) entry.actualKw = (entry.actualKw ?? 0) + Number(bill.actual_demand_kw);
+        byMonth.set(key, entry);
+    }
+    return [...byMonth.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-12).map(([, month]) => month);
 }
 
 // ─────────────────────────────────────────────
@@ -184,69 +226,12 @@ function rateProtection(contracted: number, benchmark: number): { label: string;
     return { label: 'Above market', sub: 'Your rate is above the Texas average', color: 'rose' };
 }
 
-// ─────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────
-type Tone = 'emerald' | 'amber' | 'rose' | 'zinc' | 'blue';
-
-/** Status colours on a light background. Colour always comes with a word, never alone. */
-const TONE: Record<Tone, { text: string; panel: string; dot: string }> = {
-    emerald: { text: 'text-emerald-700', panel: 'border-emerald-200 bg-emerald-50', dot: 'bg-emerald-500' },
-    amber: { text: 'text-amber-800', panel: 'border-amber-200 bg-amber-50', dot: 'bg-amber-500' },
-    rose: { text: 'text-rose-700', panel: 'border-rose-200 bg-rose-50', dot: 'bg-rose-500' },
-    zinc: { text: 'text-zinc-600', panel: 'border-zinc-200 bg-zinc-50', dot: 'bg-zinc-400' },
-    blue: { text: 'text-[#002FA7]', panel: 'border-[#002FA7]/20 bg-[#002FA7]/5', dot: 'bg-[#002FA7]' },
-};
-
 /** Deal stages as a client would say them. */
 const STAGE_LABEL: Record<string, string> = {
     SECURED: 'Active contract',
     OUT_FOR_SIGNATURE: 'Out for signature',
     ENGAGED: 'In progress',
 };
-
-function Panel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-    return <section className={`rounded-2xl border border-zinc-200 bg-white ${className}`}>{children}</section>;
-}
-
-function PanelHeading({ title, sub, aside }: { title: string; sub?: string; aside?: React.ReactNode }) {
-    return (
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-            <div>
-                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">{title}</h2>
-                {sub ? <p className="mt-1 text-sm leading-6 text-zinc-500">{sub}</p> : null}
-            </div>
-            {aside}
-        </div>
-    );
-}
-
-function StatusTag({ tone, children }: { tone: Tone; children: React.ReactNode }) {
-    return (
-        <span className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-sm font-medium ${TONE[tone].panel} ${TONE[tone].text}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${TONE[tone].dot}`} aria-hidden />
-            {children}
-        </span>
-    );
-}
-
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div className="flex items-baseline justify-between gap-6 border-b border-zinc-100 py-3 last:border-b-0">
-            <dt className="text-sm text-zinc-500">{label}</dt>
-            <dd className="text-right text-sm font-medium tabular-nums text-zinc-950">{children}</dd>
-        </div>
-    );
-}
-
-function Callout({ tone, title, children }: { tone: Tone; title?: string; children: React.ReactNode }) {
-    return (
-        <div className={`rounded-xl border p-4 ${TONE[tone].panel}`}>
-            {title ? <p className={`text-sm font-semibold ${TONE[tone].text}`}>{title}</p> : null}
-            <div className={`text-sm leading-6 text-zinc-700 ${title ? 'mt-1' : ''}`}>{children}</div>
-        </div>
-    );
-}
 
 // ─────────────────────────────────────────────
 // Main Dashboard
@@ -261,7 +246,31 @@ export function ClientDashboard() {
     const [ercotPrices, setErcotPrices] = useState<ErcotPrices | null>(null);
     const [ercotGrid, setErcotGrid] = useState<ErcotGrid | null>(null);
     const [signedDocs, setSignedDocs] = useState<SignedDoc[]>([]);
-    const [meters, setMeters] = useState<MeterData[]>([]);
+    const [bills, setBills] = useState<ClientBill[]>([]);
+    const [billsLoaded, setBillsLoaded] = useState(false);
+    const [view, setView] = useState<View>('overview');
+    const reduceMotion = useReducedMotion();
+    const tabsRef = useRef<HTMLDivElement>(null);
+
+    // The open tab lives in the address (?view=bills) so a reload or a shared link lands on it.
+    useEffect(() => {
+        const read = () => {
+            const param = new URLSearchParams(window.location.search).get('view');
+            setView(VIEWS.some((v) => v.id === param) ? (param as View) : 'overview');
+        };
+        read();
+        window.addEventListener('popstate', read);
+        return () => window.removeEventListener('popstate', read);
+    }, []);
+
+    const goTo = useCallback((next: View) => {
+        setView(next);
+        const url = new URL(window.location.href);
+        if (next === 'overview') url.searchParams.delete('view'); else url.searchParams.set('view', next);
+        window.history.pushState(null, '', url);
+        const top = tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - 64 : 0;
+        if (window.scrollY > top) window.scrollTo({ top, behavior: 'auto' });
+    }, []);
     const isScrolled = useScrollEffect((y) => y > 8, false);
     // The header turns from white-on-dark to dark-on-white once the welcome band scrolls away.
     const bandRef = useRef<HTMLDivElement>(null);
@@ -299,13 +308,6 @@ export function ClientDashboard() {
                 .single();
             if (acct) setAccount(acct);
 
-            const { data: meterData } = await supabase
-                .from('meters')
-                .select('id, esid, service_address')
-                .eq('account_id', accountId)
-                .order('created_at', { ascending: false });
-            setMeters((meterData || []) as MeterData[]);
-
             const { data: dealData } = await supabase
                 .from('deals')
                 .select('id, title, stage, amount, annualUsage, mills, contractLength, closeDate, yearlyCommission, createdAt')
@@ -333,9 +335,21 @@ export function ClientDashboard() {
             } catch { /* optional */ }
 
             setLoading(false);
+
+            // Bills load after the page is up; the Bills tab shows placeholders until then.
+            portalFetch<{ bills: ClientBill[] }>('/api/portal/bills')
+                .then((d) => setBills(d.bills || []))
+                .catch(() => setBills([]))
+                .finally(() => setBillsLoaded(true));
         }
         init();
     }, [router]);
+
+    const usageHistory = account?.metadata?.usageHistory as UsageHistoryRow[] | undefined;
+    const usageMonths = useMemo(() => {
+        const fromAdvisor = monthsFromHistory(usageHistory);
+        return fromAdvisor.length ? { months: fromAdvisor, fromBills: false } : { months: monthsFromBills(bills), fromBills: true };
+    }, [usageHistory, bills]);
 
     if (loading) {
         return (
@@ -399,6 +413,22 @@ export function ClientDashboard() {
     const expiryTone: Tone = expiryDays === null ? 'zinc' : expiryDays < 0 ? 'rose' : expiryDays <= 60 ? 'amber' : 'emerald';
     const expiryOnDark = expiryTone === 'rose' ? 'text-rose-300' : expiryTone === 'amber' ? 'text-amber-300' : 'text-emerald-300';
     const focusRing = dark ? focusOnDark : focusOnLight;
+
+    const latestBill = bills.find((b) => (b.status === 'ready' || b.status === 'needs_review') && b.period_end) || null;
+    const billsToCheck = bills.filter((b) => b.status === 'needs_review' || b.status === 'failed').length;
+    const contractEnd = activeDeal?.closeDate || account?.contract_end_date || null;
+    const contract: ContractSummary | null = activeDeal || contractEnd
+        ? {
+            title: activeDeal?.title || null,
+            supplier: account?.electricity_supplier || null,
+            lengthMonths: activeDeal?.contractLength || null,
+            startDate: activeDeal?.createdAt || null,
+            endDate: contractEnd,
+            daysLeft: expiryDays,
+            rateCents: contractedRate,
+            annualValue: activeDeal?.amount || null,
+        }
+        : null;
 
     return (
         <div className={`${displayFontClass} min-h-screen bg-zinc-100 font-sans text-zinc-600 antialiased selection:bg-[#002FA7] selection:text-white`}>
@@ -488,8 +518,45 @@ export function ClientDashboard() {
                 </div>
             </div>
 
+            {/* ── TABS: stick under the header once the welcome band scrolls away ── */}
+            {account && (
+                <div ref={tabsRef} className="sticky top-16 z-30 border-b border-zinc-200 bg-zinc-100/80 backdrop-blur-xl backdrop-saturate-150">
+                    <nav aria-label="Portal sections" className="mx-auto flex w-full max-w-7xl gap-1 overflow-x-auto px-4 lg:px-8">
+                        {VIEWS.map((item) => {
+                            const selected = view === item.id;
+                            const attention = item.id === 'bills' ? bills.filter((b) => b.status === 'needs_review' || b.status === 'failed').length : 0;
+                            return (
+                                <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => goTo(item.id)}
+                                    aria-current={selected ? 'page' : undefined}
+                                    className={`relative shrink-0 rounded-md px-3 py-4 text-base font-medium transition-colors duration-200 ${selected ? 'text-zinc-950' : 'text-zinc-500 hover:text-zinc-950'} ${focusOnLight}`}
+                                >
+                                    <span className="inline-flex items-center gap-2">
+                                        {item.label}
+                                        {attention > 0 && (
+                                            <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-amber-800">
+                                                {attention}<span className="sr-only"> to check</span>
+                                            </span>
+                                        )}
+                                    </span>
+                                    {selected && (
+                                        <motion.span
+                                            layoutId="portal-tab"
+                                            className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[#002FA7]"
+                                            transition={reduceMotion ? { duration: 0 } : { duration: 0.35, ease: EASE }}
+                                        />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
+            )}
+
             {/* ── MAIN ── */}
-            <main className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-10 lg:py-14">
+            <main className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-10 lg:py-12">
 
                 {/* NO ACCOUNT */}
                 {!account ? (
@@ -504,6 +571,19 @@ export function ClientDashboard() {
                         </div>
                     </Panel>
                 ) : (
+                    <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                        key={view}
+                        initial={reduceMotion ? false : { opacity: 0, y: 10, filter: 'blur(6px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={reduceMotion ? undefined : { opacity: 0, y: -6, filter: 'blur(4px)' }}
+                        transition={{ duration: 0.28, ease: EASE }}
+                    >
+                    {view === 'bills' && <BillsView bills={bills} loaded={billsLoaded} onChange={setBills} />}
+                    {view === 'contract' && (
+                        <ContractView contract={contract} signedDocs={signedDocs} bills={bills} userEmail={userEmail} onOpenBills={() => goTo('bills')} />
+                    )}
+                    {view === 'overview' && (
                     <div className="space-y-6">
 
                         {/* ── YOUR RATE (full width) ── */}
@@ -693,15 +773,14 @@ export function ClientDashboard() {
                             );
                         })()}
 
-                        {/* ── 12-MONTH USAGE (shared chart component, dark by design) ── */}
+                        {/* ── 12-MONTH USAGE ── */}
                         <Reveal>
-                            <section>
-                                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950">Your usage, month by month</h2>
-                                <p className="mt-1 text-sm leading-6 text-zinc-500">Energy used and peak demand over the last year, for each site.</p>
-                                <div className="mt-4 h-[400px] overflow-hidden rounded-2xl">
-                                    <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} meters={meters} />
-                                </div>
-                            </section>
+                            <UsageChart
+                                months={usageMonths.months}
+                                source={usageMonths.fromBills
+                                    ? 'Read from the bills you have on file.'
+                                    : 'Energy used and peak demand over the last year, across your sites.'}
+                            />
                         </Reveal>
 
                         {/* ── 3-COL ROW: Savings | Grid | Contract ── */}
@@ -848,54 +927,40 @@ export function ClientDashboard() {
                                 </Panel>
                             </Reveal>
 
-                            {/* Documents */}
+                            {/* Bills and files */}
                             <Reveal delay={0.07} className="h-full">
                                 <Panel className="flex h-full flex-col p-6">
                                     <PanelHeading
-                                        title="Your documents"
-                                        sub="Signed agreements, ready to download as PDF."
-                                        aside={signedDocs.length > 0 ? <span className="text-sm tabular-nums text-zinc-500">{signedDocs.length} signed</span> : undefined}
+                                        title="Bills and files"
+                                        sub="Your bills, read and filed by month, and your signed agreements."
                                     />
-
-                                    {signedDocs.length > 0 ? (
-                                        <ul className="mt-6 max-h-72 flex-1 overflow-y-auto border-t border-zinc-100">
-                                            {signedDocs.map((doc) => (
-                                                <li key={doc.id} className="flex items-center justify-between gap-4 border-b border-zinc-100 py-4">
-                                                    <div className="flex min-w-0 items-center gap-3">
-                                                        <FileText className="h-5 w-5 shrink-0 text-[#002FA7]" aria-hidden />
-                                                        <div className="min-w-0">
-                                                            <p className="truncate text-sm font-medium text-zinc-950">{doc.name}</p>
-                                                            <p className="text-xs text-zinc-500">Signed {format(parseISO(doc.signedAt), 'MMM d, yyyy')}</p>
-                                                        </div>
-                                                    </div>
-                                                    {doc.downloadUrl ? (
-                                                        <a
-                                                            href={doc.downloadUrl}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-[10px] border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-950 transition-[border-color,transform] duration-200 hover:border-zinc-950 active:scale-[0.97] ${focusOnLight}`}
-                                                        >
-                                                            <Download className="h-3.5 w-3.5" aria-hidden />
-                                                            Download
-                                                        </a>
-                                                    ) : (
-                                                        <span className="shrink-0 text-sm text-zinc-500">Processing</span>
-                                                    )}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <div className="mt-6 flex-1">
-                                            <p className="text-sm font-medium text-zinc-950">No signed documents yet</p>
-                                            <p className="mt-1 max-w-sm text-sm leading-6 text-zinc-500">
-                                                Signed contracts appear here automatically once they are complete.
-                                            </p>
+                                    <dl className="mt-6 border-t border-zinc-100">
+                                        <Row label="Bills on file">{billsLoaded ? bills.length : '—'}</Row>
+                                        <Row label="Latest bill">
+                                            {latestBill ? `${billMonth(latestBill.period_end)}, ${money(latestBill.total_amount)}` : 'None yet'}
+                                        </Row>
+                                        <Row label="Signed agreements">{signedDocs.length}</Row>
+                                    </dl>
+                                    {billsToCheck > 0 && (
+                                        <div className="mt-4">
+                                            <Callout tone="amber">
+                                                {billsToCheck === 1 ? 'One bill needs a quick check.' : `${billsToCheck} bills need a quick check.`}
+                                            </Callout>
                                         </div>
                                     )}
-
-                                    <p className="mt-5 border-t border-zinc-100 pt-4 text-xs leading-5 text-zinc-500">
-                                        These are your customer copies. Download links expire after 1 hour; reload the page for a fresh one.
-                                    </p>
+                                    <div className="mt-auto flex flex-wrap gap-3 pt-6">
+                                        <button type="button" onClick={() => goTo('bills')} className={`${buttonPrimary} ${focusOnLight} !px-5 !py-3`}>
+                                            {bills.length ? 'Open bills' : 'Add a bill'}
+                                            <NudgeArrow />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => goTo('contract')}
+                                            className={`group inline-flex items-center justify-center gap-2 rounded-[10px] border border-zinc-300 bg-white px-5 py-3 text-base font-medium text-zinc-950 transition-[border-color,transform] duration-200 ease-out hover:border-zinc-950 active:scale-[0.98] ${focusOnLight}`}
+                                        >
+                                            Contract and files
+                                        </button>
+                                    </div>
                                 </Panel>
                             </Reveal>
                         </div>
@@ -906,20 +971,23 @@ export function ClientDashboard() {
                                 <div aria-hidden className="pointer-events-none absolute -bottom-56 right-0 -z-10 h-[26rem] w-[36rem] rounded-full bg-[#002FA7]/40 blur-[130px]" />
                                 <h2 className="np-display max-w-xl text-3xl md:text-4xl">Questions about your contract?</h2>
                                 <p className="mt-4 max-w-xl text-base leading-7 text-zinc-300">
-                                    Talk to your advisor, or send us a new bill and we will read it for you.
+                                    Talk to your advisor, or add a new bill and we will read it for you.
                                 </p>
                                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                                     <PrimaryLink href={`/book${userEmail ? `?email=${encodeURIComponent(userEmail)}&from=/client` : ''}`} surface="dark">
                                         Book a call
                                     </PrimaryLink>
-                                    <OutlineLink href="/bill-debugger" surface="dark">
-                                        Review a bill
-                                    </OutlineLink>
+                                    <button type="button" onClick={() => goTo('bills')} className={`${buttonOutlineOnDark} ${focusOnDark}`}>
+                                        Add a bill
+                                    </button>
                                 </div>
                             </section>
                         </Reveal>
 
                     </div>
+                    )}
+                    </motion.div>
+                    </AnimatePresence>
                 )}
             </main>
         </div>

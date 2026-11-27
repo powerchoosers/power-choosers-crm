@@ -61,3 +61,6 @@ next-env.d.ts
 # local test output
 /scratch/scan-failures.json
 
+
+# supabase CLI local state
+supabase/.temp/

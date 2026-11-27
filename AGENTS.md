@@ -72,7 +72,7 @@ The public site is a small set of pages:
 - `/bill-debugger` - shown to visitors as "Review my bill"; the primary call to action
 - `/book` - "Book a call"
 - `/portal` - client sign in. Split screen: dark brand panel, light sign-in form. Own layout, no `PublicShell`.
-- `/client` - the signed-in client dashboard. Same fonts, colours, buttons and motion as the public site, on a light `bg-zinc-100` page with white panels and a dark welcome band. Own header (logo, account, sign out). It needs a signed-in Supabase user, so it cannot be opened in the `public-site-preview` setup without a real `.env.local`. The usage chart inside it (`UsageProfilePanel`) is shared with the CRM and stays dark; do not restyle it for the client dashboard without checking the CRM account dossier.
+- `/client` - the signed-in client dashboard. Same fonts, colours, buttons and motion as the public site, on a light `bg-zinc-100` page with white panels and a dark welcome band. Own header (logo, account, sign out). It needs a signed-in Supabase user, so it cannot be opened in the `public-site-preview` setup without a real `.env.local`. See "Client portal" below.
 - `/privacy`, `/terms`
 
 `/forensic-review`, `/philosophy`, and `/technical-docs` were merged into `/how-it-works`, and `/market-outlook` into `/market-data`. The old URLs redirect in `next.config.ts`. The redirects are temporary (307) for now; switch them to `permanent: true` once the new pages are confirmed live. `/forensic-review` was used as an ad landing page, so check running ad campaigns before changing where it points.
@@ -126,6 +126,18 @@ All in `src/components/landing/`:
 ### Sample bill on the home page
 
 `BillGaps.tsx` shows an example bill. The total ($3,735.44), usage (20,250 kWh), and "delivery and demand were nearly half" come from a real anonymized warehouse review. The individual line items are illustrative and labeled as such on the page. Keep that label if the numbers change.
+
+## Client portal (`/client`)
+
+Energy only: a client's bills, contract, signed agreements and supplier contact. Three tabs kept in the address as `?view=`: Overview, Bills, Contract and files.
+
+- UI lives in `src/app/client/`: `ClientDashboard.tsx` (shell, tabs, overview), `BillsView.tsx` (upload, automatic intake, list, detail sheet), `ContractView.tsx` (contract, supplier, files), `UsageChart.tsx` (light chart; the CRM's dark `UsageProfilePanel` is not used here), `portal-ui.tsx` (shared panels, formatters, `portalFetch`).
+- Server code lives in `src/lib/portal/` and `src/pages/api/portal/`. Every route starts with `resolvePortalAccount(req)`, which turns the sign-in into an account id. Never take an account id from the request.
+- Bill files go in the private `vault` bucket under `client-bills/{accountId}/{sha256}.{ext}`. The browser uploads to a one-time signed slot, then `/api/portal/bills/process` checks the bytes, dedupes by SHA-256 per account, and reads the bill. Clients only ever get 60-second signed links.
+- Bill reading is `src/lib/portal/bill-extract.ts` (OpenRouter, strict JSON schema, needs `OPEN_ROUTER_API_KEY`). What the model returns is a candidate: anything missing or low-confidence is saved as `needs_review`, never shown as settled.
+- Supplier phone numbers are never invented or seeded. They come from an advisor (`phone_source = 'advisor'`), the client's own bill, or a web lookup that must return its source page (`PERPLEXITY_API_KEY`), shown to the client as unconfirmed. A phone read from an uploaded bill stays on that bill and is never written to the shared `energy_suppliers` directory.
+- Automatic intake: each enrolled account gets `bills-<token>@BILL_INBOUND_DOMAIN`. Resend receives the mail and calls `/api/webhooks/bill-inbound` (needs `BILL_INBOUND_DOMAIN`, `BILL_INBOUND_WEBHOOK_SECRET`, and a full-access `RESEND_API_KEY`). The Resend account is shared with Luxor and Costivra, so the route ignores mail for other domains. Until the domain is set, enrolled clients see "your advisor is finishing the setup".
+- A fixed-position overlay inside a tab must be portalled to `<body>`: the tab transition animates `filter`, which traps `position: fixed` children.
 
 ## CRM Routes
 
@@ -199,6 +211,8 @@ Row-level security, as of the `20261126000100` migration:
 - `deals`: non-admin staff only reach deals they own (`ownerId` equal to their auth uid or email). Portal clients can read, not change, deals on their own account.
 - `meters`: readable when the meter's account is visible to you; only admins and the account owner can change them.
 - Portal clients are matched by sign-in email to `contacts.email`, then to that contact's `accountId`.
+- `contacts`: only admins can insert from the browser, because a contact row is what links a portal login to an account.
+- `client_bills`, `client_bill_intake`, `energy_suppliers`: browser can only read (bills and intake follow account visibility). Every write goes through `/api/portal/*` with the service role.
 - The browser Supabase client is subject to these rules. Server routes using `supabaseAdmin` are not. If a CRM screen suddenly shows no deals or meters for a non-admin user, check these policies first.
 
 Important relationship:
