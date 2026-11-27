@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   // Verify cron secret (matches pg_cron x-cron-secret header pattern)
   const cronSecret = req.headers['x-cron-secret'];
   const isAuthorized =
-    cronSecret === 'REDACTED_CRON_SECRET' ||
+    (!!process.env.CRON_SECRET && cronSecret === process.env.CRON_SECRET) ||
     process.env.NODE_ENV === 'development';
 
   if (!isAuthorized) {

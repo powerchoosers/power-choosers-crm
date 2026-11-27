@@ -13,10 +13,8 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from '../email/zoho-service.js';
 
 const NODAL_UID_SUFFIX = '@nodalpoint.io';
-const DEFAULT_CRON_SECRET = 'REDACTED_CRON_SECRET';
-
 function getCronSecrets() {
-    return [process.env.CRON_SECRET, DEFAULT_CRON_SECRET].filter(Boolean);
+    return [process.env.CRON_SECRET].filter(Boolean);
 }
 
 /**

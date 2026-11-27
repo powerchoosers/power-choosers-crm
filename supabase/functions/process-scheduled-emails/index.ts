@@ -1,7 +1,7 @@
 // @ts-nocheck
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 
-const CRON_SECRET = Deno.env.get('SUPABASE_CRON_SECRET') || 'REDACTED_CRON_SECRET'
+const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? ''
 const NEXT_BASE_URL = (
   Deno.env.get('PUBLIC_BASE_URL') ||
   Deno.env.get('NEXT_PUBLIC_BASE_URL') ||
@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
   }
 
   const headerSecret = req.headers.get('x-cron-secret') || ''
-  if (headerSecret !== CRON_SECRET) {
+  if (!CRON_SECRET || headerSecret !== CRON_SECRET) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' },

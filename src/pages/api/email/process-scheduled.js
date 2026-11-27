@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   }
 
   const cronSecret = req.headers['x-cron-secret']
-  if (cronSecret !== 'REDACTED_CRON_SECRET') {
+  if (!process.env.CRON_SECRET || cronSecret !== process.env.CRON_SECRET) {
     res.status(401).json({ error: 'Unauthorized' })
     return
   }
