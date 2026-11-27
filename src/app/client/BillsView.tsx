@@ -131,7 +131,7 @@ function UploadPanel({ onAdded }: { onAdded: (bill: ClientBill) => void }) {
     }, [uploadOne]);
 
     return (
-        <Panel className="h-full p-6 sm:p-8">
+        <Panel className="flex h-full flex-col p-6 sm:p-8">
             <PanelHeading title="Add a bill" sub="We read it and file it by month. PDF, JPG or PNG, up to 15 MB each." />
 
             <motion.div
@@ -140,17 +140,17 @@ function UploadPanel({ onAdded }: { onAdded: (bill: ClientBill) => void }) {
                 onDrop={(e) => { e.preventDefault(); setDragging(false); if (!busy) void addFiles(e.dataTransfer.files); }}
                 animate={reduceMotion ? undefined : { scale: dragging ? 1.01 : 1 }}
                 transition={{ duration: 0.2, ease: EASE }}
-                className={`mt-6 flex flex-col items-start gap-5 rounded-xl border border-dashed p-6 transition-colors duration-200 sm:flex-row sm:items-center sm:justify-between ${
+                className={`mt-6 flex min-h-56 flex-1 flex-col items-center justify-center gap-5 rounded-xl border border-dashed p-6 text-center transition-colors duration-200 ${
                     dragging ? 'border-[#002FA7] bg-[#002FA7]/5' : 'border-zinc-300 bg-zinc-50'
                 }`}
             >
-                <div className="flex items-start gap-4">
-                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200 ${dragging ? 'bg-[#002FA7] text-white' : 'bg-white text-[#002FA7] ring-1 ring-zinc-200'}`}>
+                <div className="flex flex-col items-center gap-4">
+                    <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200 ${dragging ? 'bg-[#002FA7] text-white' : 'bg-white text-[#002FA7] ring-1 ring-zinc-200'}`}>
                         <UploadCloud className="h-5 w-5" aria-hidden />
                     </span>
                     <div>
                         <p className="text-base font-medium text-zinc-950">{dragging ? 'Drop to add' : 'Drop bills here'}</p>
-                        <p className="mt-1 text-sm leading-6 text-zinc-500">You can add several at once. The same bill is never filed twice.</p>
+                        <p className="mx-auto mt-1 max-w-xs text-sm leading-6 text-zinc-500 [text-wrap:balance]">You can add several at once. The same bill is never filed twice.</p>
                     </div>
                 </div>
                 <button type="button" disabled={busy} onClick={() => inputRef.current?.click()} className={`${buttonPrimary} ${focusOnLight} w-full shrink-0 sm:w-auto`}>
